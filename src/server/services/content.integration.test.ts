@@ -22,7 +22,7 @@ beforeEach(async () => {
   await prisma.lessonEnrollment.create({ data: { lessonId: lesson.id, userId: student.id, source: "ADMIN" } });
 });
 
-async function uploadMaterial(bytes: Uint8Array, filename = "Udhëzuesi.pdf") {
+async function uploadMaterial(bytes: Uint8Array<ArrayBuffer>, filename = "Udhëzuesi.pdf") {
   const started = await materials.startMaterialUpload(admin, lesson.id, { filename, mimeType: "application/pdf", sizeBytes: bytes.byteLength });
   const put = await fetch(started.uploadUrl, { method: "PUT", body: bytes, headers: started.headers });
   expect(put.ok).toBe(true);
@@ -89,7 +89,7 @@ describe("lesson materials", () => {
 });
 
 describe("manual recording upload", () => {
-  async function uploadRecording(bytes: Uint8Array) {
+  async function uploadRecording(bytes: Uint8Array<ArrayBuffer>) {
     const started = await recordings.startRecordingUpload(admin, lesson.id, { filename: "Mësimi 1.mp4", mimeType: "video/mp4", sizeBytes: bytes.byteLength });
     expect(started.partCount).toBe(1);
     const [part] = await recordings.presignRecordingParts(started.recordingId, [1]);

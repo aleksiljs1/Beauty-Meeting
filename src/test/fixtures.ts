@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/server/db";
 import type { AppUser } from "@/server/auth/session";
 
@@ -22,7 +23,7 @@ export async function createUser(role: "admin" | "student", overrides: { banned?
 
 const HOUR = 3_600_000;
 
-export async function createLesson(adminId: string, overrides: Partial<Parameters<typeof prisma.lesson.create>[0]["data"]> = {}) {
+export async function createLesson(adminId: string, overrides: Partial<Prisma.LessonUncheckedCreateInput> = {}) {
   const start = new Date(Date.now() + 24 * HOUR);
   return prisma.lesson.create({
     data: {
