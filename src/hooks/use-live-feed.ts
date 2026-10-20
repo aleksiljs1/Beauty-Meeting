@@ -6,27 +6,30 @@ import { onSignedOut } from "@/lib/api/auth-events";
 import { apiGet, apiSend } from "@/lib/api/client";
 import { clearSessionHint, hasSessionHint } from "@/lib/api/session-hint";
 import { nextPollDelay } from "@/lib/polling";
+import { subscribeRealtime } from "@/lib/realtime/client";
 import type { FeedNotification, LiveFeed } from "@/server/services/live";
 
 /**
- * One notification poller per tab, shared by every component that calls `useLiveFeed()`
- * (alert, bell, notification list). Module-level store + useSyncExternalStore, so mounting
- * several consumers never multiplies requests.
+ * One live feed per tab, shared by every component that calls `useLiveFeed()` (alert, bell,
+ * notification list, page refreshers). Module-level store + useSyncExternalStore, so several
+ * consumers never multiply requests or sockets.
  *
- *  - Polls GET /api/v1/notifications every ~20 s while the tab is visible.
- *  - Refreshes immediately on start, after login (`refreshLiveFeed()`), on window focus and
- *    when the tab becomes visible again.
- *  - Exponential backoff on errors (capped at 2 min), see `nextPollDelay`.
- *  - Never runs for anonymous visitors: requires the session hint cookie AND a token.
- *  - Stops on sign-out (this tab or another one).
- *  - Pop-up dismissals are mirrored across tabs over BroadcastChannel("academy-alerts").
+ * Updates are pushed: the Socket.IO service (src/lib/realtime/client.ts) only signals
+ * "connected" / "changed" and we refetch GET /api/v1/notifications through the normal,
+ * policy-checked API. We also refetch on start, after login (`refreshLiveFeed()`), on window
+ * focus and when the tab becomes visible, plus a slow SAFETY poll (120 s) while visible in
+ * case a signal was missed. Errors back off exponentially (capped at 2 min).
+ *
+ * Never runs for anonymous visitors (needs the session hint cookie AND a token) and stops on
+ * sign-out (this tab or another one). Pop-up dismissals are mirrored across tabs over
+ * BroadcastChannel("academy-alerts").
  */
 
 export type { FeedNotification, LiveFeed };
 
 export type LiveFeedState = {
   feed: LiveFeed | null;
-  /** Last poll failed (the previous feed, if any, is kept). */
+  /** Last fetch failed (the previous feed, if any, is kept). */
   error: boolean;
   /** Notifications dismissed in this browser but maybe not yet reflected by the server. */
   dismissed: ReadonlySet<string>;
@@ -44,7 +47,10 @@ let failures = 0;
 let lastFetchAt = 0;
 let timer: ReturnType<typeof setTimeout> | undefined;
 let inFlight: Promise<void> | null = null;
+/** A "changed" signal arrived while a fetch was running: fetch once more afterwards. */
+let refetchQueued = false;
 let detach: (() => void) | null = null;
+let unsubscribeRealtime: (() => void) | null = null;
 let channel: BroadcastChannel | null = null;
 
 type AlertMessage = { type: "dismissed"; id: string } | { type: "refresh" };
@@ -58,66 +64,85 @@ function isVisible() {
   return typeof document === "undefined" || document.visibilityState === "visible";
 }
 
-async function fetchFeed(): Promise<void> {
-  if (inFlight) return inFlight;
-  inFlight = (async () => {
-    try {
-      if (!hasSessionHint()) {
-        stop();
-        return;
-      }
-      let token: string | null;
-      try {
-        token = await getAccessToken();
-      } catch {
-        throw new Error("network"); // can't reach the server — not "signed out"
-      }
-      if (!token) {
-        // The hint was stale (session gone): forget it so public pages stop trying.
-        clearSessionHint();
-        stop();
-        setState({ feed: null, error: false });
-        return;
-      }
-      const feed = await apiGet<LiveFeed>("/notifications");
-      failures = 0;
-      lastFetchAt = Date.now();
-      if (running) setState({ feed, error: false });
-    } catch {
-      failures += 1;
-      lastFetchAt = Date.now();
-      if (running) setState({ error: true });
-    } finally {
-      inFlight = null;
+async function fetchOnce(): Promise<void> {
+  try {
+    if (!hasSessionHint()) {
+      stop();
+      return;
     }
+    let token: string | null;
+    try {
+      token = await getAccessToken();
+    } catch {
+      throw new Error("network"); // can't reach the server — not "signed out"
+    }
+    if (!token) {
+      // The hint was stale (session gone): forget it so public pages stop trying.
+      clearSessionHint();
+      stop();
+      setState({ feed: null, error: false });
+      return;
+    }
+    const feed = await apiGet<LiveFeed>("/notifications");
+    failures = 0;
+    lastFetchAt = Date.now();
+    if (running) setState({ feed, error: false });
+  } catch {
+    failures += 1;
+    lastFetchAt = Date.now();
+    if (running) setState({ error: true });
+  }
+}
+
+function fetchFeed(): Promise<void> {
+  if (inFlight) {
+    refetchQueued = true;
+    return inFlight;
+  }
+  inFlight = (async () => {
+    do {
+      refetchQueued = false;
+      await fetchOnce();
+    } while (refetchQueued && running);
+    inFlight = null;
   })();
   return inFlight;
+}
+
+/** Fetch now and re-arm the safety/backoff timer. */
+function fetchAndSchedule() {
+  void fetchFeed().then(schedule);
 }
 
 function schedule() {
   clearTimeout(timer);
   timer = undefined;
   if (!running || !isVisible()) return;
-  timer = setTimeout(() => {
-    void fetchFeed().then(schedule);
-  }, nextPollDelay(failures));
+  timer = setTimeout(fetchAndSchedule, nextPollDelay(failures));
 }
 
 function start({ force = false } = {}) {
   if (consumers === 0 || !hasSessionHint()) return;
   running = true;
+  // Push channel: "connected" (also after reconnects) and "changed" both mean "resync now".
+  unsubscribeRealtime ??= subscribeRealtime(() => {
+    if (running && isVisible()) fetchAndSchedule();
+    else if (running) lastFetchAt = 0; // hidden: refetch as soon as the tab is visible again
+  });
   if (!isVisible()) return; // resumes on visibilitychange
   if (!force && Date.now() - lastFetchAt < MIN_REFETCH_GAP_MS) {
     schedule();
     return;
   }
-  void fetchFeed().then(schedule);
+  fetchAndSchedule();
 }
 
 function stop() {
   running = false;
   clearTimeout(timer);
   timer = undefined;
+  unsubscribeRealtime?.();
+  unsubscribeRealtime = null;
 }
 
 function handleWake() {
@@ -186,7 +211,7 @@ function subscribe(listener: () => void) {
 const getSnapshot = () => state;
 const getServerSnapshot = () => INITIAL;
 
-/** Shared live feed. Starts the (single) poller while at least one component uses it. */
+/** Shared live feed. Starts the (single) feed + realtime subscription while in use. */
 export function useLiveFeed(): LiveFeedState {
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   useEffect(() => acquire(), []);
@@ -206,8 +231,7 @@ export async function dismissLiveAlert(id: string) {
   try {
     await apiSend("post", `/notifications/${id}/dismiss`);
   } catch {
-    // Best effort: the local/cross-tab dismissal already applies; the next poll may show it
-    // again only if the request never reached the server.
+    // Best effort: the local/cross-tab dismissal already applies.
   }
 }
 

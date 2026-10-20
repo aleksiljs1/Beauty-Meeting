@@ -1,17 +1,20 @@
-/** Pure timing helpers for the notification poller and the recording player. */
+/** Pure timing helpers for the live feed (safety poll / backoff) and the recording player. */
 
-export const POLL_INTERVAL_MS = 20_000;
+/** Live updates arrive over Socket.IO; this slow poll only covers missed signals. */
+export const SAFETY_POLL_MS = 120_000;
+/** First retry after a failed fetch; doubles per consecutive failure. */
+export const RETRY_BASE_MS = 20_000;
 export const MAX_BACKOFF_MS = 2 * 60_000;
 
 /**
- * Delay before the next poll. Healthy: the regular interval. After consecutive failures:
- * exponential backoff (20 s, 40 s, 80 s, …) capped at 2 minutes, with up to 10 % jitter so
- * many tabs don't retry in lockstep. `random` is injectable for tests.
+ * Delay before the next feed fetch. Healthy: the slow safety poll. After consecutive
+ * failures: exponential backoff (20 s, 40 s, 80 s, …) capped at 2 minutes, with up to 10 %
+ * jitter so many tabs don't retry in lockstep. `random` is injectable for tests.
  */
 export function nextPollDelay(consecutiveFailures: number, random: () => number = Math.random): number {
-  if (consecutiveFailures <= 0) return POLL_INTERVAL_MS;
-  const exponent = Math.min(consecutiveFailures, 10);
-  const base = Math.min(MAX_BACKOFF_MS, POLL_INTERVAL_MS * 2 ** exponent);
+  if (consecutiveFailures <= 0) return SAFETY_POLL_MS;
+  const exponent = Math.min(consecutiveFailures - 1, 10);
+  const base = Math.min(MAX_BACKOFF_MS, RETRY_BASE_MS * 2 ** exponent);
   const jitter = base * 0.1 * random();
   return Math.min(MAX_BACKOFF_MS, Math.round(base - jitter));
 }

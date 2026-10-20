@@ -1,21 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { formatCountdown, grantRenewDelayMs, MAX_BACKOFF_MS, nextPollDelay, POLL_INTERVAL_MS } from "./polling";
+import { formatCountdown, grantRenewDelayMs, MAX_BACKOFF_MS, nextPollDelay, SAFETY_POLL_MS } from "./polling";
 
 describe("nextPollDelay", () => {
   const noJitter = () => 0;
 
-  it("uses the regular interval while healthy", () => {
-    expect(nextPollDelay(0)).toBe(POLL_INTERVAL_MS);
-    expect(nextPollDelay(-1)).toBe(POLL_INTERVAL_MS);
+  it("uses the slow 120 s safety poll while healthy (realtime does the rest)", () => {
+    expect(SAFETY_POLL_MS).toBe(120_000);
+    expect(nextPollDelay(0)).toBe(SAFETY_POLL_MS);
+    expect(nextPollDelay(-1)).toBe(SAFETY_POLL_MS);
   });
 
   it("backs off exponentially after failures", () => {
-    expect(nextPollDelay(1, noJitter)).toBe(40_000);
-    expect(nextPollDelay(2, noJitter)).toBe(80_000);
+    expect(nextPollDelay(1, noJitter)).toBe(20_000);
+    expect(nextPollDelay(2, noJitter)).toBe(40_000);
+    expect(nextPollDelay(3, noJitter)).toBe(80_000);
   });
 
   it("caps the backoff at two minutes", () => {
-    expect(nextPollDelay(3, noJitter)).toBe(MAX_BACKOFF_MS);
+    expect(nextPollDelay(4, noJitter)).toBe(MAX_BACKOFF_MS);
     expect(nextPollDelay(50, noJitter)).toBe(MAX_BACKOFF_MS);
   });
 
