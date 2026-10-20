@@ -333,6 +333,10 @@ model Recording {
   providerFileId  String? @unique
   /// Safe, non-secret description of the last failure.
   errorMessage    String?
+  /// Multipart upload in progress (manual uploads); cleared when completed or aborted.
+  uploadId        String?
+  /// Display name for downloads ("Mësimi 3 — regjistrimi.mp4").
+  displayName     String?
 
   createdAt DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt DateTime  @updatedAt @db.Timestamptz(3)
