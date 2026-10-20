@@ -21,6 +21,19 @@ Original brief: `c:\Users\aleksiljs\Downloads\Beauty_Academy_Zoom_Claude_Megapro
 - Hosting: **undecided** — revisit later. Build stays deployment-agnostic (S3-compatible storage, Docker-friendly). Candidate: Hetzner VPS + Cloudflare R2.
 - Phasing: 1) site + portals + auth + materials + manual recordings + demo classroom → 2) real Zoom join/host/webhooks → 3) automatic cloud-recording import.
 
+## Technical decisions (2026-10-20)
+- Versions: newest stable ≥2 weeks old, pinned exactly. Next 16.3.8 + React 19.2.8 (as pinned by create-next-app 16.3.8),
+  Prisma 7.10.1 (security patch, Prisma 8 is still RC and unsupported by Better Auth), TypeScript 6.0.3 (typescript-eslint < 6.1).
+- Next 16: `src/proxy.ts` (formerly middleware) does optimistic cookie redirects only; the DAL in `src/server/auth/session.ts` authorizes.
+- API auth: our `/api/v1` accepts **only** `Authorization: Bearer <access JWT>` (no cookie auth → no CSRF surface).
+  Better Auth's `/api/auth/*` is cookie-based with its own Origin checks. Mutations go through the API, not Server Actions.
+- Access JWT verified with `jose` against in-memory cached public keys (Better Auth's `verifyJWT` hits the DB each call).
+- **Zoom SDK isolated in its own frame page** loading Zoom's CDN build: `@zoom/meetingsdk` pins React 18.3.1 exactly,
+  which conflicts with React 19. Frame also isolates Zoom CSS, avoids remounts, and scopes COOP/COEP headers. (Phase 2)
+- Local S3: **SeaweedFS** (MinIO community images discontinued). Code uses plain S3 API → R2/S3 in production.
+- npm 10.9 has an arborist crash (`edgesOut`) resolving Vitest's optional peers; Vitest was installed with `npx npm@11`.
+- Known dev-only audit item: `braces` via eslint-config-next — no patched release exists; does not affect the site.
+
 ## Deferred / remember
 - [ ] **Playwright smoke tests** (admin lesson creation/material upload; student login/enrolment/access/replay/expiry; responsive) — postponed by request, add later.
 - [ ] Ask client about budget after the demo.

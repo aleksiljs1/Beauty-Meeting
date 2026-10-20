@@ -1,0 +1,14 @@
+{
+  "identities": [
+    {
+      "name": "academy-dev",
+      "credentials": [
+        {
+          "accessKey": "academy_dev_access_key",
+          "secretKey": "academy_dev_secret_key"
+        }
+      ],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}

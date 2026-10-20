@@ -1,0 +1,44 @@
+# Local development infrastructure. The Next.js app runs on the host (`npm run dev`).
+# Credentials here are local-only and must never be used in production.
+name: beauty-academy
+
+services:
+  postgres:
+    image: postgres:17.11-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: academy
+      POSTGRES_PASSWORD: academy_dev_password
+      POSTGRES_DB: academy
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U academy -d academy"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # S3-compatible private object storage (MinIO community images were discontinued).
+  storage:
+    image: chrislusf/seaweedfs:4.48
+    restart: unless-stopped
+    command: server -dir=/data -s3 -s3.port=8333 -s3.config=/config/s3.json
+    ports:
+      - "127.0.0.1:8333:8333"
+    volumes:
+      - storage-data:/data
+      - ./docker/seaweedfs/s3.json:/config/s3.json:ro
+
+  # Catches all outgoing email locally. Web UI: http://localhost:8025
+  mail:
+    image: axllent/mailpit:v1.31.3
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+
+volumes:
+  postgres-data:
+  storage-data:
