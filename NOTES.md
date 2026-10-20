@@ -37,6 +37,11 @@ Original brief: `c:\Users\aleksiljs\Downloads\Beauty_Academy_Zoom_Claude_Megapro
 - Access JWT verified with `jose` against in-memory cached public keys (Better Auth's `verifyJWT` hits the DB each call).
 - **Zoom SDK isolated in its own frame page** loading Zoom's CDN build: `@zoom/meetingsdk` pins React 18.3.1 exactly,
   which conflicts with React 19. Frame also isolates Zoom CSS, avoids remounts, and scopes COOP/COEP headers. (Phase 2)
+- **Realtime: Socket.IO** (user request, 2026-10-20) as a separate small service (`npm run realtime`, port 3100) —
+  Next.js route handlers can't hold WebSockets. Auth = same access JWT (verified via the app's JWKS), one room per user,
+  token re-sent before expiry, expired sockets disconnected. Fan-in via Postgres LISTEN/NOTIFY (no Redis).
+  Events carry no data ("feed:changed"); clients refetch the policy-checked API. Resync on (re)connect + slow safety poll.
+  Hosting must support long-lived connections (VPS fine; plain serverless not).
 - Local S3: **SeaweedFS** (MinIO community images discontinued). Code uses plain S3 API → R2/S3 in production.
 - npm 10.9 has an arborist crash (`edgesOut`) resolving Vitest's optional peers; Vitest was installed with `npx npm@11`.
 - Known dev-only audit item: `braces` via eslint-config-next — no patched release exists; does not affect the site.

@@ -17,6 +17,17 @@ function storageOrigin(): string {
 
 const storage = storageOrigin();
 
+/** Socket.IO service origin (http + ws) when it runs on a separate origin. */
+function realtimeOrigins(): string {
+  const value = process.env.NEXT_PUBLIC_REALTIME_URL;
+  if (!value) return "";
+  const url = new URL(value);
+  const ws = url.protocol === "https:" ? "wss:" : "ws:";
+  return `${url.origin} ${ws}//${url.host}`;
+}
+
+const realtime = realtimeOrigins();
+
 // Next.js hydration needs inline scripts; there are no third-party scripts on the site.
 // The Zoom classroom frame (Phase 2) gets its own, separately scoped policy.
 const contentSecurityPolicy = [
@@ -25,7 +36,7 @@ const contentSecurityPolicy = [
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob: ${storage}`,
   `media-src 'self' blob: ${storage}`,
-  `connect-src 'self' ${storage}`,
+  `connect-src 'self' ${storage} ${realtime}`,
   `frame-src 'self' ${storage}`,
   "font-src 'self'",
   "object-src 'none'",
