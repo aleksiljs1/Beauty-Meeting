@@ -9,6 +9,11 @@ const { s3 } = await import("@/server/storage/storage");
 const { env } = await import("@/server/env");
 
 const Bucket = env.S3_BUCKET;
+// In development, also allow the extra local ports used for parallel work.
+const allowedOrigins = [
+  new URL(env.APP_URL).origin,
+  ...(env.NODE_ENV === "production" ? [] : [3000, 3001, 3002, 3003].map((port) => `http://localhost:${port}`)),
+].filter((origin, index, all) => all.indexOf(origin) === index);
 
 try {
   await s3.send(new HeadBucketCommand({ Bucket }));
@@ -24,7 +29,7 @@ await s3.send(
     CORSConfiguration: {
       CORSRules: [
         {
-          AllowedOrigins: [new URL(env.APP_URL).origin],
+          AllowedOrigins: allowedOrigins,
           AllowedMethods: ["GET", "PUT", "HEAD"],
           AllowedHeaders: ["content-type", "content-length", "range"],
           ExposeHeaders: ["etag", "content-length", "content-range", "accept-ranges"],
@@ -34,4 +39,4 @@ await s3.send(
     },
   }),
 );
-console.log(`CORS allows ${new URL(env.APP_URL).origin}`);
+console.log(`CORS allows ${allowedOrigins.join(", ")}`);

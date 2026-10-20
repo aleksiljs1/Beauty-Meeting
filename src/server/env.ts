@@ -11,7 +11,6 @@ const schema = z
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 
     APP_URL: z.url(),
-    APP_TIMEZONE: z.string().default("Europe/Tirane"),
 
     DATABASE_URL: z.string().min(1),
 

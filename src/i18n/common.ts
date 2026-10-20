@@ -1,0 +1,42 @@
+/** Shared UI words (Albanian). Area-specific text lives in src/i18n/<area>.ts. */
+export const common = {
+  brandFallback: "Beauty Academy",
+  actions: {
+    save: "Ruaj",
+    cancel: "Anulo",
+    close: "Mbyll",
+    delete: "Fshi",
+    edit: "Ndrysho",
+    back: "Kthehu",
+    retry: "Provo përsëri",
+    confirm: "Konfirmo",
+    copy: "Kopjo",
+    copied: "U kopjua",
+    loading: "Duke u ngarkuar…",
+    signIn: "Hyr",
+    signOut: "Dil",
+  },
+  errors: {
+    generic: "Ndodhi një gabim. Provoni përsëri.",
+    network: "Nuk ka lidhje me serverin. Kontrolloni internetin.",
+    notFound: "Faqja nuk u gjet.",
+  },
+  lessonPhase: {
+    UPCOMING: "Së shpejti",
+    STARTING_SOON: "Fillon së shpejti",
+    WAITING_FOR_HOST: "Në pritje të mësueses",
+    LIVE: "Live tani",
+    REPLAY: "Regjistrimi gati",
+    ENDED: "Përfunduar",
+    EXPIRED: "Skaduar",
+    CANCELLED: "Anuluar",
+  },
+  publication: {
+    DRAFT: "Draft",
+    PUBLISHED: "Publikuar",
+    ARCHIVED: "Arkivuar",
+    CANCELLED: "Anuluar",
+  },
+  accessUntil: "Aksesi deri më",
+  demoLabel: "Demo — pa lidhje me Zoom",
+} as const;

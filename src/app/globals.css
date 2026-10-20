@@ -1,26 +1,113 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+ * Brand: restrained editorial — warm off-white ground, charcoal text, muted rose/sand accents.
+ * Light theme only. Contrast-checked pairs (WCAG AA for body text):
+ *   foreground on background ≈ 14:1 · muted-foreground on background ≈ 5.9:1 · rose-deep on background ≈ 5.6:1
+ */
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-body);
+  --font-heading: var(--font-display);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  /* Brand accents for decoration, highlights and links */
+  --color-rose: var(--rose);
+  --color-rose-deep: var(--rose-deep);
+  --color-sand: var(--sand);
+  --color-live: var(--live);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  --background: #faf7f4;
+  --foreground: #2b2724;
+  --card: #ffffff;
+  --card-foreground: #2b2724;
+  --popover: #ffffff;
+  --popover-foreground: #2b2724;
+  --primary: #2b2724;
+  --primary-foreground: #faf7f4;
+  --secondary: #efe7df;
+  --secondary-foreground: #2b2724;
+  --muted: #f2ece6;
+  --muted-foreground: #6b625b;
+  --accent: #f3e6e1;
+  --accent-foreground: #5e3b35;
+  --destructive: #b3261e;
+  --border: #e6ddd4;
+  --input: #ddd2c7;
+  --ring: #b5867d;
+  --radius: 0.5rem;
+
+  --rose: #b5867d;
+  --rose-deep: #8c5a52;
+  --sand: #e8ded3;
+  /* Live-class indicator: distinct but not alarming */
+  --live: #b3261e;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-background text-foreground;
+    text-rendering: optimizeLegibility;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-heading;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Respect reduced-motion preferences everywhere (toasts, dialogs, page transitions). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
