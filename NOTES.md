@@ -21,6 +21,13 @@ Original brief: `c:\Users\aleksiljs\Downloads\Beauty_Academy_Zoom_Claude_Megapro
 - Hosting: **undecided** — revisit later. Build stays deployment-agnostic (S3-compatible storage, Docker-friendly). Candidate: Hetzner VPS + Cloudflare R2.
 - Phasing: 1) site + portals + auth + materials + manual recordings + demo classroom → 2) real Zoom join/host/webhooks → 3) automatic cloud-recording import.
 
+## Accounts & invitations (decided by user, 2026-10-20)
+- **Admin creates every student account** (name + email). The student receives a "set your password" email.
+  No self-registration anywhere — not even through a lesson link.
+- **One shared invitation link per lesson** (not per student). Teacher shares it with the class (e.g. WhatsApp).
+  Student opens it → logs in with their own credentials → explicitly clicks "Bashkohu" → enrolled.
+  Opening the link (GET / link previews) never enrolls. Optional redemption limit + redeem deadline per link.
+
 ## Technical decisions (2026-10-20)
 - Versions: newest stable ≥2 weeks old, pinned exactly. Next 16.3.8 + React 19.2.8 (as pinned by create-next-app 16.3.8),
   Prisma 7.10.1 (security patch, Prisma 8 is still RC and unsupported by Better Auth), TypeScript 6.0.3 (typescript-eslint < 6.1).

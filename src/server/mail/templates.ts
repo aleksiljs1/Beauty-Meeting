@@ -14,6 +14,22 @@ function layout(heading: string, paragraphs: string[], action: { label: string; 
 </div></body></html>`;
 }
 
+export function accountSetupEmail(params: { to: string; name: string; url: string; academyName: string; validHours: number }): MailMessage {
+  const heading = `Mirë se vini në ${params.academyName}`;
+  const paragraphs = [
+    `Përshëndetje ${params.name},`,
+    "Për ju është krijuar një llogari në portalin e akademisë, ku do të gjeni mësimet, materialet dhe regjistrimet.",
+    `Vendosni fjalëkalimin tuaj për të hyrë. Lidhja është e vlefshme për ${params.validHours} orë dhe mund të përdoret vetëm një herë.`,
+  ];
+  const footnote = "Nëse nuk e prisnit këtë email, mund ta injoroni.";
+  return {
+    to: params.to,
+    subject: heading,
+    text: `${paragraphs.join("\n\n")}\n\n${params.url}\n\n${footnote}`,
+    html: layout(heading, paragraphs, { label: "Vendos fjalëkalimin", url: params.url }, footnote),
+  };
+}
+
 export function passwordResetEmail(params: { to: string; name: string; url: string }): MailMessage {
   const heading = "Rivendosni fjalëkalimin";
   const paragraphs = [
