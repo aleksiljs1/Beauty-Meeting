@@ -3,6 +3,7 @@ import { checkCapability, evaluateLessonAccess, isExpired } from "@/server/acces
 import type { AppUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
 import { ApiError } from "@/server/http";
+import { publishFeedChanged, publishLessonChanged } from "@/server/realtime/publish";
 import { audit } from "./audit";
 
 /**
@@ -41,6 +42,7 @@ export async function markLessonEnded(lessonId: string, source: LiveSource, acto
     where: { lessonId, type: "LESSON_LIVE", OR: [{ validUntil: null }, { validUntil: { gt: endedAt } }] },
     data: { validUntil: endedAt },
   });
+  await publishLessonChanged(lessonId);
   await audit(actorId, source === "demo" ? "lesson.demo_end" : "lesson.end", "lesson", lessonId);
 }
 
@@ -62,6 +64,7 @@ async function notifyLessonLive(lessonId: string, startedAt: Date) {
       validUntil: e.deadline,
     }));
   if (rows.length) await prisma.notification.createMany({ data: rows, skipDuplicates: true });
+  await publishFeedChanged(rows.map((r) => r.userId));
 }
 
 export async function notifyRecordingReady(lessonId: string, recordingId: string) {
@@ -74,6 +77,7 @@ export async function notifyRecordingReady(lessonId: string, recordingId: string
     data: enrollments.map((e) => ({ userId: e.userId, lessonId, type: "RECORDING_READY" as const, dedupeKey: `RECORDING_READY:${recordingId}` })),
     skipDuplicates: true,
   });
+  await publishFeedChanged(enrollments.map((e) => e.userId));
 }
 
 // ---------------------------------------------------------------------------------------

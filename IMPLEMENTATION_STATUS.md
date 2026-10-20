@@ -1,6 +1,7 @@
 # Implementation status
 
 Single source of truth for progress. Update at the end of every work session / stage.
+Last updated: 2026-10-20
 Legend: ✅ done & verified · 🟡 in progress · ⬜ not started · ⛔ blocked (reason)
 
 ## Phase 1 — site, portals, auth, materials, manual recordings, demo classroom
@@ -26,16 +27,18 @@ Legend: ✅ done & verified · 🟡 in progress · ⬜ not started · ⛔ blocke
 - ✅ End-to-end auth checks: role escalation, sign-up, foreign origin, forged token all rejected
 
 ### Features
-- ⬜ Public website (home, about, services, academy/courses, gallery, contact, privacy/terms drafts)
-- ⬜ Login, password reset, password change pages
-- ⬜ Admin: students (invite/create, deactivate), lessons CRUD + publish/cancel/archive, roster, invitations
+- 🟡 Public website (home, about, services, academy/courses, gallery, contact, privacy/terms drafts) + admin content forms — public-site agent
+- 🟡 Login, password reset/setup, password change pages — student agent
+- 🟡 Admin portal: students (create + setup email, deactivate), lessons CRUD + publish/cancel/archive, roster, invitation links, uploads, demo controls, integrations, audit view — admin agent
 - ✅ Invitation redemption service (transactional, idempotent, limit-safe) — UI pending
 - ✅ Private storage provider + material upload/verify/grant services — UI pending
 - ✅ Manual recording multipart upload + playback grant services — UI pending
-- ⬜ Student portal: dashboard, lesson list filters, lesson page
-- ⬜ Notifications + live-class pop-up (polling) + demo "go live" simulation
-- ⬜ Demo classroom (clearly labelled)
-- ⬜ Audit log entries for sensitive admin actions
+- 🟡 Student portal: dashboard, lesson list filters, lesson/classroom page, invitation page — student agent
+- ✅ Live alert/notification service + demo go-live simulation service (tested)
+- ✅ Socket.IO realtime service + browser client + publish hooks in services (6 integration tests)
+- 🟡 Live-class pop-up UI, live-feed hook (Socket.IO signals + safety poll), notification bell — student agent
+- 🟡 Demo classroom (clearly labelled) — student agent
+- ✅ Audit entries written by services (accounts, invitations, live, materials, recordings)
 
 ## Phase 2 — real Zoom
 - ⬜ Isolated Zoom frame (CDN SDK, Client View mobile / Component View desktop)
@@ -44,6 +47,13 @@ Legend: ✅ done & verified · 🟡 in progress · ⬜ not started · ⛔ blocke
 
 ## Phase 3 — cloud recording import
 - ⬜ pg-boss worker, streamed multipart copy, idempotent import, retries
+
+## How to verify
+- `npm run check` (typecheck + lint + unit tests) · `npm run test:integration` (needs `docker compose up`; uses the separate `academy_test` DB) · `npm run build`
+
+## Lead follow-ups (after merging agents)
+- ⬜ Mount `<LiveClassAlert />` on public pages
+- ⬜ README.md, docs/architecture.md, docs/storage-and-recordings.md, docs/acceptance-checklist.md
 
 ## Deferred
 - ⬜ Playwright smoke tests (postponed by request)

@@ -33,3 +33,6 @@ Thumbs.db
 
 # generated prisma client (rebuilt by `npm install` / `prisma generate`)
 src/generated/
+
+# local agent worktrees / settings
+.claude/
