@@ -56,7 +56,13 @@ export async function requireApiUser(request: Request, role?: Role): Promise<App
   if (!claims) throw new ApiError("UNAUTHENTICATED", "Ju lutem identifikohuni.");
 
   // Re-read the user so deactivation and role changes apply immediately, not after token expiry.
-  const row = await prisma.user.findUnique({ where: { id: claims.userId }, select: userSelect });
+  // One query: the user plus their token's session, which must still exist and be unexpired —
+  // so sign-out, password reset and deactivation take effect immediately, not at token expiry.
+  const found = await prisma.user.findUnique({
+    where: { id: claims.userId },
+    select: { ...userSelect, sessions: { where: { id: claims.sessionId, expiresAt: { gt: new Date() } }, select: { id: true }, take: 1 } },
+  });
+  const row = found && found.sessions.length > 0 ? found : null;
   const user = row ? toAppUser(row) : null;
   if (!user) throw new ApiError("UNAUTHENTICATED", "Ju lutem identifikohuni.");
   if (role && user.role !== role) throw new ApiError("FORBIDDEN", "Nuk keni leje për këtë veprim.");

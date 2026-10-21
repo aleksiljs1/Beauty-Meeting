@@ -30,6 +30,15 @@ const schema = z
     SMTP_SECURE: z.stringbool().default(false),
     MAIL_FROM: z.string().min(1),
 
+    // Header carrying the real client IP, set (overwritten) by the reverse proxy, e.g.
+    // "cf-connecting-ip" (Cloudflare) or "x-real-ip" (nginx). Required in production.
+    TRUSTED_IP_HEADER: z.string().trim().toLowerCase().min(1).optional(),
+    // Optional comma-separated proxy IPs/CIDRs when using a multi-hop X-Forwarded-For chain.
+    TRUSTED_PROXIES: z
+      .string()
+      .optional()
+      .transform((v) => (v ? v.split(",").map((s) => s.trim()).filter(Boolean) : undefined)),
+
     // Optional in development (defaults to demo). Production must choose explicitly so a
     // misconfigured deployment never silently turns a real paid lesson into a simulation.
     ZOOM_MODE: z.enum(["demo", "live"]).optional(),
@@ -37,6 +46,10 @@ const schema = z
   .transform((value, ctx) => {
     if (!value.ZOOM_MODE && value.NODE_ENV === "production") {
       ctx.addIssue({ code: "custom", path: ["ZOOM_MODE"], message: "ZOOM_MODE must be set explicitly in production" });
+      return z.NEVER;
+    }
+    if (!value.TRUSTED_IP_HEADER && value.NODE_ENV === "production") {
+      ctx.addIssue({ code: "custom", path: ["TRUSTED_IP_HEADER"], message: "Set the proxy's client-IP header so rate limits can't be bypassed" });
       return z.NEVER;
     }
     return { ...value, ZOOM_MODE: value.ZOOM_MODE ?? "demo" };

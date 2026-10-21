@@ -23,7 +23,9 @@ export async function GET(_request: Request, ctx: RouteContext<"/media/gallery/[
     if (!object) return notFound();
     const headers = new Headers({
       "Content-Type": object.contentType,
-      "Cache-Control": "public, max-age=31536000, immutable",
+      // Short-lived on purpose: an unpublished/deleted photo must disappear within hours, not a year.
+      // Each upload gets a new id, so a changed image never needs this cache to expire.
+      "Cache-Control": "public, max-age=3600",
       "Content-Disposition": "inline",
       "X-Content-Type-Options": "nosniff",
     });

@@ -1,5 +1,5 @@
 import "server-only";
-import { createLocalJWKSet, errors, jwtVerify, type JSONWebKeySet } from "jose";
+import { createLocalJWKSet, errors, jwtVerify, type JSONWebKeySet, type JWTPayload } from "jose";
 import { env } from "@/server/env";
 import { auth } from "./auth";
 
@@ -18,18 +18,23 @@ async function loadKeySet() {
   return keySet;
 }
 
-export type AccessTokenClaims = { userId: string };
+export type AccessTokenClaims = { userId: string; sessionId: string };
+
+// Tokens without a session id (`sid`) are rejected, so every token is tied to a live session.
+function toClaims(payload: JWTPayload): AccessTokenClaims | null {
+  return typeof payload.sub === "string" && typeof payload.sid === "string" ? { userId: payload.sub, sessionId: payload.sid } : null;
+}
 
 export async function verifyAccessToken(token: string): Promise<AccessTokenClaims | null> {
   const options = { issuer: env.APP_URL, audience: env.APP_URL };
   try {
     const { payload } = await jwtVerify(token, keySet ?? (await loadKeySet()), options);
-    return payload.sub ? { userId: payload.sub } : null;
+    return toClaims(payload);
   } catch (error) {
     if (error instanceof errors.JWKSNoMatchingKey) {
       try {
         const { payload } = await jwtVerify(token, await loadKeySet(), options);
-        return payload.sub ? { userId: payload.sub } : null;
+        return toClaims(payload);
       } catch {
         return null;
       }

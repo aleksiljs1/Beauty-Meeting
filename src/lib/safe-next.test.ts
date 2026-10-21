@@ -39,6 +39,12 @@ describe("safeNextPath", () => {
     expect(safeNextPath("/portal/../admin")).toBe("/admin");
     expect(safeNextPath("/../../etc")).toBe("/etc");
   });
+
+  it("rejects paths that only become protocol-relative after normalization", () => {
+    for (const value of ["/.//evil.com", "/..//evil.com", "/a/..//evil.com", "/%2e//evil.com"]) {
+      expect(safeNextPath(value)).toBeNull();
+    }
+  });
 });
 
 describe("postLoginDestination", () => {

@@ -35,7 +35,10 @@ How to run: `README.md` · How to test: `docs/testing.md` · Decisions: `NOTES.m
 - ✅ Live-class pop-up on public pages for signed-in students (lazy-loaded; anonymous visitors don't download it)
 - ✅ Admin portal: dashboard, students (create + setup email, deactivate/reactivate, resend), lessons CRUD/publish/cancel/archive/restore, roster & per-student deadlines, shared invitation links, material & multipart recording uploads, demo go-live/end/reset, integrations status, audit history (56 live API checks)
 - ✅ Phase 1 merged: 67 unit + 50 integration tests, production build green
-- 🟡 Independent security review of the merged code (fresh reviewer agent)
+- ✅ Independent security review: no critical/high issues. Fixed all findings — rate limits no longer bypassable by
+  spoofed X-Forwarded-For (TRUSTED_IP_HEADER required in production + per-account throttle), access tokens bound to
+  their session (logout/reset revoke instantly), missing gallery upload route, normalized `next` redirect check,
+  gallery cache shortened to 1 h. Verified live.
 
 ### Known issues / small follow-ups
 - ⬜ Integration tests share one `academy_test` DB → random failures if two runs overlap (give each worktree its own DB)

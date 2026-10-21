@@ -20,7 +20,10 @@ export function safeNextPath(raw: unknown): string | null {
     const base = "http://same.origin";
     const url = new URL(value, base);
     if (url.origin !== base) return null;
-    return `${url.pathname}${url.search}${url.hash}`;
+    const path = `${url.pathname}${url.search}${url.hash}`;
+    // Re-check after normalization: "/.//evil.com" or "/%2e//evil.com" collapse to "//evil.com".
+    if (path.startsWith("//") || path.startsWith("/\\")) return null;
+    return path;
   } catch {
     return null;
   }

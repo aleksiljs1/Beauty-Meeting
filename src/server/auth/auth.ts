@@ -2,11 +2,13 @@ import "server-only";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { admin, jwt } from "better-auth/plugins";
 import { prisma } from "@/server/db";
 import { env, isProduction } from "@/server/env";
 import { sendMail } from "@/server/mail";
 import { passwordResetEmail } from "@/server/mail/templates";
+import { allowEmailAttempt } from "./email-throttle";
 import { ac, roles } from "./roles";
 
 /** Lifetime of the in-memory access JWT used by the Axios client. */
@@ -61,6 +63,24 @@ export const auth = betterAuth({
     cookiePrefix: "academy",
     useSecureCookies: isProduction,
     defaultCookieAttributes: { httpOnly: true, sameSite: "lax", path: "/" },
+    // Client IP for rate limiting must come from a header the reverse proxy OVERWRITES —
+    // a client-supplied X-Forwarded-For would let anyone rotate IPs and bypass limits.
+    ipAddress: {
+      ipAddressHeaders: env.TRUSTED_IP_HEADER ? [env.TRUSTED_IP_HEADER] : ["x-forwarded-for"],
+      trustedProxies: env.TRUSTED_PROXIES,
+    },
+  },
+
+  // Account-level throttle on top of the IP limits (see email-throttle.ts).
+  hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      const scope = ctx.path === "/sign-in/email" ? "sign-in" : ctx.path === "/request-password-reset" ? "reset" : null;
+      const email: unknown = ctx.body?.email;
+      if (!scope || typeof email !== "string") return;
+      if (!(await allowEmailAttempt(scope, email))) {
+        throw new APIError("TOO_MANY_REQUESTS", { message: "Too many attempts for this account. Try again later." });
+      }
+    }),
   },
 
   plugins: [
@@ -70,8 +90,9 @@ export const auth = betterAuth({
         issuer: env.APP_URL,
         audience: env.APP_URL,
         expirationTime: `${ACCESS_TOKEN_TTL_SECONDS}s`,
-        // Role is a hint for the UI/API; authorization re-reads the user from the DB.
-        definePayload: ({ user }) => ({ role: user.role }),
+        // Role is a hint for the UI; authorization re-reads the user from the DB. `sid` binds the
+        // token to its session, so sign-out/password reset invalidate it immediately.
+        definePayload: ({ user, session }) => ({ role: user.role, sid: session.id }),
       },
     }),
     nextCookies(), // must stay last
