@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { Info } from "lucide-react";
 import { toast } from "sonner";
@@ -103,7 +103,8 @@ export function LessonForm({
   const [initial] = useState(() => toValues(lesson ?? defaultSchedule(suggestedStart(new Date()))));
   const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: initial });
   const [confirming, setConfirming] = useState<Values | null>(null);
-  const lastStart = useRef(initial.scheduledStartAt);
+  // Previous start value, so a new lesson keeps its duration when the start moves.
+  const [lastStart, setLastStart] = useState(initial.scheduledStartAt);
   const { errors, dirtyFields, isSubmitting } = form.formState;
 
   const isEdit = !!lesson;
@@ -114,8 +115,8 @@ export function LessonForm({
   /** New lessons: keep join-open, end and deadline following the start until the admin edits them. */
   function onStartChange(value: string) {
     const start = fromZonedInputValue(value);
-    const previousStart = fromZonedInputValue(lastStart.current);
-    if (start) lastStart.current = value;
+    const previousStart = fromZonedInputValue(lastStart);
+    if (start) setLastStart(value);
     if (isEdit || !start || !previousStart) return;
     const currentEnd = fromZonedInputValue(form.getValues("scheduledEndAt"));
     if (!currentEnd) return;
