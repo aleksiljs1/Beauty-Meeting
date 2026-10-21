@@ -19,8 +19,8 @@ test-results/
 !.env.example
 
 # local data
-storage/
-uploads/
+/storage/
+/uploads/
 *.log
 npm-debug.log*
 
