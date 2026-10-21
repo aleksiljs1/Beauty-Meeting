@@ -75,7 +75,7 @@ ftesat, materialet, regjistrimet), `/admin/permbajtja/**`, `/admin/integrimet`, 
 ## Existing building blocks (use them)
 - Access: `requireLessonCapability(user, lessonId, "VIEW_CARD" | "VIEW_CONTENT" | "JOIN_LIVE")`,
   pure `evaluateLessonAccess`, `checkCapability`, `lessonPhase`, `effectiveDeadline` (`src/server/access/policy.ts`).
-- Accounts: `createAccount`, `sendAccountSetupEmail`, `setAccountActive` (`services/accounts.ts`).
+- Accounts: `createAccount`, `sendAccountSetupEmail` (`services/accounts.ts`); activation via `setStudentActive` (`services/students.ts`).
 - Invitations: `createInvitation`, `revokeInvitation`, `previewInvitation`, `redeemInvitation`.
 - Live: `markLessonLive`/`markLessonEnded` (demo source only for `isDemo` lessons), `getLiveFeed`,
   `dismissNotification`, `markNotificationsRead` (`services/live.ts`).

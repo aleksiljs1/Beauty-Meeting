@@ -26,8 +26,7 @@ export async function renameStudent(userId: string, name: string, admin: AppUser
  * everywhere at once (API calls already re-check `banned` on every request).
  *
  * Goes through Better Auth's internal adapter rather than `auth.api.banUser`, because that
- * endpoint requires an admin *cookie* session and our API is Bearer-only (see report on
- * `setAccountActive` in services/accounts.ts).
+ * endpoint requires an admin *cookie* session and our API is Bearer-only.
  */
 export async function setStudentActive(userId: string, active: boolean, admin: AppUser) {
   if (userId === admin.id) throw new ApiError("FORBIDDEN", "Nuk mund të çaktivizoni llogarinë tuaj.");

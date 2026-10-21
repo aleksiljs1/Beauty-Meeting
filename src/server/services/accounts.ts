@@ -7,7 +7,6 @@ import { env } from "@/server/env";
 import { ApiError } from "@/server/http";
 import { sendMail } from "@/server/mail";
 import { accountSetupEmail } from "@/server/mail/templates";
-import { publishFeedChanged } from "@/server/realtime/publish";
 import { audit } from "./audit";
 
 export const ACCOUNT_SETUP_VALID_HOURS = 72;
@@ -56,12 +55,5 @@ export async function createAccount(input: { name: string; email: string; role: 
   return { id: user.id, name: user.name, email: user.email };
 }
 
-/** Deactivation bans the account in Better Auth, which also revokes all of its sessions. */
-export async function setAccountActive(userId: string, active: boolean, actorId: string) {
-  if (userId === actorId) throw new ApiError("FORBIDDEN", "Nuk mund të çaktivizoni llogarinë tuaj.");
-  if (active) await auth.api.unbanUser({ body: { userId } });
-  else await auth.api.banUser({ body: { userId, banReason: "Deactivated by administrator" } });
-  // Open tabs refetch immediately, get 401 and sign out instead of waiting for token expiry.
-  await publishFeedChanged([userId]);
-  await audit(actorId, active ? "account.reactivate" : "account.deactivate", "user", userId);
-}
+// Activation/deactivation lives in services/students.ts (setStudentActive): it must not use
+// auth.api.banUser, which requires an admin cookie session our Bearer-only API doesn't have.
