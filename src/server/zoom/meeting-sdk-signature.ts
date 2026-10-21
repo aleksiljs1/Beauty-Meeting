@@ -1,8 +1,7 @@
-
 import { createHmac } from "node:crypto";
 
 /**
- * Input needed to generate a Zoom Meeting SDK participant signature.
+ * Input needed to generate a Zoom Meeting SDK signature.
  *
  * Credentials must come from server-side environment variables.
  * Never call this function from browser code.
@@ -18,19 +17,23 @@ export type MeetingSdkSignatureInput = {
   nowSeconds?: number;
 };
 
+type MeetingRole = 0 | 1;
+
 const CLOCK_SKEW_SECONDS = 30;
 const TOKEN_LIFETIME_SECONDS = 30 * 60;
 
 /**
- * Generates a Meeting SDK JWT for a participant.
+ * Generates a Meeting SDK JWT for a specific role.
  *
- * The role is deliberately fixed to 0. Host signatures require a separate,
- * explicitly authorized flow and a Zoom user's ZAK token.
+ * Role 0 = participant.
+ * Role 1 = host, which also requires a host ZAK token.
  *
- * Credentials must never be returned to the browser.
+ * This function creates the signature only. It does not authorize the
+ * caller as a Beauty Meeting admin or retrieve the host's ZAK token.
  */
-export function createMeetingSdkParticipantSignature(
+function createMeetingSdkSignature(
   input: MeetingSdkSignatureInput,
+  role: MeetingRole,
 ): string {
   const clientId = input.clientId.trim();
   const clientSecret = input.clientSecret;
@@ -66,7 +69,7 @@ export function createMeetingSdkParticipantSignature(
   const payload = {
     appKey: clientId,
     mn: meetingNumber,
-    role: 0,
+    role,
     iat,
     exp,
     tokenExp: exp,
@@ -78,10 +81,34 @@ export function createMeetingSdkParticipantSignature(
 
   const signingInput = `${encodedHeader}.${encodedPayload}`;
 
-  // HMAC-SHA256 produces the third, cryptographically signed JWT segment.
+  // HMAC-SHA256 signs the JWT using the Meeting SDK Client Secret.
   const signature = createHmac("sha256", clientSecret)
     .update(signingInput)
     .digest("base64url");
 
   return `${signingInput}.${signature}`;
+}
+
+/**
+ * Generate a participant signature.
+ *
+ * This is the existing student-facing signature function.
+ */
+export function createMeetingSdkParticipantSignature(
+  input: MeetingSdkSignatureInput,
+): string {
+  return createMeetingSdkSignature(input, 0);
+}
+
+/**
+ * Generate a host signature.
+ *
+ * Only call this from a server-side route after verifying admin access.
+ * A host signature alone is insufficient: the Zoom host's ZAK token
+ * must also be supplied when starting the meeting.
+ */
+export function createMeetingSdkHostSignature(
+  input: MeetingSdkSignatureInput,
+): string {
+  return createMeetingSdkSignature(input, 1);
 }

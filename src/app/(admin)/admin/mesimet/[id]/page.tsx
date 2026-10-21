@@ -11,7 +11,13 @@ import { LessonTabs } from "@/components/admin/lessons/lesson-tabs";
 import { MaterialsPanel } from "@/components/admin/lessons/materials-panel";
 import { RecordingsPanel } from "@/components/admin/lessons/recordings-panel";
 import { RosterPanel } from "@/components/admin/lessons/roster-panel";
-import { DemoBadge, PageHeader, Pagination, SectionCard } from "@/components/admin/page-parts";
+import { ZoomHostPanel } from "@/components/admin/lessons/zoom-host-panel";
+import {
+  DemoBadge,
+  PageHeader,
+  Pagination,
+  SectionCard,
+} from "@/components/admin/page-parts";
 import { admin } from "@/i18n/admin";
 import {
   formatDateTime,
@@ -74,13 +80,18 @@ export default async function LessonDetailPage({
       listRecordings(user, id),
     ]);
 
-  //Only expose whether server-side Zoom API configuration is complete.
-  //Never pass Zoom credentials or meeting passwords to the client component.
+  // Ekspozojmë vetëm nëse konfigurimi i API-së së Zoom është i plotë.
+  // Kredencialet dhe fjalëkalimi i takimit nuk dërgohen te komponentët e klientit.
   const zoomApiConfigured = Boolean(
     env.ZOOM_S2S_ACCOUNT_ID &&
       env.ZOOM_S2S_CLIENT_ID &&
       env.ZOOM_S2S_CLIENT_SECRET &&
       env.ZOOM_HOST_USER_ID,
+  );
+
+  // Takimi konsiderohet i lidhur vetëm kur numri dhe UUID-ja janë ruajtur.
+  const hasZoomMeeting = Boolean(
+    lesson.zoomMeetingNumber && lesson.zoomMeetingUuid,
   );
 
   return (
@@ -95,11 +106,13 @@ export default async function LessonDetailPage({
 
       <div className="space-y-2">
         <PageHeader title={lesson.title} />
+
         <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           {lesson.isDemo && <DemoBadge />}
           {formatWeekdayDate(lesson.scheduledStartAt)} ·{" "}
           {formatTimeRange(lesson.scheduledStartAt, lesson.scheduledEndAt)} ·{" "}
-          {admin.lessonForm.deadline}: {formatDateTime(lesson.accessExpiresAt)} (
+          {admin.lessonForm.deadline}:{" "}
+          {formatDateTime(lesson.accessExpiresAt)} (
           {ACADEMY_TIMEZONE_LABEL},{" "}
           {timezoneAbbreviation(lesson.accessExpiresAt)})
         </p>
@@ -115,6 +128,16 @@ export default async function LessonDetailPage({
                   lesson={lesson}
                   zoomMode={env.ZOOM_MODE}
                   zoomApiConfigured={zoomApiConfigured}
+                />
+              </SectionCard>
+
+              <SectionCard title="Klasa live në Zoom">
+                <ZoomHostPanel
+                  lessonId={lesson.id}
+                  hasZoomMeeting={hasZoomMeeting}
+                  isDemo={lesson.isDemo}
+                  publication={lesson.publication}
+                  meetingStatus={lesson.meetingStatus}
                 />
               </SectionCard>
 
@@ -135,6 +158,7 @@ export default async function LessonDetailPage({
                 lessonDeadline={lesson.accessExpiresAt}
                 rows={roster.items}
               />
+
               <Pagination
                 page={roster.page}
                 pageCount={roster.pageCount}
@@ -147,19 +171,28 @@ export default async function LessonDetailPage({
 
           ftesat: (
             <SectionCard title={admin.invitations.title}>
-              <InvitationsPanel lesson={lesson} invitations={invitations} />
+              <InvitationsPanel
+                lesson={lesson}
+                invitations={invitations}
+              />
             </SectionCard>
           ),
 
           materialet: (
             <SectionCard title={admin.materials.title}>
-              <MaterialsPanel lessonId={lesson.id} materials={materials} />
+              <MaterialsPanel
+                lessonId={lesson.id}
+                materials={materials}
+              />
             </SectionCard>
           ),
 
           regjistrimet: (
             <SectionCard title={admin.recordings.title}>
-              <RecordingsPanel lessonId={lesson.id} recordings={recordings} />
+              <RecordingsPanel
+                lessonId={lesson.id}
+                recordings={recordings}
+              />
             </SectionCard>
           ),
         }}

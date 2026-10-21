@@ -1,7 +1,9 @@
-
 import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { createMeetingSdkParticipantSignature } from "./meeting-sdk-signature";
+import {
+  createMeetingSdkHostSignature,
+  createMeetingSdkParticipantSignature,
+} from "./meeting-sdk-signature";
 
 const TEST_CLIENT_ID = "test-client-id";
 const TEST_CLIENT_SECRET = "test-client-secret";
@@ -82,6 +84,27 @@ describe("createMeetingSdkParticipantSignature", () => {
       }),
     ).toThrow("Zoom Meeting SDK Client Secret is required.");
   });
+
+
+  it("creates a host signature with role 1", () => {
+    const token = createMeetingSdkHostSignature({
+      clientId: TEST_CLIENT_ID,
+      clientSecret: TEST_CLIENT_SECRET,
+      meetingNumber: TEST_MEETING_NUMBER,
+      nowSeconds: TEST_NOW,
+    });
+
+    const payload = decodeSegment(token.split(".")[1]) as {
+      role: number;
+      mn: string;
+      appKey: string;
+    };
+
+    expect(payload.role).toBe(1);
+    expect(payload.mn).toBe(TEST_MEETING_NUMBER);
+    expect(payload.appKey).toBe(TEST_CLIENT_ID);
+  });
+
 
   it("rejects invalid meeting numbers", () => {
     expect(() =>

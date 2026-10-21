@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="sq">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Klasa live — Beauty Academy</title>
+
+  <link rel="stylesheet" href="https://source.zoom.us/6.5.0/css/bootstrap.css">
+  <link rel="stylesheet" href="https://source.zoom.us/6.5.0/css/react-select.css">
+
+  <style>
+    html, body {
+      width: 100%;
+      min-height: 100%;
+      margin: 0;
+      background: #101010;
+      color: #fff;
+      font-family: Arial, sans-serif;
+    }
+
+    #status {
+      box-sizing: border-box;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    #error {
+      color: #ff9b9b;
+    }
+  </style>
+
+  <!-- Zoom Meeting SDK dependencies. Keep their loading order. -->
+  <script defer src="https://source.zoom.us/6.5.0/lib/vendor/react.min.js"></script>
+  <script defer src="https://source.zoom.us/6.5.0/lib/vendor/react-dom.min.js"></script>
+  <script defer src="https://source.zoom.us/6.5.0/lib/vendor/redux.min.js"></script>
+  <script defer src="https://source.zoom.us/6.5.0/lib/vendor/redux-thunk.min.js"></script>
+  <script defer src="https://source.zoom.us/6.5.0/lib/vendor/react-redux.min.js"></script>
+  <script defer src="https://source.zoom.us/6.5.0/lib/vendor/lodash.min.js"></script>
+
+  <!-- Client View, isolated from Beauty Meeting's React application. -->
+  <script defer src="https://source.zoom.us/zoom-meeting-6.5.0.min.js"></script>
+  <script defer src="/zoom-frame.js"></script>
+</head>
+<body>
+  <main id="status" role="status">
+    <h2>Beauty Academy</h2>
+    <p id="message">Po ngarkohet Zoom...</p>
+    <p id="error" hidden></p>
+  </main>
+</body>
+</html>

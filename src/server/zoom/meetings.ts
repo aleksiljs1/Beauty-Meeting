@@ -6,6 +6,7 @@ import type { AppUser } from "@/server/auth/session";
 import { ApiError } from "@/server/http";
 import { audit } from "@/server/services/audit";
 import { publishLessonChanged } from "@/server/realtime/publish";
+import { createMeetingSdkHostSignature } from "@/server/zoom/meeting-sdk-signature";
 
 const ZOOM_OAUTH_URL = "https://zoom.us/oauth/token";
 const ZOOM_API_URL = "https://api.zoom.us/v2";
@@ -240,3 +241,166 @@ export async function createZoomMeetingForLesson(lessonId: string, admin: AppUse
     meetingStatus: "SCHEDULED" as const,
   };
 }
+
+
+/**
+ * Creates short-lived authorization for the academy's Zoom host to start
+ * an existing lesson meeting inside the Web Meeting SDK.
+ *
+ * The caller must already be authenticated as an admin. The host ZAK and
+ * SDK signature are returned to that admin only; never save or log them.
+ */
+export async function createZoomHostAuthorization(
+  lessonId: string,
+  admin: AppUser,
+) {
+  if (admin.role !== "admin") {
+    throw new ApiError("FORBIDDEN", "Nuk keni leje për të nisur klasën.");
+  }
+
+  const config = getZoomConfig();
+
+  if (!env.ZOOM_CLIENT_ID || !env.ZOOM_CLIENT_SECRET) {
+    throw new ApiError(
+      "INTEGRATION_NOT_CONFIGURED",
+      "Kredencialet e Zoom Meeting SDK nuk janë konfiguruar.",
+    );
+  }
+
+  // Read the saved meeting and schedule from our database, never from the browser.
+  const lesson = await prisma.lesson.findUnique({
+    where: { id: lessonId },
+    select: {
+      id: true,
+      title: true,
+      publication: true,
+      meetingStatus: true,
+      isDemo: true,
+      scheduledStartAt: true,
+      scheduledEndAt: true,
+      zoomMeetingNumber: true,
+      zoomMeetingUuid: true,
+      zoomMeetingPassword: true,
+    },
+  });
+
+  if (!lesson) {
+    throw new ApiError("NOT_FOUND", "Mësimi nuk u gjet.");
+  }
+
+  if (lesson.isDemo) {
+    throw new ApiError(
+      "CONFLICT",
+      "Kjo klasë është demonstrim dhe nuk përdor Zoom real.",
+    );
+  }
+
+  if (lesson.publication !== "PUBLISHED") {
+    throw new ApiError(
+      "CONFLICT",
+      "Publikoni mësimin para se të nisni klasën live.",
+    );
+  }
+
+  if (!lesson.zoomMeetingNumber || !lesson.zoomMeetingUuid) {
+    throw new ApiError(
+      "INTEGRATION_NOT_CONFIGURED",
+      "Ky mësim nuk ka një takim Zoom të ruajtur.",
+    );
+  }
+
+  if (lesson.meetingStatus === "ENDED" || lesson.meetingStatus === "ERROR") {
+    throw new ApiError(
+      "CONFLICT",
+      "Ky takim ka përfunduar ose ka një gabim.",
+    );
+  }
+
+  const now = Date.now();
+
+  const earliestHostStartAt =
+    lesson.scheduledStartAt.getTime() - 30 * 60 * 1000;
+
+  if (now < earliestHostStartAt) {
+    throw new ApiError(
+      "LESSON_JOIN_NOT_OPEN",
+      "Mund ta nisni klasën jo më herët se 30 minuta para orarit.",
+    );
+  }
+
+  if (now >= lesson.scheduledEndAt.getTime()) {
+    throw new ApiError(
+      "CONFLICT",
+      "Orari i këtij mësimi ka përfunduar.",
+    );
+  }
+
+  // Fetch a fresh Server-to-Server OAuth access token.
+  const accessToken = await getAccessToken(config);
+
+  // ZAK is short-lived and must never be persisted or logged.
+  const zakUrl = new URL(
+    `${ZOOM_API_URL}/users/${encodeURIComponent(config.hostUserId)}/token`,
+  );
+  zakUrl.searchParams.set("type", "zak");
+  zakUrl.searchParams.set("ttl", "300");
+
+  let zakResponse: Response;
+
+  try {
+    zakResponse = await fetch(zakUrl, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch {
+    throw new ApiError(
+      "INTEGRATION_FAILED",
+      "Nuk mund të merret autorizimi i host-it nga Zoom.",
+    );
+  }
+
+  const zakPayload: unknown = await zakResponse.json().catch(() => null);
+  const parsedZak = z.object({ token: z.string().min(1) }).safeParse(zakPayload);
+
+  if (!zakResponse.ok || !parsedZak.success) {
+    console.error("[zoom] Host ZAK request failed", {
+      status: zakResponse.status,
+    });
+
+    throw new ApiError(
+      "INTEGRATION_FAILED",
+      "Zoom nuk autorizoi host-in e klasës.",
+    );
+  }
+
+  const signature = createMeetingSdkHostSignature({
+    clientId: env.ZOOM_CLIENT_ID,
+    clientSecret: env.ZOOM_CLIENT_SECRET,
+    meetingNumber: lesson.zoomMeetingNumber,
+  });
+
+  await audit(
+    admin.id,
+    "lesson.zoom_host_authorization",
+    "lesson",
+    lesson.id,
+    {
+      provider: "zoom",
+      meetingNumber: lesson.zoomMeetingNumber,
+    },
+  );
+
+  // Only the authorized admin receives this temporary join configuration.
+  return {
+    mode: "host" as const,
+    lessonId: lesson.id,
+    signature,
+    meetingNumber: lesson.zoomMeetingNumber,
+    password: lesson.zoomMeetingPassword ?? "",
+    userName: admin.name,
+    zak: parsedZak.data.token,
+  };
+}
+
