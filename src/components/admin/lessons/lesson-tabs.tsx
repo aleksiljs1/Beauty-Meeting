@@ -3,9 +3,8 @@
 import { useState, type ReactNode } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { admin } from "@/i18n/admin";
+import { LESSON_TABS, type LessonTab } from "./lesson-tab-ids";
 
-export const LESSON_TABS = ["detaje", "studentet", "ftesat", "materialet", "regjistrimet"] as const;
-export type LessonTab = (typeof LESSON_TABS)[number];
 
 const LABELS: Record<LessonTab, string> = {
   detaje: admin.lessons.tabs.details,
