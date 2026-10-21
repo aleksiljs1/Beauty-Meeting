@@ -211,6 +211,18 @@ model Lesson {
   /// True when the meeting is the clearly labelled demo classroom (ZOOM_MODE=demo).
   isDemo        Boolean           @default(false)
 
+  /// Zoom meeting number (Zoom API 'id') used by the Meeting SDK to join.
+  /// Stored as text to preserve its exact representation.
+  zoomMeetingNumber String? @unique
+
+  /// Zoom meeting UUID used to correlate lifecycle webhook events
+  /// with this specific meeting instance.
+  zoomMeetingUuid String? @unique
+
+  /// Zoom meeting passcode required for embedded SDK joins.
+  /// Server-only: never expose through general lesson listings or notifications.
+  zoomMeetingPassword String?
+
   createdById String
   createdBy   User     @relation(fields: [createdById], references: [id], onDelete: Restrict)
   createdAt   DateTime @default(now()) @db.Timestamptz(3)

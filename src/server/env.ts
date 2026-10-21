@@ -1,3 +1,4 @@
+
 import "server-only";
 import { z } from "zod";
 
@@ -33,6 +34,7 @@ const schema = z
     // Header carrying the real client IP, set (overwritten) by the reverse proxy, e.g.
     // "cf-connecting-ip" (Cloudflare) or "x-real-ip" (nginx). Required in production.
     TRUSTED_IP_HEADER: z.string().trim().toLowerCase().min(1).optional(),
+
     // Optional comma-separated proxy IPs/CIDRs when using a multi-hop X-Forwarded-For chain.
     TRUSTED_PROXIES: z
       .string()
@@ -42,26 +44,75 @@ const schema = z
     // Optional in development (defaults to demo). Production must choose explicitly so a
     // misconfigured deployment never silently turns a real paid lesson into a simulation.
     ZOOM_MODE: z.enum(["demo", "live"]).optional(),
+
+    // Meeting SDK credentials are server-only. Never expose these through NEXT_PUBLIC_ variables.
+    // Required when ZOOM_MODE=live.
+    ZOOM_CLIENT_ID: z.string().trim().min(1).optional(),
+    ZOOM_CLIENT_SECRET: z.string().min(1).optional(),
   })
   .transform((value, ctx) => {
+    let invalid = false;
+
     if (!value.ZOOM_MODE && value.NODE_ENV === "production") {
-      ctx.addIssue({ code: "custom", path: ["ZOOM_MODE"], message: "ZOOM_MODE must be set explicitly in production" });
-      return z.NEVER;
+      ctx.addIssue({
+        code: "custom",
+        path: ["ZOOM_MODE"],
+        message: "ZOOM_MODE must be set explicitly in production",
+      });
+      invalid = true;
     }
+
     if (!value.TRUSTED_IP_HEADER && value.NODE_ENV === "production") {
-      ctx.addIssue({ code: "custom", path: ["TRUSTED_IP_HEADER"], message: "Set the proxy's client-IP header so rate limits can't be bypassed" });
+      ctx.addIssue({
+        code: "custom",
+        path: ["TRUSTED_IP_HEADER"],
+        message: "Set the proxy's client-IP header so rate limits can't be bypassed",
+      });
+      invalid = true;
+    }
+
+    // Live Zoom lessons require both Meeting SDK credentials.
+    // Keep demo mode available for local development and existing demo lessons.
+    if (value.ZOOM_MODE === "live") {
+      if (!value.ZOOM_CLIENT_ID) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["ZOOM_CLIENT_ID"],
+          message: "Required when ZOOM_MODE=live",
+        });
+        invalid = true;
+      }
+
+      if (!value.ZOOM_CLIENT_SECRET) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["ZOOM_CLIENT_SECRET"],
+          message: "Required when ZOOM_MODE=live",
+        });
+        invalid = true;
+      }
+    }
+
+    if (invalid) {
       return z.NEVER;
     }
-    return { ...value, ZOOM_MODE: value.ZOOM_MODE ?? "demo" };
+
+    return {
+      ...value,
+      ZOOM_MODE: value.ZOOM_MODE ?? "demo",
+    };
   });
 
 function loadEnv() {
   const result = schema.safeParse(process.env);
+
   if (!result.success) {
     // Print variable names and problems only — never values.
     const problems = result.error.issues.map((issue) => `  - ${issue.path.join(".")}: ${issue.message}`);
+
     throw new Error(`Invalid environment configuration:\n${problems.join("\n")}\nSee .env.example.`);
   }
+
   return result.data;
 }
 
