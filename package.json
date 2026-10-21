@@ -9,6 +9,7 @@
     "dev": "next dev",
     "build": "next build",
     "realtime": "tsx src/realtime/main.mts",
+    "demo": "tsx --conditions=react-server scripts/demo-lesson.mts",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",

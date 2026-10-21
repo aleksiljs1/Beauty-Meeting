@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PublicLiveAlert } from "@/components/public/public-live-alert";
 import { SiteFooter } from "@/components/public/site-footer";
 import { SiteHeader } from "@/components/public/site-header";
 import { publicSite } from "@/i18n/public";
@@ -28,6 +29,7 @@ export default async function PublicLayout({ children }: LayoutProps<"/">) {
         {children}
       </main>
       <SiteFooter settings={settings} />
+      <PublicLiveAlert />
     </>
   );
 }

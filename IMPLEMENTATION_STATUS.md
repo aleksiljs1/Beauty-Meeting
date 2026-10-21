@@ -1,60 +1,61 @@
 # Implementation status
 
 Single source of truth for progress. Update at the end of every work session / stage.
-Last updated: 2026-10-20
+Last updated: 2026-10-21
 Legend: ✅ done & verified · 🟡 in progress · ⬜ not started · ⛔ blocked (reason)
+
+How to run: `README.md` · How to test: `docs/testing.md` · Decisions: `NOTES.md`
 
 ## Phase 1 — site, portals, auth, materials, manual recordings, demo classroom
 
 ### Foundation
-- ✅ Next.js 16.3.8 / React 19.2.8 / TypeScript 6 strict scaffold, ESLint flat config
-- ✅ Pinned dependencies, lockfile, prod `npm audit` = 0
-- ✅ Docker Compose: Postgres 17.11, SeaweedFS 4.48 (S3), Mailpit 1.31.3
-- ✅ Prisma 7 schema (auth + academy domain + public content), client generated
-- ✅ Migrations + dev seed (`npm run db:seed`, all lesson states, sample PDF, shared invite link)
-- ✅ Validated server env (`src/server/env.ts`)
-- ✅ Better Auth config: no public sign-up, admin/student roles, hashed reset tokens, DB-backed rate limits, 5-min access JWT
-- ✅ Typed API envelope + error handling (`src/server/http.ts`), `GET /api/v1/me`
-- ✅ Access-token verifier with cached JWKS; DAL (`requirePageUser`, `requireApiUser`)
+- ✅ Next.js 16.3.8 / React 19.2.8 / TypeScript 6 strict, ESLint flat config, pinned deps, prod `npm audit` = 0
+- ✅ Docker Compose: Postgres 17.11 (port 5433), SeaweedFS 4.48 (S3), Mailpit 1.31.3
+- ✅ Prisma 7 schema + migrations; dev seed with lessons in every state, sample PDF, shared invite link
+- ✅ Validated server env; security headers / CSP; no-referrer on invitation links
+- ✅ Better Auth: invite-only (no sign-up), admin/student roles, hashed tokens, DB rate limits, 5-min access JWT
 - ✅ Axios client + interceptors (single-flight refresh, one retry, 403 ≠ logout, own-origin only), cross-tab sign-out
-- ✅ `src/proxy.ts` optimistic redirect for /portal and /admin
-- ✅ Central access policy (pure) + loader; 15 unit tests passing
-- ✅ Security headers / CSP (next.config.ts), no-referrer on /ftese
+- ✅ `src/proxy.ts` optimistic redirect; real checks in the DAL (`requirePageUser`, `requireApiUser`)
+- ✅ Central access policy + loader (unit-tested incl. exact deadline edge)
 - ✅ Admin bootstrap command (`npm run admin:create`)
-- ✅ Design system: shadcn/ui (Radix), brand tokens, Cormorant Garamond + Manrope (latin-ext)
+- ✅ Design system: shadcn/ui (Radix), brand palette, Cormorant Garamond + Manrope
 - ✅ Timezone helpers (Europe/Tirane ⇄ UTC, DST-tested)
-- ✅ Services: accounts, shared invitations, live alerts/notifications, materials, recordings (34 integration tests)
-- ✅ End-to-end auth checks: role escalation, sign-up, foreign origin, forged token all rejected
+- ✅ Services: accounts, shared invitations, live alerts, materials, recordings, audit (integration-tested)
+- ✅ Socket.IO realtime service (`npm run realtime`) with Postgres LISTEN/NOTIFY, token re-auth, expiry sweep
+- ✅ Clean clone from GitHub installs, passes checks and builds (verified after the `.gitignore` fix)
 
 ### Features
-- 🟡 Public website (home, about, services, academy/courses, gallery, contact, privacy/terms drafts) + admin content forms — public-site agent
-- 🟡 Login, password reset/setup, password change pages — student agent
-- 🟡 Admin portal: students (create + setup email, deactivate), lessons CRUD + publish/cancel/archive, roster, invitation links, uploads, demo controls, integrations, audit view — admin agent
-- ✅ Invitation redemption service (transactional, idempotent, limit-safe) — UI pending
-- ✅ Private storage provider + material upload/verify/grant services — UI pending
-- ✅ Manual recording multipart upload + playback grant services — UI pending
-- 🟡 Student portal: dashboard, lesson list filters, lesson/classroom page, invitation page — student agent
-- ✅ Live alert/notification service + demo go-live simulation service (tested)
-- ✅ Socket.IO realtime service + browser client + publish hooks in services (6 integration tests)
-- 🟡 Live-class pop-up UI, live-feed hook (Socket.IO signals + safety poll), notification bell — student agent
-- 🟡 Demo classroom (clearly labelled) — student agent
-- ✅ Audit entries written by services (accounts, invitations, live, materials, recordings)
+- ✅ Public website: home, about, services, courses (+ detail with WhatsApp/phone/email enquiry), gallery, contact, privacy/terms drafts — prerendered + tag revalidation
+- ✅ Admin content editor (`/admin/permbajtja`): academy info, services, courses, gallery uploads (verified images)
+- ✅ Auth pages: login (`/hyr`), forgot password, set/reset password (incl. first-time setup link)
+- ✅ Student portal: dashboard, lessons with filters, notifications, profile/password change
+- ✅ Lesson/classroom page: demo classroom (labelled, no fake Zoom), materials panel (PDF viewer/download), recording player with grant renewal, mobile tabs, stage never remounts
+- ✅ Invitation page `/ftese/[token]`: read-only preview + explicit "Bashkohu" (verified GET never enrolls)
+- ✅ Live-class pop-up + notification bell via Socket.IO (+120 s safety poll), cross-tab dismissal — verified end to end
+- 🟡 Live-class pop-up on public pages for signed-in students (lazy-loaded) — code done, build verification running
+- 🟡 Admin portal: dashboard, students (create + setup email, deactivate), lessons CRUD/publish/cancel/archive, roster & deadlines, invitation links, material/recording uploads, demo go-live controls, integrations status, audit history — admin agent (resumed after usage limit)
 
-## Phase 2 — real Zoom
+### Known issues / small follow-ups
+- ⬜ Integration tests share one `academy_test` DB → random failures if two runs overlap (give each worktree its own DB)
+- ⬜ Pages for lessons a student can't see return HTTP 200 with not-found content (streaming starts first); content is non-disclosing
+- ⬜ Shared `Sheet` close button has an English screen-reader label ("Close") — translate in `src/components/ui/sheet.tsx`
+- ⬜ "Aksesi deri më" is read twice by screen readers on lesson cards/header
+- ⬜ Demo join endpoint allows join once the join window opens (UI only offers it when LIVE) — decide if it should require LIVE
+- ⬜ Abandoned gallery uploads can leave orphan objects in storage (needs a cleanup job)
+- ⬜ No visual/browser pass at 360 px yet (only HTTP-level checks) — do a manual click-through (see docs/testing.md)
+
+## Phase 2 — real Zoom (needs the academy's Zoom account)
 - ⬜ Isolated Zoom frame (CDN SDK, Client View mobile / Component View desktop)
 - ⬜ Server-to-Server OAuth, meeting creation (idempotent), SDK signature, host ZAK
 - ⬜ Webhooks (signature verification, durable storage) → LIVE/ENDED state
 
-## Phase 3 — cloud recording import
+## Phase 3 — cloud recording import (needs Zoom Pro)
 - ⬜ pg-boss worker, streamed multipart copy, idempotent import, retries
 
-## How to verify
-- `npm run check` (typecheck + lint + unit tests) · `npm run test:integration` (needs `docker compose up`; uses the separate `academy_test` DB) · `npm run build`
-
-## Lead follow-ups (after merging agents)
-- ⬜ Mount `<LiveClassAlert />` on public pages
-- ⬜ README.md, docs/architecture.md, docs/storage-and-recordings.md, docs/acceptance-checklist.md
+## Docs
+- ✅ README.md (setup, run, scripts) · ✅ docs/testing.md · ✅ docs/agent-guide.md
+- ⬜ docs/architecture.md, docs/storage-and-recordings.md, docs/zoom-setup.md, docs/zoom-feature-matrix.md
 
 ## Deferred
 - ⬜ Playwright smoke tests (postponed by request)
-- ⬜ Deployment target (undecided)
+- ⬜ Deployment target (undecided; must support long-lived WebSocket connections)
