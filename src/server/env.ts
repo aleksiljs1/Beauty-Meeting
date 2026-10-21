@@ -49,6 +49,16 @@ const schema = z
     // Required when ZOOM_MODE=live.
     ZOOM_CLIENT_ID: z.string().trim().min(1).optional(),
     ZOOM_CLIENT_SECRET: z.string().min(1).optional(),
+
+    // Server-to-Server OAuth credentials for managing Zoom meetings.
+    // Separate from the Meeting SDK credentials above.
+    ZOOM_S2S_ACCOUNT_ID: z.string().trim().min(1).optional(),
+    ZOOM_S2S_CLIENT_ID: z.string().trim().min(1).optional(),
+    ZOOM_S2S_CLIENT_SECRET: z.string().min(1).optional(),
+
+    // Zoom user ID or email address that will own academy meetings.
+    ZOOM_HOST_USER_ID: z.string().trim().min(1).optional(),
+
   })
   .transform((value, ctx) => {
     let invalid = false;
@@ -96,6 +106,28 @@ const schema = z
     if (invalid) {
       return z.NEVER;
     }
+    
+    //Supply the entire setting list to the server require a complete list set.
+
+    const zoomS2sSettings = [
+      ["ZOOM_S2S_ACCOUNT_ID", value.ZOOM_S2S_ACCOUNT_ID],
+      ["ZOOM_S2S_CLIENT_ID", value.ZOOM_S2S_CLIENT_ID],
+      ["ZOOM_S2S_CLIENT_SECRET", value.ZOOM_S2S_CLIENT_SECRET],
+      ["ZOOM_HOST_USER_ID", value.ZOOM_HOST_USER_ID],
+    ] as const;
+
+    if (zoomS2sSettings.some(([, setting]) => Boolean(setting))) {
+        for (const [name, setting] of zoomS2sSettings) {
+          if (!setting) {
+            ctx.addIssue({
+              code: "custom",
+              path: [name],
+              message: `Required when configuring Zoom meeting management`,
+            });
+            invalid = true;
+          }
+        }
+      }
 
     return {
       ...value,

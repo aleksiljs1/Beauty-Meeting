@@ -228,6 +228,8 @@ export async function getAdminLesson(lessonId: string) {
       liveStartedAt: true,
       liveEndedAt: true,
       isDemo: true,
+      zoomMeetingNumber: true,
+      zoomMeetingUuid: true,
       createdAt: true,
       updatedAt: true,
       course: { select: { title: true } },
