@@ -32,8 +32,10 @@ How to run: `README.md` · How to test: `docs/testing.md` · Decisions: `NOTES.m
 - ✅ Lesson/classroom page: demo classroom (labelled, no fake Zoom), materials panel (PDF viewer/download), recording player with grant renewal, mobile tabs, stage never remounts
 - ✅ Invitation page `/ftese/[token]`: read-only preview + explicit "Bashkohu" (verified GET never enrolls)
 - ✅ Live-class pop-up + notification bell via Socket.IO (+120 s safety poll), cross-tab dismissal — verified end to end
-- 🟡 Live-class pop-up on public pages for signed-in students (lazy-loaded) — code done, build verification running
-- 🟡 Admin portal: dashboard, students (create + setup email, deactivate), lessons CRUD/publish/cancel/archive, roster & deadlines, invitation links, material/recording uploads, demo go-live controls, integrations status, audit history — admin agent (resumed after usage limit)
+- ✅ Live-class pop-up on public pages for signed-in students (lazy-loaded; anonymous visitors don't download it)
+- ✅ Admin portal: dashboard, students (create + setup email, deactivate/reactivate, resend), lessons CRUD/publish/cancel/archive/restore, roster & per-student deadlines, shared invitation links, material & multipart recording uploads, demo go-live/end/reset, integrations status, audit history (56 live API checks)
+- ✅ Phase 1 merged: 67 unit + 50 integration tests, production build green
+- 🟡 Independent security review of the merged code (fresh reviewer agent)
 
 ### Known issues / small follow-ups
 - ⬜ Integration tests share one `academy_test` DB → random failures if two runs overlap (give each worktree its own DB)
@@ -42,7 +44,7 @@ How to run: `README.md` · How to test: `docs/testing.md` · Decisions: `NOTES.m
 - ⬜ "Aksesi deri më" is read twice by screen readers on lesson cards/header
 - ⬜ Demo join endpoint allows join once the join window opens (UI only offers it when LIVE) — decide if it should require LIVE
 - ⬜ Abandoned gallery uploads can leave orphan objects in storage (needs a cleanup job)
-- ⬜ No visual/browser pass at 360 px yet (only HTTP-level checks) — do a manual click-through (see docs/testing.md)
+- ⬜ No visual/browser pass at 360 px yet (only HTTP-level checks) — do a manual click-through (see docs/testing.md); also verify in a browser that storage CORS exposes the ETag header (multipart recording upload)
 
 ## Phase 2 — real Zoom (needs the academy's Zoom account)
 - ⬜ Isolated Zoom frame (CDN SDK, Client View mobile / Component View desktop)
