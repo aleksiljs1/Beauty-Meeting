@@ -9,7 +9,7 @@ export function SiteHeader({ academyName }: { academyName: string }) {
       <Container className="flex h-16 items-center justify-between gap-4 sm:h-20">
         <Link
           href="/"
-          className="min-w-0 truncate rounded-sm font-heading text-2xl leading-none tracking-tight text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:text-[1.7rem]"
+          className="min-w-0 truncate rounded-sm font-heading text-[1.75rem] leading-none tracking-tight text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:text-[1.85rem]"
         >
           {academyName}
         </Link>
