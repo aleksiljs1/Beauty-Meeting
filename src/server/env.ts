@@ -44,11 +44,14 @@ const schema = z
     ZOOM_MODE: z.enum(["demo", "live"]).optional(),
   })
   .transform((value, ctx) => {
-    if (!value.ZOOM_MODE && value.NODE_ENV === "production") {
+    // `next build` also runs with NODE_ENV=production; deployment-only settings are checked
+    // when the server actually starts, not while compiling.
+    const enforceProduction = value.NODE_ENV === "production" && process.env.NEXT_PHASE !== "phase-production-build";
+    if (!value.ZOOM_MODE && enforceProduction) {
       ctx.addIssue({ code: "custom", path: ["ZOOM_MODE"], message: "ZOOM_MODE must be set explicitly in production" });
       return z.NEVER;
     }
-    if (!value.TRUSTED_IP_HEADER && value.NODE_ENV === "production") {
+    if (!value.TRUSTED_IP_HEADER && enforceProduction) {
       ctx.addIssue({ code: "custom", path: ["TRUSTED_IP_HEADER"], message: "Set the proxy's client-IP header so rate limits can't be bypassed" });
       return z.NEVER;
     }
