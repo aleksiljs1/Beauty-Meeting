@@ -88,6 +88,14 @@ The seed printed a link for the upcoming lesson (or create one in the admin port
 - [ ] Historiku shows every action; Integrimet shows "Zoom: demo mode" honestly.
 - [ ] Përmbajtja → edit academy info / a service / upload a gallery photo → public site updates on the next visit.
 
+### Gallery display switches
+- [ ] In `/admin/permbajtja/galeria`, upload an image with every display switch off; confirm it stays out of all public pages.
+- [ ] Enable only "Në galeri"; confirm it appears on `/galeria` and nowhere else.
+- [ ] Enable only "Te Rreth nesh"; confirm it appears on `/rreth-nesh` but not `/galeria`. Enable both flags and confirm it appears in both places.
+- [ ] Test the home switches independently: "Në krye të faqes kryesore" displays beside the home title; "Në galerinë e faqes kryesore" displays in the home gallery section.
+- [ ] Assign another image to the home hero, then another to About; confirm each replaces the previous image in that single-image slot while other display flags stay unchanged.
+- [ ] Disable "Publikuar" for an image with display switches enabled; confirm it disappears from public pages but remains in the admin gallery.
+
 ### G. Security spot checks (optional, terminal)
 ```bash
 # API without a token → 401

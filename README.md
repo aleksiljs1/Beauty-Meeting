@@ -22,6 +22,10 @@ Next.js 16 (App Router) · React 19 · TypeScript (strict) · PostgreSQL 17 · P
 | Private object storage | Docker (SeaweedFS) | localhost:8333 |
 | Mail (dev inbox) | Docker (Mailpit) | UI at http://localhost:8025 |
 
+Admin gallery uploads support independent display switches for the public gallery, home hero,
+home gallery section, and About page. New uploads stay off public pages until a display switch is
+enabled; see `docs/testing.md` for a manual walkthrough.
+
 ## Local setup
 Requirements: Node.js ≥ 22, Docker Desktop.
 

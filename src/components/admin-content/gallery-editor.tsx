@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Trash2Icon, UploadIcon } from "lucide-react";
 import { useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, type Control } from "react-hook-form";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,7 +20,7 @@ import { Switch } from "@/components/ui/switch";
 import { adminContent } from "@/i18n/admin-content";
 import { common } from "@/i18n/common";
 import { apiSend } from "@/lib/api/client";
-import { galleryItemSchema, type GalleryItemInput } from "@/lib/content-schemas";
+import { galleryItemSchema, galleryVisibilityFields, type GalleryItemInput } from "@/lib/content-schemas";
 import { applyFieldIssues, errorMessage, Field, moveItem, OrderButtons, PublishedBadge, StatusMessage, type Status } from "./form-bits";
 import type { AdminGalleryItem } from "./types";
 
@@ -30,6 +30,28 @@ const MAX_BYTES = 10 * 1024 * 1024;
 
 type UploadGrant = { uploadKey: string; uploadUrl: string; headers: Record<string, string> };
 
+function VisibilityOptions({ control, idPrefix }: { control: Control<GalleryItemInput>; idPrefix: string }) {
+  return (
+    <fieldset className="grid gap-3">
+      <legend className="text-sm font-medium">{t.displayHeading}</legend>
+      <p className="text-sm text-muted-foreground">{t.displayHint}</p>
+      {galleryVisibilityFields.map((name) => (
+        <Controller
+          key={name}
+          control={control}
+          name={name}
+          render={({ field }) => (
+            <label htmlFor={`${idPrefix}-${name}`} className="flex items-center gap-3 text-sm">
+              <Switch id={`${idPrefix}-${name}`} checked={field.value} onCheckedChange={field.onChange} />
+              {t.visibilityLabels[name]}
+            </label>
+          )}
+        />
+      ))}
+    </fieldset>
+  );
+}
+
 function UploadForm({ onUploaded }: { onUploaded: (item: AdminGalleryItem) => void }) {
   // Changing the key remounts (clears) the file input after a successful upload.
   const [inputKey, setInputKey] = useState(0);
@@ -38,7 +60,15 @@ function UploadForm({ onUploaded }: { onUploaded: (item: AdminGalleryItem) => vo
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const { register, control, handleSubmit, formState, setError, reset } = useForm<GalleryItemInput>({
     resolver: zodResolver(galleryItemSchema),
-    defaultValues: { alt: "", caption: "", isPublished: true },
+    defaultValues: {
+      alt: "",
+      caption: "",
+      isPublished: true,
+      showInGallery: false,
+      showOnHomeHero: false,
+      showOnHomeGallery: false,
+      showOnAbout: false,
+    },
   });
 
   const checkFile = (candidate: File | null) => {
@@ -104,6 +134,7 @@ function UploadForm({ onUploaded }: { onUploaded: (item: AdminGalleryItem) => vo
       <Field id="gallery-caption" label={t.caption} error={formState.errors.caption?.message}>
         {(aria) => <Input {...aria} {...register("caption")} />}
       </Field>
+      <VisibilityOptions control={control} idPrefix="gallery-new" />
       <Controller
         control={control}
         name="isPublished"
@@ -143,9 +174,17 @@ function ItemCard({
   onDelete: () => void;
 }) {
   const [status, setStatus] = useState<Status>({ kind: "idle" });
-  const { register, handleSubmit, formState, setError, reset } = useForm<GalleryItemInput>({
+  const { register, control, handleSubmit, formState, setError, reset } = useForm<GalleryItemInput>({
     resolver: zodResolver(galleryItemSchema),
-    defaultValues: { alt: item.alt, caption: item.caption ?? "", isPublished: item.isPublished },
+    defaultValues: {
+      alt: item.alt,
+      caption: item.caption ?? "",
+      isPublished: item.isPublished,
+      showInGallery: item.showInGallery,
+      showOnHomeHero: item.showOnHomeHero,
+      showOnHomeGallery: item.showOnHomeGallery,
+      showOnAbout: item.showOnAbout,
+    },
   });
 
   const save = async (patch: Partial<GalleryItemInput>) => {
@@ -153,7 +192,15 @@ function ItemCard({
     try {
       const updated = await apiSend<AdminGalleryItem>("patch", `/admin/content/gallery/${item.id}`, patch);
       onChange(updated);
-      reset({ alt: updated.alt, caption: updated.caption ?? "", isPublished: updated.isPublished });
+      reset({
+        alt: updated.alt,
+        caption: updated.caption ?? "",
+        isPublished: updated.isPublished,
+        showInGallery: updated.showInGallery,
+        showOnHomeHero: updated.showOnHomeHero,
+        showOnHomeGallery: updated.showOnHomeGallery,
+        showOnAbout: updated.showOnAbout,
+      });
       setStatus({ kind: "ok", text: adminContent.status.saved });
     } catch (error) {
       applyFieldIssues(error, setError);
@@ -161,7 +208,9 @@ function ItemCard({
     }
   };
 
-  const onSubmit = handleSubmit(({ alt, caption }) => save({ alt, caption }));
+  const onSubmit = handleSubmit(({ alt, caption, showInGallery, showOnHomeHero, showOnHomeGallery, showOnAbout }) =>
+    save({ alt, caption, showInGallery, showOnHomeHero, showOnHomeGallery, showOnAbout }),
+  );
   const saving = status.kind === "busy";
 
   return (
@@ -186,6 +235,7 @@ function ItemCard({
         <Field id={`caption-${item.id}`} label={t.caption} error={formState.errors.caption?.message}>
           {(aria) => <Input {...aria} {...register("caption")} />}
         </Field>
+        <VisibilityOptions control={control} idPrefix={`gallery-${item.id}`} />
         <div className="flex flex-wrap items-center gap-3">
           <Button type="submit" variant="outline" disabled={saving || !formState.isDirty}>
             {common.actions.save}

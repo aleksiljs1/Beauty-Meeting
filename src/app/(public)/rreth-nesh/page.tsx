@@ -10,7 +10,7 @@ const t = publicSite.about;
 export const metadata: Metadata = { title: t.title, description: t.description };
 
 export default async function AboutPage() {
-  const [settings, gallery] = await Promise.all([getPublicSettings(), getPublicGallery(1)]);
+  const [settings, gallery] = await Promise.all([getPublicSettings(), getPublicGallery(1, "showOnAbout")]);
   const text = paragraphs(settings.about);
   const image = gallery[0];
 

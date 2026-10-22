@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createUser, resetDatabase } from "@/test/fixtures";
 
 const content = await import("./content");
+const publicQueries = await import("@/server/queries/public");
 const { prisma } = await import("@/server/db");
 const { headObject } = await import("@/server/storage/storage");
 const { openGalleryObject } = await import("@/server/storage/public-media");
@@ -43,6 +44,66 @@ describe("gallery uploads", () => {
 
     await content.deleteGalleryItem(admin, item.id);
     expect(await headObject(uploadKey)).toBeNull();
+  });
+
+  it("keeps display choices independent and assigns one image to single-image slots", async () => {
+    const firstKey = await upload(png);
+    const first = await content.createGalleryItem(admin, {
+      uploadKey: firstKey,
+      mimeType: "image/png",
+      sizeBytes: png.byteLength,
+      alt: "Foto e parë",
+      caption: "",
+      isPublished: true,
+      showInGallery: true,
+      showOnHomeHero: false,
+      showOnHomeGallery: true,
+      showOnAbout: true,
+    });
+
+    const secondKey = await upload(png);
+    const second = await content.createGalleryItem(admin, {
+      uploadKey: secondKey,
+      mimeType: "image/png",
+      sizeBytes: png.byteLength,
+      alt: "Foto e dytë",
+      caption: "",
+      isPublished: true,
+      showInGallery: false,
+      showOnHomeHero: true,
+      showOnHomeGallery: false,
+      showOnAbout: true,
+    });
+
+    expect(await prisma.galleryItem.findUnique({ where: { id: first.id } })).toMatchObject({
+      showInGallery: true,
+      showOnHomeHero: false,
+      showOnHomeGallery: true,
+      showOnAbout: false,
+    });
+    expect(await prisma.galleryItem.findUnique({ where: { id: second.id } })).toMatchObject({
+      showInGallery: false,
+      showOnHomeHero: true,
+      showOnHomeGallery: false,
+      showOnAbout: true,
+    });
+
+    const gallery = await publicQueries.queryPublicGallery(100, "showInGallery");
+    const homeHero = await publicQueries.queryPublicGallery(100, "showOnHomeHero");
+    const homeGallery = await publicQueries.queryPublicGallery(100, "showOnHomeGallery");
+    const about = await publicQueries.queryPublicGallery(100, "showOnAbout");
+    expect(gallery.map(({ id }) => id)).toContain(first.id);
+    expect(gallery.map(({ id }) => id)).not.toContain(second.id);
+    expect(homeHero.map(({ id }) => id)).toContain(second.id);
+    expect(homeHero.map(({ id }) => id)).not.toContain(first.id);
+    expect(homeGallery.map(({ id }) => id)).toContain(first.id);
+    expect(homeGallery.map(({ id }) => id)).not.toContain(second.id);
+    expect(about.map(({ id }) => id)).toContain(second.id);
+    expect(about.map(({ id }) => id)).not.toContain(first.id);
+
+    await content.updateGalleryItem(admin, first.id, { showInGallery: false, showOnAbout: true });
+    expect(await prisma.galleryItem.findUnique({ where: { id: first.id } })).toMatchObject({ showInGallery: false, showOnAbout: true });
+    expect(await prisma.galleryItem.findUnique({ where: { id: second.id } })).toMatchObject({ showOnAbout: false, showOnHomeHero: true });
   });
 
   it("rejects bytes that are not the declared image and removes the object", async () => {

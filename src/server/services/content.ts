@@ -3,7 +3,7 @@ import { z } from "zod";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { Prisma } from "@/generated/prisma/client";
 import { adminContent } from "@/i18n/admin-content";
-import type { CourseInput, GalleryItemInput, ServiceInput, SettingsInput } from "@/lib/content-schemas";
+import type { CourseInput, GalleryItemInput, GalleryVisibilityField, ServiceInput, SettingsInput } from "@/lib/content-schemas";
 import { readImageDimensions } from "@/lib/image-dimensions";
 import { parseOpeningHours } from "@/lib/public-content";
 import type { AppUser } from "@/server/auth/session";
@@ -209,7 +209,19 @@ export async function reorderCourses(admin: AppUser, ids: string[]) {
 /** Enough bytes to sniff the type and find JPEG dimensions behind typical EXIF blocks. */
 const DIMENSION_PROBE_BYTES = 64 * 1024;
 
-const galleryAdminSelect = { id: true, alt: true, caption: true, width: true, height: true, isPublished: true, position: true } as const;
+const galleryAdminSelect = {
+  id: true,
+  alt: true,
+  caption: true,
+  width: true,
+  height: true,
+  isPublished: true,
+  position: true,
+  showInGallery: true,
+  showOnHomeHero: true,
+  showOnHomeGallery: true,
+  showOnAbout: true,
+} as const;
 
 /** Admin list. Exposes an id-based preview path, never the storage key or a presigned URL. */
 export async function listGalleryForAdmin() {
@@ -236,7 +248,7 @@ export async function startGalleryUpload(file: { filename: string; mimeType: str
 /** Step 2: verify what actually landed in storage (size, type, magic bytes), then create the item. */
 export async function createGalleryItem(
   admin: AppUser,
-  input: GalleryItemInput & { uploadKey: string; mimeType: string; sizeBytes: number },
+  input: Omit<GalleryItemInput, GalleryVisibilityField> & Partial<Pick<GalleryItemInput, GalleryVisibilityField>> & { uploadKey: string; mimeType: string; sizeBytes: number },
 ) {
   if (!isGalleryKey(input.uploadKey)) throw new ApiError("VALIDATION_FAILED", e.badImage);
   if (await prisma.galleryItem.findUnique({ where: { imageKey: input.uploadKey }, select: { id: true } })) {
@@ -261,34 +273,56 @@ export async function createGalleryItem(
     throw new ApiError("VALIDATION_FAILED", e.badImage);
   }
 
-  const item = await prisma.galleryItem.create({
-    data: {
-      imageKey: input.uploadKey,
-      alt: input.alt.trim(),
-      caption: orNull(input.caption),
-      isPublished: input.isPublished,
-      width: dimensions?.width ?? null,
-      height: dimensions?.height ?? null,
-      position: after(await prisma.galleryItem.aggregate({ _max: { position: true } })),
-    },
-    select: galleryAdminSelect,
+  const item = await prisma.$transaction(async (tx) => {
+    if (input.showOnHomeHero) {
+      await tx.galleryItem.updateMany({ where: { showOnHomeHero: true }, data: { showOnHomeHero: false } });
+    }
+    if (input.showOnAbout) {
+      await tx.galleryItem.updateMany({ where: { showOnAbout: true }, data: { showOnAbout: false } });
+    }
+    return tx.galleryItem.create({
+      data: {
+        imageKey: input.uploadKey,
+        alt: input.alt.trim(),
+        caption: orNull(input.caption),
+        isPublished: input.isPublished,
+        showInGallery: input.showInGallery ?? false,
+        showOnHomeHero: input.showOnHomeHero ?? false,
+        showOnHomeGallery: input.showOnHomeGallery ?? false,
+        showOnAbout: input.showOnAbout ?? false,
+        width: dimensions?.width ?? null,
+        height: dimensions?.height ?? null,
+        position: after(await tx.galleryItem.aggregate({ _max: { position: true } })),
+      },
+      select: galleryAdminSelect,
+    });
   });
   await audit(admin.id, "content.gallery.create", "galleryItem", item.id);
   return withPreview(item);
 }
 
 export async function updateGalleryItem(admin: AppUser, id: string, input: Partial<GalleryItemInput>) {
-  const item = await rethrowMissing(
-    prisma.galleryItem.update({
+  const item = await rethrowMissing(prisma.$transaction(async (tx) => {
+    if (input.showOnHomeHero) {
+      await tx.galleryItem.updateMany({ where: { id: { not: id }, showOnHomeHero: true }, data: { showOnHomeHero: false } });
+    }
+    if (input.showOnAbout) {
+      await tx.galleryItem.updateMany({ where: { id: { not: id }, showOnAbout: true }, data: { showOnAbout: false } });
+    }
+    return tx.galleryItem.update({
       where: { id },
       data: {
         ...(input.alt !== undefined && { alt: input.alt.trim() }),
         ...(input.caption !== undefined && { caption: orNull(input.caption) }),
         ...(input.isPublished !== undefined && { isPublished: input.isPublished }),
+        ...(input.showInGallery !== undefined && { showInGallery: input.showInGallery }),
+        ...(input.showOnHomeHero !== undefined && { showOnHomeHero: input.showOnHomeHero }),
+        ...(input.showOnHomeGallery !== undefined && { showOnHomeGallery: input.showOnHomeGallery }),
+        ...(input.showOnAbout !== undefined && { showOnAbout: input.showOnAbout }),
       },
       select: galleryAdminSelect,
-    }),
-  );
+    });
+  }));
   await audit(admin.id, "content.gallery.update", "galleryItem", id);
   return withPreview(item);
 }

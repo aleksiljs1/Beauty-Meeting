@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ContactActions } from "@/components/public/contact";
 import { CourseCard } from "@/components/public/course-card";
-import { ArrowLink, Container, Eyebrow, GalleryImage, ImagePlaceholder, LinkButton, monogramOf, SectionHeading } from "@/components/public/primitives";
+import { ArrowLink, Container, Eyebrow, GalleryImage, ImagePlaceholder, LinkButton, SectionHeading } from "@/components/public/primitives";
 import { ServiceList } from "@/components/public/service-list";
 import { publicSite } from "@/i18n/public";
 import { getPublicCourses, getPublicGallery, getPublicServices, getPublicSettings } from "@/server/queries/public";
@@ -19,14 +19,14 @@ export async function generateMetadata(): Promise<Metadata> {
 const onlineIcons = [VideoIcon, FileTextIcon, PlayCircleIcon];
 
 export default async function HomePage() {
-  const [settings, services, courses, gallery] = await Promise.all([
+  const [settings, services, courses, heroImages, selected] = await Promise.all([
     getPublicSettings(),
     getPublicServices(),
     getPublicCourses(),
-    getPublicGallery(7),
+    getPublicGallery(1, "showOnHomeHero"),
+    getPublicGallery(6, "showOnHomeGallery"),
   ]);
-  const [heroImage, ...moreImages] = gallery;
-  const selected = moreImages.length >= 3 ? moreImages.slice(0, 6) : gallery.slice(0, 6);
+  const heroImage = heroImages[0] ?? { src: "/images/01.jpg", alt: "Studioja e thonjve me harkun dekorativ dhe ulëset e bardha" };
 
   return (
     <>
@@ -46,11 +46,12 @@ export default async function HomePage() {
               </LinkButton>
             </div>
           </div>
-          {heroImage ? (
-            <GalleryImage item={heroImage} preload sizes="(min-width: 1024px) 42vw, 100vw" className="aspect-[4/5] max-h-[38rem] w-full" />
-          ) : (
-            <ImagePlaceholder monogram={monogramOf(settings.name)} className="aspect-[4/5] max-h-[38rem] w-full" />
-          )}
+          <GalleryImage
+            item={heroImage}
+            preload
+            sizes="(min-width: 1024px) 42vw, 100vw"
+            className="aspect-[4/5] max-h-[38rem] w-full"
+          />
         </Container>
       </section>
 
@@ -132,7 +133,7 @@ export default async function HomePage() {
             id="gallery-title"
             eyebrow={t.galleryEyebrow}
             title={t.galleryTitle}
-            action={gallery.length > 0 ? <ArrowLink href="/galeria">{t.galleryAll}</ArrowLink> : undefined}
+            action={selected.length > 0 ? <ArrowLink href="/galeria">{t.galleryAll}</ArrowLink> : undefined}
           />
           {selected.length > 0 ? (
             <ul className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3">
