@@ -3,7 +3,7 @@ import { HeadBucketCommand } from "@aws-sdk/client-s3";
 import type { Prisma } from "@/generated/prisma/client";
 import type { PublicationStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/server/db";
-import { env } from "@/server/env";
+import { env, ZOOM_LIVE_VARIABLES } from "@/server/env";
 import { ApiError } from "@/server/http";
 import { s3 } from "@/server/storage/storage";
 import { invitationStatus, rosterEntryState } from "./invitation-status";
@@ -228,6 +228,7 @@ export async function getAdminLesson(lessonId: string) {
       liveStartedAt: true,
       liveEndedAt: true,
       isDemo: true,
+      zoomMeetingNumber: true,
       createdAt: true,
       updatedAt: true,
       course: { select: { title: true } },
@@ -351,15 +352,8 @@ const isUuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]
 
 // --- Integrations ----------------------------------------------------------------------------
 
-/** Names the Zoom integration (Phase 2) will read. Only presence is ever reported. */
-export const ZOOM_ENV_VARS = [
-  "ZOOM_ACCOUNT_ID",
-  "ZOOM_CLIENT_ID",
-  "ZOOM_CLIENT_SECRET",
-  "ZOOM_MEETING_SDK_KEY",
-  "ZOOM_MEETING_SDK_SECRET",
-  "ZOOM_WEBHOOK_SECRET_TOKEN",
-] as const;
+/** Variables live Zoom needs — the same list the env schema enforces. Only presence is reported. */
+export const ZOOM_ENV_VARS = ZOOM_LIVE_VARIABLES;
 
 export async function getIntegrationStatus() {
   let storageReachable = false;

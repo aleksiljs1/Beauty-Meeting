@@ -1,8 +1,23 @@
 "use client";
+import {
+  CalendarClock,
+  CircleAlert,
+  CircleCheck,
+  Hourglass,
+  Loader2,
+  Radio,
+  Wrench,
+} from "lucide-react";
 
-import { CalendarClock, CircleAlert, CircleCheck, Hourglass, Loader2, Radio, Wrench } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { Button } from "@/components/ui/button";
 import { portalText } from "@/i18n/portal";
 import { ApiClientError, apiSend } from "@/lib/api/client";
@@ -10,6 +25,9 @@ import { formatTime, timezoneAbbreviation } from "@/lib/datetime";
 import { formatCountdown } from "@/lib/polling";
 import type { StageState } from "@/server/queries/portal";
 import { DemoStage } from "./demo-stage";
+import { ZoomFrame } from "@/components/zoom/zoom-frame";
+import { isZoomJoinConfig, useZoomFrame } from "@/hooks/use-zoom-frame";
+import { zoomText } from "@/i18n/zoom";
 
 const t = portalText.stage;
 
@@ -27,9 +45,22 @@ export type StageProps = {
   onShowRecordings: () => void;
 };
 
-type JoinState = { kind: "idle" } | { kind: "joining" } | { kind: "joined"; mode: "demo" } | { kind: "error"; message: string };
+type JoinState = { kind: "idle" } | { kind: "joining" } | { kind: "demo" } | { kind: "error"; message: string };
 
-function StageMessage({ icon, title, children, tone = "default" }: { icon: ReactNode; title: string; children?: ReactNode; tone?: "default" | "live" }) {
+const errorMessage = (error: unknown) =>
+  error instanceof ApiClientError || error instanceof Error ? error.message : portalText.states.errorBody;
+
+function StageMessage({
+  icon,
+  title,
+  children,
+  tone = "default",
+}: {
+  icon: ReactNode;
+  title: string;
+  children?: ReactNode;
+  tone?: "default" | "live";
+}) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 px-6 py-10 text-center">
       <span
@@ -49,7 +80,15 @@ function StageMessage({ icon, title, children, tone = "default" }: { icon: React
 }
 
 /** Countdown (display only). When the join window opens, the server is asked again. */
-function Countdown({ startAt, opensAt, serverTime }: { startAt: string; opensAt: string; serverTime: string }) {
+function Countdown({
+  startAt,
+  opensAt,
+  serverTime,
+}: {
+  startAt: string;
+  opensAt: string;
+  serverTime: string;
+}) {
   const router = useRouter();
   const [now, setNow] = useState<number | null>(null);
   const refreshed = useRef(false);
@@ -58,6 +97,7 @@ function Countdown({ startAt, opensAt, serverTime }: { startAt: string; opensAt:
     const offset = new Date(serverTime).getTime() - Date.now();
     const tick = () => setNow(Date.now() + offset);
     tick();
+
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [serverTime]);
@@ -69,7 +109,11 @@ function Countdown({ startAt, opensAt, serverTime }: { startAt: string; opensAt:
     }
   }, [now, opensAt, router]);
 
-  const seconds = now === null ? null : Math.max(0, (new Date(startAt).getTime() - now) / 1000);
+  const seconds =
+    now === null
+      ? null
+      : Math.max(0, (new Date(startAt).getTime() - now) / 1000);
+
   return (
     <div className="grid gap-1">
       <p className="text-sm text-muted-foreground">{t.startsIn}</p>
@@ -85,37 +129,62 @@ function Countdown({ startAt, opensAt, serverTime }: { startAt: string; opensAt:
 
 function ClassroomStageImpl(props: StageProps) {
   const { lessonId, stage, canJoin, autoJoin } = props;
+
   const [join, setJoin] = useState<JoinState>({ kind: "idle" });
+  const zoom = useZoomFrame(portalText.states.errorBody);
+  const startZoom = zoom.start;
   const autoJoinTried = useRef(false);
 
   const requestJoin = useCallback(async () => {
     setJoin({ kind: "joining" });
     try {
-      const result = await apiSend<{ mode: "demo" }>("post", `/lessons/${lessonId}/join`);
-      setJoin({ kind: "joined", mode: result.mode });
+      // The server re-checks enrolment, deadline, join window and meeting state every time.
+      const result = await apiSend<unknown>("post", `/lessons/${lessonId}/join`);
+      if ((result as { mode?: unknown } | null)?.mode === "demo") {
+        setJoin({ kind: "demo" });
+        return;
+      }
+      if (!isZoomJoinConfig(result, "student", lessonId)) throw new Error(zoomText.frame.invalidResponse);
+      setJoin({ kind: "idle" });
+      startZoom(result);
     } catch (error) {
-      setJoin({ kind: "error", message: error instanceof ApiClientError ? error.message : portalText.states.errorBody });
+      setJoin({ kind: "error", message: errorMessage(error) });
     }
-  }, [lessonId]);
+  }, [lessonId, startZoom]);
 
   // "Bashkohu" from the alert/dashboard was an explicit click; finish it here once.
   useEffect(() => {
     if (!autoJoin || autoJoinTried.current) return;
+
     const id = setTimeout(() => {
       autoJoinTried.current = true;
+
       const url = new URL(window.location.href);
       url.searchParams.delete("bashkohu");
-      window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${url.pathname}${url.search}${url.hash}`,
+      );
+
       if (stage === "LIVE" && canJoin) void requestJoin();
     }, 0);
+
     return () => clearTimeout(id);
   }, [autoJoin, stage, canJoin, requestJoin]);
 
+  const isJoining = join.kind === "joining";
+  const joinError = join.kind === "error" ? join.message : zoom.status === "error" ? zoom.error : null;
+
   let content: ReactNode;
+
   if (stage === "ENDED") {
     content = (
       <StageMessage icon={<CircleCheck className="size-6" />} title={t.endedTitle}>
-        <p className="max-w-md text-sm text-muted-foreground">{props.hasRecordings ? t.endedReplay : t.endedBody}</p>
+        <p className="max-w-md text-sm text-muted-foreground">
+          {props.hasRecordings ? t.endedReplay : t.endedBody}
+        </p>
+
         {props.hasRecordings ? (
           <Button size="lg" onClick={props.onShowRecordings}>
             {t.watchReplay}
@@ -123,16 +192,32 @@ function ClassroomStageImpl(props: StageProps) {
         ) : null}
       </StageMessage>
     );
-  } else if (stage === "LIVE" && join.kind === "joined") {
+  } else if (join.kind === "demo") {
     content = <DemoStage lessonTitle={props.lessonTitle} onLeave={() => setJoin({ kind: "idle" })} />;
+  } else if (zoom.open) {
+    content = (
+      <div className="flex min-h-[22rem] flex-1 flex-col bg-black lg:min-h-[32rem]">
+        <ZoomFrame frameRef={zoom.frameRef} frameKey={zoom.frameKey} title={zoomText.admin.frameTitle} className="h-[65vh] min-h-[28rem] flex-1" />
+      </div>
+    );
   } else if (stage === "LIVE") {
     content = (
-      <StageMessage icon={<Radio className="size-6" />} title={t.liveTitle} tone="live">
+      <StageMessage
+        icon={<Radio className="size-6" />}
+        title={t.liveTitle}
+        tone="live"
+      >
         {canJoin ? (
           <>
             <p className="max-w-md text-sm text-muted-foreground">{t.liveBody}</p>
-            <Button size="lg" className="h-11 min-w-40 bg-live px-6 text-base text-white hover:bg-live/90" disabled={join.kind === "joining"} onClick={() => void requestJoin()}>
-              {join.kind === "joining" ? (
+
+            <Button
+              size="lg"
+              className="h-11 min-w-40 bg-live px-6 text-base text-white hover:bg-live/90"
+              disabled={isJoining}
+              onClick={() => void requestJoin()}
+            >
+              {isJoining ? (
                 <>
                   <Loader2 className="animate-spin" aria-hidden="true" />
                   {t.joining}
@@ -143,14 +228,23 @@ function ClassroomStageImpl(props: StageProps) {
             </Button>
           </>
         ) : (
-          <p className="max-w-md text-sm text-muted-foreground">{props.joinBlockedMessage ?? t.joinBlocked}</p>
+          <p className="max-w-md text-sm text-muted-foreground">
+            {props.joinBlockedMessage ?? t.joinBlocked}
+          </p>
         )}
-        {join.kind === "error" ? (
-          <div role="alert" className="mt-2 flex max-w-md items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-left text-sm text-destructive">
-            <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+
+        {joinError ? (
+          <div
+            role="alert"
+            className="mt-2 flex max-w-md items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-left text-sm text-destructive"
+          >
+            <CircleAlert
+              aria-hidden="true"
+              className="mt-0.5 size-4 shrink-0"
+            />
             <div>
               <p className="font-medium">{t.errorTitle}</p>
-              <p>{join.message}</p>
+              <p>{joinError}</p>
             </div>
           </div>
         ) : null}
@@ -164,8 +258,15 @@ function ClassroomStageImpl(props: StageProps) {
     );
   } else if (stage === "NOT_OPEN") {
     content = (
-      <StageMessage icon={<CalendarClock className="size-6" />} title={t.notOpenTitle}>
-        <Countdown startAt={props.scheduledStartAt} opensAt={props.joinOpensAt} serverTime={props.serverTime} />
+      <StageMessage
+        icon={<CalendarClock className="size-6" />}
+        title={t.notOpenTitle}
+      >
+        <Countdown
+          startAt={props.scheduledStartAt}
+          opensAt={props.joinOpensAt}
+          serverTime={props.serverTime}
+        />
         <p className="max-w-md text-sm text-muted-foreground">{t.notOpenBody}</p>
       </StageMessage>
     );
@@ -178,8 +279,11 @@ function ClassroomStageImpl(props: StageProps) {
   }
 
   return (
-    <section aria-label={t.regionLabel} className="flex min-h-[22rem] flex-col overflow-hidden rounded-xl border bg-card lg:min-h-[32rem]">
-      <div aria-live="polite" className="flex-1">
+    <section
+      aria-label={t.regionLabel}
+      className="flex min-h-[22rem] flex-col overflow-hidden rounded-xl border bg-card lg:min-h-[32rem]"
+    >
+      <div aria-live="polite" className="flex flex-1 flex-col">
         {content}
       </div>
     </section>

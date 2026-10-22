@@ -1,7 +1,7 @@
 # Implementation status
 
 Single source of truth for progress. Update at the end of every work session / stage.
-Last updated: 2026-10-21
+Last updated: 2026-10-22
 Legend: ✅ done & verified · 🟡 in progress · ⬜ not started · ⛔ blocked (reason)
 
 How to run: `README.md` · How to test: `docs/testing.md` · Decisions: `NOTES.md`
@@ -49,10 +49,14 @@ How to run: `README.md` · How to test: `docs/testing.md` · Decisions: `NOTES.m
 - ⬜ Abandoned gallery uploads can leave orphan objects in storage (needs a cleanup job)
 - ⬜ No visual/browser pass at 360 px yet (only HTTP-level checks) — do a manual click-through (see docs/testing.md); also verify in a browser that storage CORS exposes the ETag header (multipart recording upload)
 
-## Phase 2 — real Zoom (needs the academy's Zoom account)
-- ⬜ Isolated Zoom frame (CDN SDK, Client View mobile / Component View desktop)
-- ⬜ Server-to-Server OAuth, meeting creation (idempotent), SDK signature, host ZAK
-- ⬜ Webhooks (signature verification, durable storage) → LIVE/ENDED state
+## Phase 2 — real Zoom (code complete; needs the academy's Zoom account to test live)
+- ✅ Isolated Zoom SDK frame (Client View, CDN SDK 6.5.0, scoped CSP) + shared `useZoomFrame` protocol — Eli + review
+- ✅ S2S OAuth client (cached token), duplicate-safe meeting creation, reschedule sync, delete on cancel
+- ✅ Student join (policy-checked, role-0 signature) and host start (role-1 + ZAK) inside the site
+- ✅ Webhooks: verified, durable (WebhookEvent), deduplicated, order-safe → LIVE/ENDED + realtime pop-up
+- ✅ Passcodes encrypted at rest; ZOOM_MODE=live refuses to start half-configured
+- ✅ 15-case integration test against a fake Zoom API + unit tests (signatures, bodies, encryption)
+- ⬜ Real-account acceptance test (desktop/Android/iPhone, 30 participants, 3 h) — see NOTES.md "Zoom setup checklist"
 
 ## Phase 3 — cloud recording import (needs Zoom Pro)
 - ⬜ pg-boss worker, streamed multipart copy, idempotent import, retries

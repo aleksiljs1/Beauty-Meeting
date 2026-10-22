@@ -211,6 +211,16 @@ model Lesson {
   /// True when the meeting is the clearly labelled demo classroom (ZOOM_MODE=demo).
   isDemo        Boolean           @default(false)
 
+  /// Zoom meeting number (Zoom API `id`), stored as text (exceeds JS safe integers).
+  /// Webhooks are matched on this: a scheduled meeting gets a NEW uuid every time it starts.
+  zoomMeetingNumber         String?   @unique
+  /// Meeting passcode, AES-256-GCM encrypted with APP_ENCRYPTION_KEY. Never sent to clients
+  /// except inside a join/host authorization for a user the access policy allows.
+  zoomPasscodeEncrypted     String?
+  /// Set while a meeting is being created in Zoom — a lock against duplicate meetings
+  /// (double clicks, retries after a timeout). Cleared when creation finishes or fails.
+  zoomProvisioningStartedAt DateTime? @db.Timestamptz(3)
+
   createdById String
   createdBy   User     @relation(fields: [createdById], references: [id], onDelete: Restrict)
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
@@ -365,6 +375,34 @@ model Notification {
 
   @@unique([userId, dedupeKey])
   @@index([userId, createdAt])
+}
+
+enum WebhookEventStatus {
+  RECEIVED
+  PROCESSED
+  IGNORED
+  FAILED
+}
+
+/// Every verified provider webhook, stored before it is acted on. `dedupeKey` makes repeated
+/// deliveries harmless; FAILED rows can be retried by the admin "sync" action.
+model WebhookEvent {
+  id            String             @id @default(uuid(7)) @db.Uuid
+  provider      String
+  /// e.g. "zoom:meeting.started:<meeting number>:<event_ts>"
+  dedupeKey     String             @unique
+  eventType     String
+  meetingNumber String?
+  /// Provider event time (ms since epoch) — used to ignore stale, out-of-order events.
+  eventTs       BigInt
+  status        WebhookEventStatus @default(RECEIVED)
+  /// Safe, non-secret description of why it was ignored or failed.
+  note          String?
+  receivedAt    DateTime           @default(now()) @db.Timestamptz(3)
+  processedAt   DateTime?          @db.Timestamptz(3)
+
+  @@index([provider, meetingNumber, eventTs])
+  @@index([status, receivedAt])
 }
 
 model AuditLog {

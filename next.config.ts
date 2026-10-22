@@ -1,3 +1,4 @@
+
 import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV !== "production";
@@ -29,7 +30,7 @@ function realtimeOrigins(): string {
 const realtime = realtimeOrigins();
 
 // Next.js hydration needs inline scripts; there are no third-party scripts on the site.
-// The Zoom classroom frame (Phase 2) gets its own, separately scoped policy.
+// The Zoom classroom frame gets its own, separately scoped policy below.
 const contentSecurityPolicy = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
@@ -46,22 +47,76 @@ const contentSecurityPolicy = [
   ...(isDev ? [] : ["upgrade-insecure-requests"]),
 ].join("; ");
 
+/**
+ * Zoom Meeting SDK runs only inside public/zoom-frame.html.
+ * Its CDN, media connections, WebAssembly and inline styles must be allowed
+ * there without relaxing the policy for the rest of Beauty Meeting.
+ *
+ * Zoom's Web SDK documentation identifies these additional CSP requirements:
+ * https://developers.zoom.us/docs/meeting-sdk/web/browser-support/
+ */
+const zoomFrameCsp = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'self'",
+  "worker-src 'self' blob:",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://source.zoom.us https://zoom.us https://*.zoom.us https://dmogdx0jrul3u.cloudfront.net blob:",
+  "style-src 'self' 'unsafe-inline' https://source.zoom.us https://*.zoom.us",
+  "img-src 'self' data: blob: https:",
+  "media-src 'self' blob: https:",
+  "font-src 'self' data: https:",
+  "connect-src 'self' https://source.zoom.us https://zoom.us https://*.zoom.us wss://*.zoom.us https://zoom.com https://*.zoom.com wss://*.zoom.com https://zoom.com.cn https://*.zoom.com.cn wss://*.zoom.com.cn https://dmogdx0jrul3u.cloudfront.net",
+  "frame-src 'self' https://zoom.us https://*.zoom.us https://zoom.com https://*.zoom.com blob:",
+  "form-action 'self' https://zoom.us https://*.zoom.us",
+  ...(isDev ? [] : ["upgrade-insecure-requests"]),
+].join("; ");
+
 const securityHeaders = [
   { key: "Content-Security-Policy", value: contentSecurityPolicy },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  // Camera/mic only for our own origin (the Zoom classroom); never for embedded third parties.
-  { key: "Permissions-Policy", value: "camera=(self), microphone=(self), display-capture=(self), geolocation=(), payment=()" },
-  ...(isDev ? [] : [{ key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" }]),
+  // Camera/mic are allowed for our own origin, including the same-origin Zoom frame.
+  {
+    key: "Permissions-Policy",
+    value:
+      "camera=(self), microphone=(self), display-capture=(self), geolocation=(), payment=()",
+  },
+  ...(isDev
+    ? []
+    : [
+        {
+          key: "Strict-Transport-Security",
+          value: "max-age=63072000; includeSubDomains",
+        },
+      ]),
 ];
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },
+
       // Invitation tokens live in the URL path: never leak them through the Referer header.
-      { source: "/ftese/:path*", headers: [{ key: "Referrer-Policy", value: "no-referrer" }] },
+      {
+        source: "/ftese/:path*",
+        headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+      },
+
+      // Override only the CSP and permissions policy for the isolated Zoom SDK frame.
+      {
+        source: "/zoom-frame.html",
+        headers: [
+          { key: "Content-Security-Policy", value: zoomFrameCsp },
+          {
+            key: "Permissions-Policy",
+            value:
+              "camera=(self), microphone=(self), display-capture=(self), geolocation=(), payment=()",
+          },
+        ],
+      },
     ];
   },
 };

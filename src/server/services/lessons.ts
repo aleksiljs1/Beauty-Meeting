@@ -8,6 +8,7 @@ import { env } from "@/server/env";
 import { ApiError } from "@/server/http";
 import { publishLessonChanged } from "@/server/realtime/publish";
 import { deleteObject } from "@/server/storage/storage";
+import { deleteZoomMeeting, syncZoomMeetingSchedule } from "@/server/zoom/meetings";
 import { audit } from "./audit";
 import { markLessonEnded, markLessonLive } from "./live";
 
@@ -93,6 +94,7 @@ export async function updateLesson(lessonId: string, patch: LessonPatch, confirm
   let meetingStatus = current.meetingStatus;
   if (patch.isDemo !== undefined && patch.isDemo !== current.isDemo) {
     if (current.meetingStatus === "LIVE") throw new ApiError("CONFLICT", "Nuk mund të ndryshoni llojin e klasës ndërsa mësimi është live.");
+    if (patch.isDemo && current.zoomMeetingNumber) throw new ApiError("CONFLICT", "Ky mësim ka një takim Zoom. Anulojeni mësimin për ta fshirë takimin.");
     assertDemoAllowed(patch.isDemo);
     if (patch.isDemo && current.meetingStatus === "NOT_PROVISIONED") meetingStatus = "SCHEDULED";
     if (!patch.isDemo && current.meetingStatus === "SCHEDULED") meetingStatus = "NOT_PROVISIONED";
@@ -122,6 +124,15 @@ export async function updateLesson(lessonId: string, patch: LessonPatch, confirm
     await audit(admin.id, "lesson.update", "lesson", lessonId, { fields: changed });
     await publishLessonChanged(lessonId);
   }
+
+  // Keep the Zoom meeting's title/time in step. Best effort: the lesson is already saved.
+  const zoomRelevant = changed.some((key) => key === "title" || key === "scheduledStartAt" || key === "scheduledEndAt");
+  if (!zoomRelevant || !current.zoomMeetingNumber) return { zoomSynced: true };
+  const { synced } = await syncZoomMeetingSchedule(
+    { id: lessonId, title: patch.title?.trim() ?? current.title, ...schedule, zoomMeetingNumber: current.zoomMeetingNumber },
+    admin.id,
+  );
+  return { zoomSynced: synced };
 }
 
 const PUBLICATION_ACTION: Record<PublicationStatus, string> = {
@@ -140,9 +151,9 @@ const TRANSITIONS: Record<PublicationStatus, PublicationStatus[]> = {
 };
 
 export async function setLessonPublication(lessonId: string, publication: PublicationStatus, admin: AppUser) {
-  const lesson = await prisma.lesson.findUnique({ where: { id: lessonId }, select: { publication: true, meetingStatus: true } });
+  const lesson = await prisma.lesson.findUnique({ where: { id: lessonId }, select: { publication: true, meetingStatus: true, zoomMeetingNumber: true } });
   if (!lesson) throw new ApiError("NOT_FOUND", "Mësimi nuk u gjet.");
-  if (lesson.publication === publication) return;
+  if (lesson.publication === publication) return { zoomDeleted: true };
   if (!TRANSITIONS[lesson.publication].includes(publication)) throw new ApiError("CONFLICT", "Ky ndryshim statusi nuk lejohet.");
   if (lesson.meetingStatus === "LIVE" && publication !== "PUBLISHED") {
     throw new ApiError("CONFLICT", "Përfundoni fillimisht mësimin live.");
@@ -153,6 +164,17 @@ export async function setLessonPublication(lessonId: string, publication: Public
   if (result.count === 0) throw new ApiError("CONFLICT", "Mësimi u ndryshua ndërkohë. Rifreskoni faqen.");
   await audit(admin.id, PUBLICATION_ACTION[publication], "lesson", lessonId, { from: lesson.publication });
   await publishLessonChanged(lessonId);
+
+  // A cancelled lesson's Zoom meeting is removed so nobody can still join it from Zoom.
+  if (publication !== "CANCELLED" || !lesson.zoomMeetingNumber) return { zoomDeleted: true };
+  const { deleted } = await deleteZoomMeeting(lessonId, lesson.zoomMeetingNumber, admin.id);
+  if (deleted) {
+    await prisma.lesson.update({
+      where: { id: lessonId },
+      data: { zoomMeetingNumber: null, zoomPasscodeEncrypted: null, meetingStatus: "NOT_PROVISIONED" },
+    });
+  }
+  return { zoomDeleted: deleted };
 }
 
 /** Only drafts nobody is enrolled in can be deleted; everything else is archived instead. */
@@ -162,6 +184,7 @@ export async function deleteDraftLesson(lessonId: string, admin: AppUser) {
     select: {
       publication: true,
       title: true,
+      zoomMeetingNumber: true,
       _count: { select: { enrollments: true } },
       materials: { select: { objectKey: true } },
       recordings: { select: { objectKey: true } },
@@ -174,6 +197,7 @@ export async function deleteDraftLesson(lessonId: string, admin: AppUser) {
   const recordings = await prisma.recording.findMany({ where: { lessonId }, select: { id: true, uploadId: true } });
   if (recordings.some((r) => r.uploadId)) throw new ApiError("CONFLICT", "Një ngarkim regjistrimi është në vazhdim. Ndalojeni ose fshijeni fillimisht.");
 
+  await deleteZoomMeeting(lessonId, lesson.zoomMeetingNumber, admin.id);
   await prisma.lesson.delete({ where: { id: lessonId } });
   const keys = [...lesson.materials.map((m) => m.objectKey), ...lesson.recordings.map((r) => r.objectKey)].filter((k): k is string => !!k);
   await Promise.all(keys.map((key) => deleteObject(key).catch((error) => console.error("[storage] orphan lesson object", key, error))));

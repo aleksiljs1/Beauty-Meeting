@@ -1,0 +1,75 @@
+import "server-only";
+import { z } from "zod";
+import type { AppUser } from "@/server/auth/session";
+import { prisma } from "@/server/db";
+import { env } from "@/server/env";
+import { ApiError } from "@/server/http";
+import { audit } from "@/server/services/audit";
+import { requireZoomCredentials, toApiError, zoomRequest } from "./client";
+import { createMeetingSdkHostSignature } from "./meeting-sdk-signature";
+import { openPasscode } from "./meetings";
+
+/** The host may open the meeting this long before the scheduled start. */
+const HOST_EARLY_START_MS = 30 * 60_000;
+/** ZAK lifetime requested from Zoom — only needed to start the meeting. */
+const ZAK_TTL_SECONDS = 300;
+
+export type ZoomJoinConfig = {
+  mode: "host" | "student";
+  lessonId: string;
+  signature: string;
+  meetingNumber: string;
+  password: string;
+  userName: string;
+  zak?: string;
+};
+
+/**
+ * Short-lived authorization for the academy host to start a lesson's meeting in the embedded
+ * SDK (role-1 signature + ZAK). Returned only to an authenticated admin; never stored or logged.
+ */
+export async function createZoomHostAuthorization(lessonId: string, admin: AppUser, now = Date.now()): Promise<ZoomJoinConfig> {
+  if (admin.role !== "admin") throw new ApiError("FORBIDDEN", "Nuk keni leje për të nisur klasën.");
+  const { hostUserId } = requireZoomCredentials();
+
+  const lesson = await prisma.lesson.findUnique({
+    where: { id: lessonId },
+    select: { id: true, publication: true, meetingStatus: true, isDemo: true, scheduledStartAt: true, scheduledEndAt: true, zoomMeetingNumber: true, zoomPasscodeEncrypted: true },
+  });
+  if (!lesson) throw new ApiError("NOT_FOUND", "Mësimi nuk u gjet.");
+  if (lesson.isDemo) throw new ApiError("CONFLICT", "Kjo klasë është demonstrim dhe nuk përdor Zoom real.");
+  if (lesson.publication !== "PUBLISHED") throw new ApiError("CONFLICT", "Publikoni mësimin para se të nisni klasën live.");
+  if (!lesson.zoomMeetingNumber) throw new ApiError("INTEGRATION_NOT_CONFIGURED", "Ky mësim nuk ka ende një takim Zoom.");
+  if (lesson.meetingStatus === "ENDED" || lesson.meetingStatus === "ERROR") throw new ApiError("CONFLICT", "Ky takim ka përfunduar.");
+  if (now < lesson.scheduledStartAt.getTime() - HOST_EARLY_START_MS) {
+    throw new ApiError("LESSON_JOIN_NOT_OPEN", "Mund ta nisni klasën jo më herët se 30 minuta para orarit.");
+  }
+  if (now >= lesson.scheduledEndAt.getTime()) throw new ApiError("CONFLICT", "Orari i këtij mësimi ka përfunduar.");
+
+  let zak: string;
+  try {
+    ({ token: zak } = await zoomRequest(`/users/${encodeURIComponent(hostUserId)}/token`, {
+      query: { type: "zak", ttl: String(ZAK_TTL_SECONDS) },
+      schema: z.object({ token: z.string().min(1) }),
+    }));
+  } catch (error) {
+    toApiError(error, "Zoom nuk autorizoi host-in e klasës.");
+  }
+
+  const signature = await createMeetingSdkHostSignature({
+    clientId: env.ZOOM_CLIENT_ID!,
+    clientSecret: env.ZOOM_CLIENT_SECRET!,
+    meetingNumber: lesson.zoomMeetingNumber,
+  });
+  await audit(admin.id, "lesson.zoom_host_authorization", "lesson", lesson.id, { meetingNumber: lesson.zoomMeetingNumber });
+
+  return {
+    mode: "host",
+    lessonId: lesson.id,
+    signature,
+    meetingNumber: lesson.zoomMeetingNumber,
+    password: openPasscode(lesson.zoomPasscodeEncrypted),
+    userName: admin.name,
+    zak,
+  };
+}

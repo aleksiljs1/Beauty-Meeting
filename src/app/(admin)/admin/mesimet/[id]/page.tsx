@@ -5,6 +5,8 @@ import { ChevronLeft } from "lucide-react";
 import { InvitationsPanel } from "@/components/admin/lessons/invitations-panel";
 import { LessonForm } from "@/components/admin/lessons/lesson-form";
 import { LessonStatusPanel } from "@/components/admin/lessons/lesson-status-panel";
+import { ZoomHostPanel } from "@/components/admin/lessons/zoom-host-panel";
+import { zoomText } from "@/i18n/zoom";
 import { LESSON_TABS, type LessonTab } from "@/components/admin/lessons/lesson-tab-ids";
 import { LessonTabs } from "@/components/admin/lessons/lesson-tabs";
 import { MaterialsPanel } from "@/components/admin/lessons/materials-panel";
@@ -69,6 +71,17 @@ export default async function LessonDetailPage({ params, searchParams }: PagePro
               <SectionCard title={admin.lessonActions.status}>
                 <LessonStatusPanel lesson={lesson} zoomMode={env.ZOOM_MODE} />
               </SectionCard>
+              {!lesson.isDemo && (
+                <SectionCard title={zoomText.admin.sectionTitle}>
+                  <ZoomHostPanel
+                    lessonId={lesson.id}
+                    zoomLive={env.ZOOM_MODE === "live"}
+                    meetingNumber={lesson.zoomMeetingNumber}
+                    publication={lesson.publication}
+                    meetingStatus={lesson.meetingStatus}
+                  />
+                </SectionCard>
+              )}
               <SectionCard title={admin.lessons.tabs.details}>
                 <LessonForm lesson={lesson} courses={courses} demoAllowed={env.ZOOM_MODE === "demo"} />
               </SectionCard>
