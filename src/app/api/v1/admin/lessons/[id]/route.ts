@@ -3,6 +3,9 @@ import { ok, readJson, route } from "@/server/http";
 import { requireAdminLesson } from "@/server/queries/admin";
 import { deleteDraftLesson, updateLesson } from "@/server/services/lessons";
 import { updateLessonSchema, uuidParam } from "@/server/validation/admin";
+import { zoomText } from "@/i18n/zoom";
+
+const ZOOM_SYNC_WARNING = zoomText.warnings.syncFailed;
 
 type Ctx = RouteContext<"/api/v1/admin/lessons/[id]">;
 const lessonId = async (ctx: Ctx) => uuidParam((await ctx.params).id, "Mësimi nuk u gjet.");
@@ -16,8 +19,8 @@ export const PATCH = route<Ctx>(async (request, ctx) => {
   const admin = await requireApiUser(request, "admin");
   const id = await lessonId(ctx);
   const { confirmEarlyDeadline, ...patch } = updateLessonSchema.parse(await readJson(request));
-  await updateLesson(id, patch, confirmEarlyDeadline ?? false, admin);
-  return ok(await requireAdminLesson(id));
+  const { zoomSynced } = await updateLesson(id, patch, confirmEarlyDeadline ?? false, admin);
+  return ok({ ...(await requireAdminLesson(id)), zoomWarning: zoomSynced ? null : ZOOM_SYNC_WARNING });
 });
 
 /** Only drafts without enrolments; everything else is archived instead. */

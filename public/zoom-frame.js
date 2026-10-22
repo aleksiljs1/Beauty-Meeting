@@ -85,17 +85,17 @@
     }
 
     joinStarted = true;
-message.textContent = "Po përgatitet klasa live...";
+    message.textContent = "Po përgatitet klasa live...";
 
     try {
-    // Load the Zoom interface only after the server-authorized join request.
-    zoom.setZoomJSLib(`https://source.zoom.us/${VERSION}/lib`, "/av");
-    zoom.preLoadWasm();
-    zoom.prepareWebSDK();
+      // Load the Zoom interface only after the server-authorized join request.
+      zoom.setZoomJSLib(`https://source.zoom.us/${VERSION}/lib`, "/av");
+      zoom.preLoadWasm();
+      zoom.prepareWebSDK();
     } catch {
-    showError("Përgatitja e Zoom SDK dështoi.");
-    joinStarted = false;
-    return;
+      showError("Përgatitja e Zoom SDK dështoi.");
+      joinStarted = false;
+      return;
     }
 
     message.textContent = "Po lidhemi me klasën...";

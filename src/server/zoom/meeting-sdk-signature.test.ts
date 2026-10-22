@@ -15,8 +15,8 @@ function decodeSegment(segment: string): unknown {
 }
 
 describe("createMeetingSdkParticipantSignature", () => {
-  it("creates a valid HS256 JWT for a participant", () => {
-    const token = createMeetingSdkParticipantSignature({
+  it("creates a valid HS256 JWT for a participant", async () => {
+    const token = await createMeetingSdkParticipantSignature({
       clientId: TEST_CLIENT_ID,
       clientSecret: TEST_CLIENT_SECRET,
       meetingNumber: TEST_MEETING_NUMBER,
@@ -50,8 +50,8 @@ describe("createMeetingSdkParticipantSignature", () => {
     expect(actualSignature).toBe(expectedSignature);
   });
 
-  it("normalizes whitespace in the meeting number", () => {
-    const token = createMeetingSdkParticipantSignature({
+  it("normalizes whitespace in the meeting number", async () => {
+    const token = await createMeetingSdkParticipantSignature({
       clientId: TEST_CLIENT_ID,
       clientSecret: TEST_CLIENT_SECRET,
       meetingNumber: "123 456 7890",
@@ -65,29 +65,29 @@ describe("createMeetingSdkParticipantSignature", () => {
     expect(payload.mn).toBe(TEST_MEETING_NUMBER);
   });
 
-  it("rejects missing credentials", () => {
-    expect(() =>
+  it("rejects missing credentials", async () => {
+    await expect(
       createMeetingSdkParticipantSignature({
         clientId: "",
         clientSecret: TEST_CLIENT_SECRET,
         meetingNumber: TEST_MEETING_NUMBER,
         nowSeconds: TEST_NOW,
       }),
-    ).toThrow("Zoom Meeting SDK Client ID is required.");
+    ).rejects.toThrow("Zoom Meeting SDK Client ID is required.");
 
-    expect(() =>
+    await expect(
       createMeetingSdkParticipantSignature({
         clientId: TEST_CLIENT_ID,
         clientSecret: "",
         meetingNumber: TEST_MEETING_NUMBER,
         nowSeconds: TEST_NOW,
       }),
-    ).toThrow("Zoom Meeting SDK Client Secret is required.");
+    ).rejects.toThrow("Zoom Meeting SDK Client Secret is required.");
   });
 
 
-  it("creates a host signature with role 1", () => {
-    const token = createMeetingSdkHostSignature({
+  it("creates a host signature with role 1", async () => {
+    const token = await createMeetingSdkHostSignature({
       clientId: TEST_CLIENT_ID,
       clientSecret: TEST_CLIENT_SECRET,
       meetingNumber: TEST_MEETING_NUMBER,
@@ -106,14 +106,14 @@ describe("createMeetingSdkParticipantSignature", () => {
   });
 
 
-  it("rejects invalid meeting numbers", () => {
-    expect(() =>
+  it("rejects invalid meeting numbers", async () => {
+    await expect(
       createMeetingSdkParticipantSignature({
         clientId: TEST_CLIENT_ID,
         clientSecret: TEST_CLIENT_SECRET,
         meetingNumber: "not-a-meeting",
         nowSeconds: TEST_NOW,
       }),
-    ).toThrow("A valid Zoom meeting number is required.");
+    ).rejects.toThrow("A valid Zoom meeting number is required.");
   });
 });

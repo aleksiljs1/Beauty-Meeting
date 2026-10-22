@@ -1,406 +1,153 @@
 import "server-only";
 import { z } from "zod";
-import { env } from "@/server/env";
-import { prisma } from "@/server/db";
 import type { AppUser } from "@/server/auth/session";
+import { decryptSecret, encryptSecret } from "@/server/crypto/secret-box";
+import { prisma } from "@/server/db";
+import { env } from "@/server/env";
 import { ApiError } from "@/server/http";
-import { audit } from "@/server/services/audit";
 import { publishLessonChanged } from "@/server/realtime/publish";
-import { createMeetingSdkHostSignature } from "@/server/zoom/meeting-sdk-signature";
-
-const ZOOM_OAUTH_URL = "https://zoom.us/oauth/token";
-const ZOOM_API_URL = "https://api.zoom.us/v2";
-const REQUEST_TIMEOUT_MS = 15_000;
-
-const createdMeetingSchema = z.object({
-  id: z.union([z.string().min(1), z.number().int().positive()]),
-  uuid: z.string().min(1),
-  password: z.string().nullable().optional(),
-});
-
-type ZoomConfig = {
-  accountId: string;
-  clientId: string;
-  clientSecret: string;
-  hostUserId: string;
-};
-
-function getZoomConfig(): ZoomConfig {
-  const { ZOOM_S2S_ACCOUNT_ID, ZOOM_S2S_CLIENT_ID, ZOOM_S2S_CLIENT_SECRET, ZOOM_HOST_USER_ID } = env;
-
-  if (!ZOOM_S2S_ACCOUNT_ID || !ZOOM_S2S_CLIENT_ID || !ZOOM_S2S_CLIENT_SECRET || !ZOOM_HOST_USER_ID) {
-    throw new ApiError("INTEGRATION_NOT_CONFIGURED", "Integrimi me Zoom nuk është konfiguruar.");
-  }
-
-  return {
-    accountId: ZOOM_S2S_ACCOUNT_ID,
-    clientId: ZOOM_S2S_CLIENT_ID,
-    clientSecret: ZOOM_S2S_CLIENT_SECRET,
-    hostUserId: ZOOM_HOST_USER_ID,
-  };
-}
-
-async function getAccessToken(config: ZoomConfig): Promise<string> {
-  const params = new URLSearchParams({
-    grant_type: "account_credentials",
-    account_id: config.accountId,
-  });
-
-  let response: Response;
-
-  try {
-    response = await fetch(`${ZOOM_OAUTH_URL}?${params.toString()}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${Buffer.from(`${config.clientId}:${config.clientSecret}`).toString("base64")}`,
-      },
-      cache: "no-store",
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    });
-  } catch {
-    throw new ApiError("INTEGRATION_FAILED", "Nuk mund të lidhemi me Zoom. Provoni përsëri.");
-  }
-
-  const payload: unknown = await response.json().catch(() => null);
-  const token = z.object({ access_token: z.string().min(1) }).safeParse(payload);
-
-  if (!response.ok || !token.success) {
-    console.error("[zoom] OAuth token request failed", { status: response.status });
-    throw new ApiError("INTEGRATION_FAILED", "Zoom nuk autorizoi krijimin e takimit.");
-  }
-
-  return token.data.access_token;
-}
-
-async function deleteRemoteMeeting(accessToken: string, meetingNumber: string) {
-  const response = await fetch(
-    `${ZOOM_API_URL}/meetings/${encodeURIComponent(meetingNumber)}`,
-    {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${accessToken}` },
-      cache: "no-store",
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    },
-  );
-
-  if (!response.ok && response.status !== 404) {
-    throw new Error(`Zoom meeting cleanup failed (${response.status}).`);
-  }
-}
+import { audit } from "@/server/services/audit";
+import { toApiError, requireZoomCredentials, zoomRequest, ZoomRequestError } from "./client";
+import { createMeetingBody, lessonMarker, meetingSchedule, type LessonSchedule } from "./meeting-body";
 
 /**
- * Create one real Zoom meeting for an existing non-demo lesson.
- *
- * The admin API route must authenticate an admin before calling this service.
- * Meeting passcodes and host URLs never leave the server through this result.
+ * Zoom meetings for lessons: create (duplicate-safe), keep in sync with the lesson, delete.
+ * One scheduled meeting per lesson. Webhooks match on the meeting number (see webhooks.ts).
  */
-export async function createZoomMeetingForLesson(lessonId: string, admin: AppUser) {
-  const config = getZoomConfig();
 
+/** A provisioning lock older than this is considered abandoned (crashed request). */
+const PROVISIONING_LOCK_MS = 2 * 60_000;
+
+const meetingSchema = z.object({
+  id: z.union([z.number().int().positive(), z.string().regex(/^\d+$/)]).transform(String),
+  password: z.string().nullish(),
+  agenda: z.string().nullish(),
+});
+const meetingListSchema = z.object({
+  meetings: z.array(z.object({ id: z.union([z.number(), z.string()]).transform(String), start_time: z.string().optional() })).default([]),
+});
+
+// --- passcode at rest ------------------------------------------------------------------
+
+function encryptionKey(): string {
+  if (!env.APP_ENCRYPTION_KEY) throw new ApiError("INTEGRATION_NOT_CONFIGURED", "Mungon APP_ENCRYPTION_KEY.");
+  return env.APP_ENCRYPTION_KEY;
+}
+export const sealPasscode = (passcode: string | null | undefined) => (passcode ? encryptSecret(passcode, encryptionKey()) : null);
+export const openPasscode = (sealed: string | null) => (sealed ? decryptSecret(sealed, encryptionKey()) : "");
+
+// --- create ------------------------------------------------------------------------------
+
+/** Looks for a meeting already created for this lesson (e.g. by a request that timed out). */
+async function findExistingMeeting(hostUserId: string, lesson: LessonSchedule) {
+  const { meetings } = await zoomRequest(`/users/${encodeURIComponent(hostUserId)}/meetings`, {
+    query: { type: "upcoming", page_size: "300" },
+    schema: meetingListSchema,
+  });
+  const start = lesson.scheduledStartAt.toISOString().slice(0, 16);
+  const candidates = meetings.filter((m) => m.start_time?.slice(0, 16) === start);
+  for (const candidate of candidates) {
+    const detail = await zoomRequest(`/meetings/${candidate.id}`, { schema: meetingSchema });
+    if (detail.agenda?.includes(lessonMarker(lesson.id))) return detail;
+  }
+  return null;
+}
+
+export async function createZoomMeetingForLesson(lessonId: string, admin: AppUser) {
+  const { hostUserId } = requireZoomCredentials();
   const lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
-    select: {
-      id: true,
-      title: true,
-      scheduledStartAt: true,
-      scheduledEndAt: true,
-      isDemo: true,
-      publication: true,
-      meetingStatus: true,
-      zoomMeetingNumber: true,
-      zoomMeetingUuid: true,
-    },
+    select: { id: true, title: true, scheduledStartAt: true, scheduledEndAt: true, isDemo: true, publication: true, meetingStatus: true, zoomMeetingNumber: true },
   });
-
   if (!lesson) throw new ApiError("NOT_FOUND", "Mësimi nuk u gjet.");
-
-  if (lesson.isDemo) {
-    throw new ApiError("CONFLICT", "Nuk mund të krijoni takim Zoom për një klasë demo.");
-  }
-
-  if (lesson.zoomMeetingNumber || lesson.zoomMeetingUuid) {
-    throw new ApiError("CONFLICT", "Ky mësim tashmë është lidhur me një takim Zoom.");
-  }
-
+  if (lesson.isDemo) throw new ApiError("CONFLICT", "Klasat demo nuk përdorin Zoom.");
+  if (lesson.zoomMeetingNumber) throw new ApiError("CONFLICT", "Ky mësim ka tashmë një takim Zoom.");
   if (lesson.publication === "CANCELLED" || lesson.publication === "ARCHIVED") {
     throw new ApiError("CONFLICT", "Riktheni ose publikoni mësimin para krijimit të takimit.");
   }
-
   if (lesson.meetingStatus === "LIVE" || lesson.meetingStatus === "ENDED") {
     throw new ApiError("CONFLICT", "Nuk mund të krijoni takim për një mësim live ose të përfunduar.");
   }
+  if (lesson.scheduledEndAt.getTime() <= Date.now()) throw new ApiError("VALIDATION_FAILED", "Orari i mësimit ka kaluar.");
 
-  if (lesson.scheduledStartAt.getTime() <= Date.now()) {
-    throw new ApiError("VALIDATION_FAILED", "Orari i mësimit duhet të jetë në të ardhmen.");
-  }
-
-  const accessToken = await getAccessToken(config);
-  const durationMinutes = Math.ceil(
-    (lesson.scheduledEndAt.getTime() - lesson.scheduledStartAt.getTime()) / 60_000,
-  );
-
-  let response: Response;
+  // Lock: only one creation per lesson at a time (double clicks, parallel tabs).
+  const lockExpired = new Date(Date.now() - PROVISIONING_LOCK_MS);
+  const locked = await prisma.lesson.updateMany({
+    where: { id: lessonId, zoomMeetingNumber: null, OR: [{ zoomProvisioningStartedAt: null }, { zoomProvisioningStartedAt: { lt: lockExpired } }] },
+    data: { zoomProvisioningStartedAt: new Date() },
+  });
+  if (locked.count === 0) throw new ApiError("CONFLICT", "Krijimi i takimit është tashmë në proces. Rifreskoni faqen pas pak.");
 
   try {
-    response = await fetch(
-      `${ZOOM_API_URL}/users/${encodeURIComponent(config.hostUserId)}/meetings`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          topic: lesson.title,
-          type: 2,
-          start_time: lesson.scheduledStartAt.toISOString(),
-          duration: durationMinutes,
-          timezone: "UTC",
-          settings: {
-            join_before_host: false,
-            waiting_room: true,
-            host_video: true,
-            participant_video: true,
-          },
-        }),
-        cache: "no-store",
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      },
-    );
-  } catch {
-    throw new ApiError("INTEGRATION_FAILED", "Nuk mund të lidhemi me Zoom. Provoni përsëri.");
-  }
+    // A previous attempt may have created the meeting in Zoom before failing on our side.
+    let meeting = await findExistingMeeting(hostUserId, lesson);
+    if (!meeting) {
+      try {
+        meeting = await zoomRequest(`/users/${encodeURIComponent(hostUserId)}/meetings`, {
+          method: "POST",
+          body: createMeetingBody(lesson, env.ZOOM_AUTO_RECORDING),
+          schema: meetingSchema,
+        });
+      } catch (error) {
+        // Timeout / 5xx: Zoom may still have created it — check before reporting failure.
+        if (error instanceof ZoomRequestError && error.uncertain) meeting = await findExistingMeeting(hostUserId, lesson);
+        if (!meeting) throw error;
+      }
+    }
 
-  const payload: unknown = await response.json().catch(() => null);
-  const parsed = createdMeetingSchema.safeParse(payload);
-
-  if (!response.ok || !parsed.success) {
-    console.error("[zoom] Create meeting request failed", { status: response.status });
-    throw new ApiError("INTEGRATION_FAILED", "Zoom nuk arriti të krijojë takimin.");
-  }
-
-  const meetingNumber = String(parsed.data.id);
-  const meetingUuid = parsed.data.uuid;
-  const meetingPassword = parsed.data.password || null;
-
-  // Compare-and-set: prevents two overlapping requests from attaching different
-  // meetings to the same lesson. If another request wins, remove this new meeting.
-  let saved: { count: number };
-
-  try {
-    saved = await prisma.lesson.updateMany({
-      where: {
-        id: lessonId,
-        zoomMeetingNumber: null,
-        zoomMeetingUuid: null,
-        isDemo: false,
-        publication: { notIn: ["CANCELLED", "ARCHIVED"] },
-        meetingStatus: { notIn: ["LIVE", "ENDED"] },
-      },
+    await prisma.lesson.update({
+      where: { id: lessonId },
       data: {
-        zoomMeetingNumber: meetingNumber,
-        zoomMeetingUuid: meetingUuid,
-        zoomMeetingPassword: meetingPassword,
+        zoomMeetingNumber: meeting.id,
+        zoomPasscodeEncrypted: sealPasscode(meeting.password),
+        zoomProvisioningStartedAt: null,
         meetingStatus: "SCHEDULED",
       },
     });
-  } catch {
-    try {
-      await deleteRemoteMeeting(accessToken, meetingNumber);
-    } catch {
-      console.error("[zoom] Could not clean up a meeting after a database error", { meetingNumber });
-    }
-
-    throw new ApiError(
-      "INTEGRATION_FAILED",
-      "Takimi u krijua në Zoom, por nuk u ruajt në akademi. Verifikoni Zoom para se të provoni përsëri.",
-    );
+    await audit(admin.id, "lesson.zoom_meeting_create", "lesson", lessonId, { meetingNumber: meeting.id });
+    await publishLessonChanged(lessonId);
+    return { lessonId, meetingNumber: meeting.id, meetingStatus: "SCHEDULED" as const };
+  } catch (error) {
+    await prisma.lesson.update({ where: { id: lessonId }, data: { zoomProvisioningStartedAt: null } });
+    await audit(admin.id, "zoom.provision_failed", "lesson", lessonId, {
+      status: error instanceof ZoomRequestError ? error.status : null,
+    });
+    toApiError(error, "Zoom nuk arriti të krijojë takimin. Provoni përsëri.");
   }
-
-  if (saved.count !== 1) {
-    try {
-      await deleteRemoteMeeting(accessToken, meetingNumber);
-    } catch {
-      console.error("[zoom] Could not clean up a duplicate meeting", { meetingNumber });
-    }
-
-    throw new ApiError("CONFLICT", "Mësimi u ndryshua gjatë krijimit. Rifreskoni faqen.");
-  }
-
-  await audit(admin.id, "lesson.zoom_meeting_create", "lesson", lessonId, {
-    provider: "zoom",
-    meetingNumber,
-  });
-  await publishLessonChanged(lessonId);
-
-  //Do not return meetingPassword, the Zoom host start URL, or OAuth tokens.
-  return {
-    lessonId,
-    meetingNumber,
-    meetingUuid,
-    meetingStatus: "SCHEDULED" as const,
-  };
 }
 
+// --- keep in sync with the lesson ------------------------------------------------------
 
 /**
- * Creates short-lived authorization for the academy's Zoom host to start
- * an existing lesson meeting inside the Web Meeting SDK.
- *
- * The caller must already be authenticated as an admin. The host ZAK and
- * SDK signature are returned to that admin only; never save or log them.
+ * Called after a lesson's title/schedule changed. Best effort: a Zoom failure is audited and
+ * reported back, but never blocks saving the lesson itself.
  */
-export async function createZoomHostAuthorization(
-  lessonId: string,
-  admin: AppUser,
-) {
-  if (admin.role !== "admin") {
-    throw new ApiError("FORBIDDEN", "Nuk keni leje për të nisur klasën.");
-  }
-
-  const config = getZoomConfig();
-
-  if (!env.ZOOM_CLIENT_ID || !env.ZOOM_CLIENT_SECRET) {
-    throw new ApiError(
-      "INTEGRATION_NOT_CONFIGURED",
-      "Kredencialet e Zoom Meeting SDK nuk janë konfiguruar.",
-    );
-  }
-
-  // Read the saved meeting and schedule from our database, never from the browser.
-  const lesson = await prisma.lesson.findUnique({
-    where: { id: lessonId },
-    select: {
-      id: true,
-      title: true,
-      publication: true,
-      meetingStatus: true,
-      isDemo: true,
-      scheduledStartAt: true,
-      scheduledEndAt: true,
-      zoomMeetingNumber: true,
-      zoomMeetingUuid: true,
-      zoomMeetingPassword: true,
-    },
-  });
-
-  if (!lesson) {
-    throw new ApiError("NOT_FOUND", "Mësimi nuk u gjet.");
-  }
-
-  if (lesson.isDemo) {
-    throw new ApiError(
-      "CONFLICT",
-      "Kjo klasë është demonstrim dhe nuk përdor Zoom real.",
-    );
-  }
-
-  if (lesson.publication !== "PUBLISHED") {
-    throw new ApiError(
-      "CONFLICT",
-      "Publikoni mësimin para se të nisni klasën live.",
-    );
-  }
-
-  if (!lesson.zoomMeetingNumber || !lesson.zoomMeetingUuid) {
-    throw new ApiError(
-      "INTEGRATION_NOT_CONFIGURED",
-      "Ky mësim nuk ka një takim Zoom të ruajtur.",
-    );
-  }
-
-  if (lesson.meetingStatus === "ENDED" || lesson.meetingStatus === "ERROR") {
-    throw new ApiError(
-      "CONFLICT",
-      "Ky takim ka përfunduar ose ka një gabim.",
-    );
-  }
-
-  const now = Date.now();
-
-  const earliestHostStartAt =
-    lesson.scheduledStartAt.getTime() - 30 * 60 * 1000;
-
-  if (now < earliestHostStartAt) {
-    throw new ApiError(
-      "LESSON_JOIN_NOT_OPEN",
-      "Mund ta nisni klasën jo më herët se 30 minuta para orarit.",
-    );
-  }
-
-  if (now >= lesson.scheduledEndAt.getTime()) {
-    throw new ApiError(
-      "CONFLICT",
-      "Orari i këtij mësimi ka përfunduar.",
-    );
-  }
-
-  // Fetch a fresh Server-to-Server OAuth access token.
-  const accessToken = await getAccessToken(config);
-
-  // ZAK is short-lived and must never be persisted or logged.
-  const zakUrl = new URL(
-    `${ZOOM_API_URL}/users/${encodeURIComponent(config.hostUserId)}/token`,
-  );
-  zakUrl.searchParams.set("type", "zak");
-  zakUrl.searchParams.set("ttl", "300");
-
-  let zakResponse: Response;
-
+export async function syncZoomMeetingSchedule(lesson: LessonSchedule & { zoomMeetingNumber: string | null }, actorId: string) {
+  if (!lesson.zoomMeetingNumber) return { synced: true };
   try {
-    zakResponse = await fetch(zakUrl, {
-      method: "GET",
-      headers: { Authorization: `Bearer ${accessToken}` },
-      cache: "no-store",
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    });
-  } catch {
-    throw new ApiError(
-      "INTEGRATION_FAILED",
-      "Nuk mund të merret autorizimi i host-it nga Zoom.",
-    );
+    await zoomRequest(`/meetings/${lesson.zoomMeetingNumber}`, { method: "PATCH", body: meetingSchedule(lesson) });
+    return { synced: true };
+  } catch (error) {
+    await audit(actorId, "zoom.sync_failed", "lesson", lesson.id, { status: error instanceof ZoomRequestError ? error.status : null });
+    return { synced: false };
   }
-
-  const zakPayload: unknown = await zakResponse.json().catch(() => null);
-  const parsedZak = z.object({ token: z.string().min(1) }).safeParse(zakPayload);
-
-  if (!zakResponse.ok || !parsedZak.success) {
-    console.error("[zoom] Host ZAK request failed", {
-      status: zakResponse.status,
-    });
-
-    throw new ApiError(
-      "INTEGRATION_FAILED",
-      "Zoom nuk autorizoi host-in e klasës.",
-    );
-  }
-
-  const signature = createMeetingSdkHostSignature({
-    clientId: env.ZOOM_CLIENT_ID,
-    clientSecret: env.ZOOM_CLIENT_SECRET,
-    meetingNumber: lesson.zoomMeetingNumber,
-  });
-
-  await audit(
-    admin.id,
-    "lesson.zoom_host_authorization",
-    "lesson",
-    lesson.id,
-    {
-      provider: "zoom",
-      meetingNumber: lesson.zoomMeetingNumber,
-    },
-  );
-
-  // Only the authorized admin receives this temporary join configuration.
-  return {
-    mode: "host" as const,
-    lessonId: lesson.id,
-    signature,
-    meetingNumber: lesson.zoomMeetingNumber,
-    password: lesson.zoomMeetingPassword ?? "",
-    userName: admin.name,
-    zak: parsedZak.data.token,
-  };
 }
 
+/** Deletes the Zoom meeting of a cancelled/deleted lesson. Missing meetings count as deleted. */
+export async function deleteZoomMeeting(lessonId: string, meetingNumber: string | null, actorId: string) {
+  if (!meetingNumber) return { deleted: true };
+  try {
+    await zoomRequest(`/meetings/${meetingNumber}`, { method: "DELETE", acceptStatus: [404] });
+    await audit(actorId, "lesson.zoom_meeting_delete", "lesson", lessonId, { meetingNumber });
+    return { deleted: true };
+  } catch (error) {
+    await audit(actorId, "zoom.delete_failed", "lesson", lessonId, { status: error instanceof ZoomRequestError ? error.status : null });
+    return { deleted: false };
+  }
+}
+
+/** Live status straight from Zoom — used by the admin "sync" action when a webhook was missed. */
+export async function fetchZoomMeetingStatus(meetingNumber: string): Promise<"started" | "waiting" | "unknown"> {
+  const { status } = await zoomRequest(`/meetings/${meetingNumber}`, { schema: z.object({ status: z.string().optional() }) });
+  return status === "started" || status === "waiting" ? status : "unknown";
+}

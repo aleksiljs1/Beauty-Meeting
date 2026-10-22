@@ -25,6 +25,9 @@ import { formatTime, timezoneAbbreviation } from "@/lib/datetime";
 import { formatCountdown } from "@/lib/polling";
 import type { StageState } from "@/server/queries/portal";
 import { DemoStage } from "./demo-stage";
+import { ZoomFrame } from "@/components/zoom/zoom-frame";
+import { isZoomJoinConfig, useZoomFrame } from "@/hooks/use-zoom-frame";
+import { zoomText } from "@/i18n/zoom";
 
 const t = portalText.stage;
 
@@ -42,26 +45,10 @@ export type StageProps = {
   onShowRecordings: () => void;
 };
 
-type ZoomJoinConfig = {
-  mode: "zoom";
-  lessonId: string;
-  signature: string;
-  meetingNumber: string;
-  password: string;
-  userName: string;
-};
+type JoinState = { kind: "idle" } | { kind: "joining" } | { kind: "demo" } | { kind: "error"; message: string };
 
-type JoinResponse =
-  | { mode: "demo" }
-  | ZoomJoinConfig;
-
-type JoinState =
-  | { kind: "idle" }
-  | { kind: "joining" }
-  | { kind: "waiting-frame" }
-  | { kind: "connecting" }
-  | { kind: "joined"; mode: "demo" | "zoom" }
-  | { kind: "error"; message: string };
+const errorMessage = (error: unknown) =>
+  error instanceof ApiClientError || error instanceof Error ? error.message : portalText.states.errorBody;
 
 function StageMessage({
   icon,
@@ -144,135 +131,26 @@ function ClassroomStageImpl(props: StageProps) {
   const { lessonId, stage, canJoin, autoJoin } = props;
 
   const [join, setJoin] = useState<JoinState>({ kind: "idle" });
-  const [frameOpen, setFrameOpen] = useState(false);
-  const [frameReady, setFrameReady] = useState(false);
-  const [zoomConfig, setZoomConfig] = useState<ZoomJoinConfig | null>(null);
-
-  const frameRef = useRef<HTMLIFrameElement>(null);
-  const joinSentRef = useRef(false);
+  const zoom = useZoomFrame(portalText.states.errorBody);
+  const startZoom = zoom.start;
   const autoJoinTried = useRef(false);
 
   const requestJoin = useCallback(async () => {
     setJoin({ kind: "joining" });
-
     try {
-      // The server rechecks the student's enrollment, access deadline and join window.
-      const result = await apiSend<JoinResponse>(
-        "post",
-        `/lessons/${lessonId}/join`,
-      );
-
-      if (result.mode === "demo") {
-        setZoomConfig(null);
-        setFrameOpen(false);
-        setFrameReady(false);
-        joinSentRef.current = false;
-        setJoin({ kind: "joined", mode: "demo" });
+      // The server re-checks enrolment, deadline, join window and meeting state every time.
+      const result = await apiSend<unknown>("post", `/lessons/${lessonId}/join`);
+      if ((result as { mode?: unknown } | null)?.mode === "demo") {
+        setJoin({ kind: "demo" });
         return;
       }
-
-      if (
-        result.mode !== "zoom" ||
-        result.lessonId !== lessonId ||
-        !result.signature ||
-        !result.meetingNumber ||
-        !result.userName
-      ) {
-        throw new Error("Të dhënat e autorizimit të klasës janë të pavlefshme.");
-      }
-
-      // Never accept meeting details from the URL. Use the server-authorized response.
-      joinSentRef.current = false;
-      setFrameReady(false);
-      setZoomConfig(result);
-      setFrameOpen(true);
-      setJoin({ kind: "waiting-frame" });
+      if (!isZoomJoinConfig(result, "student", lessonId)) throw new Error(zoomText.frame.invalidResponse);
+      setJoin({ kind: "idle" });
+      startZoom(result);
     } catch (error) {
-      setZoomConfig(null);
-      setJoin({
-        kind: "error",
-        message:
-          error instanceof ApiClientError
-            ? error.message
-            : error instanceof Error
-              ? error.message
-              : portalText.states.errorBody,
-      });
+      setJoin({ kind: "error", message: errorMessage(error) });
     }
-  }, [lessonId]);
-
-  // The isolated Zoom frame sends READY only after its SDK has loaded.
-  // Send the short-lived participant authorization once the frame is ready.
-  useEffect(() => {
-    if (!frameOpen || !frameReady || !zoomConfig || joinSentRef.current) return;
-
-    const target = frameRef.current?.contentWindow;
-    if (!target) return;
-
-    target.postMessage(
-      { type: "BEAUTY_ZOOM_JOIN", payload: zoomConfig },
-      window.location.origin,
-    );
-
-    joinSentRef.current = true;
-    setZoomConfig(null);
-    setJoin({ kind: "connecting" });
-  }, [frameOpen, frameReady, zoomConfig]);
-
-  // Accept SDK status messages only from our own embedded Zoom frame.
-  useEffect(() => {
-    function onMessage(event: MessageEvent<unknown>) {
-      const frameWindow = frameRef.current?.contentWindow;
-
-      if (
-        !frameWindow ||
-        event.origin !== window.location.origin ||
-        event.source !== frameWindow ||
-        !event.data ||
-        typeof event.data !== "object"
-      ) {
-        return;
-      }
-
-      const data = event.data as Record<string, unknown>;
-
-      switch (data.type) {
-        case "BEAUTY_ZOOM_FRAME_READY":
-          setFrameReady(true);
-          break;
-
-        case "BEAUTY_ZOOM_JOINED":
-          if (data.mode !== "student") return;
-          setJoin({ kind: "joined", mode: "zoom" });
-          break;
-
-        case "BEAUTY_ZOOM_FRAME_ERROR":
-          setFrameOpen(false);
-          setFrameReady(false);
-          setZoomConfig(null);
-          joinSentRef.current = false;
-          setJoin({
-            kind: "error",
-            message:
-              typeof data.message === "string"
-                ? data.message
-                : portalText.states.errorBody,
-          });
-          break;
-
-        case "BEAUTY_ZOOM_LEFT":
-          setFrameOpen(false);
-          setFrameReady(false);
-          setZoomConfig(null);
-          joinSentRef.current = false;
-          setJoin({ kind: "idle" });
-          break;
-      }
-    }
-
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, []);
+  }, [lessonId, startZoom]);
 
   // "Bashkohu" from the alert/dashboard was an explicit click; finish it here once.
   useEffect(() => {
@@ -295,18 +173,8 @@ function ClassroomStageImpl(props: StageProps) {
     return () => clearTimeout(id);
   }, [autoJoin, stage, canJoin, requestJoin]);
 
-  const isJoining =
-    join.kind === "joining" ||
-    join.kind === "waiting-frame" ||
-    join.kind === "connecting";
-
-  const showZoomFrame =
-    frameOpen &&
-    (
-      join.kind === "waiting-frame" ||
-      join.kind === "connecting" ||
-      (join.kind === "joined" && join.mode === "zoom")
-    );
+  const isJoining = join.kind === "joining";
+  const joinError = join.kind === "error" ? join.message : zoom.status === "error" ? zoom.error : null;
 
   let content: ReactNode;
 
@@ -324,25 +192,12 @@ function ClassroomStageImpl(props: StageProps) {
         ) : null}
       </StageMessage>
     );
-  } else if (join.kind === "joined" && join.mode === "demo") {
-    content = (
-      <DemoStage
-        lessonTitle={props.lessonTitle}
-        onLeave={() => setJoin({ kind: "idle" })}
-      />
-    );
-  } else if (showZoomFrame) {
+  } else if (join.kind === "demo") {
+    content = <DemoStage lessonTitle={props.lessonTitle} onLeave={() => setJoin({ kind: "idle" })} />;
+  } else if (zoom.open) {
     content = (
       <div className="flex min-h-[22rem] flex-1 flex-col bg-black lg:min-h-[32rem]">
-        <iframe
-          ref={frameRef}
-          title="Klasa live në Zoom"
-          src="/zoom-frame.html"
-          allow="camera; microphone; display-capture; autoplay; fullscreen"
-          allowFullScreen
-          referrerPolicy="no-referrer"
-          className="h-[65vh] min-h-[28rem] w-full flex-1 border-0 bg-black"
-        />
+        <ZoomFrame frameRef={zoom.frameRef} frameKey={zoom.frameKey} title={zoomText.admin.frameTitle} className="h-[65vh] min-h-[28rem] flex-1" />
       </div>
     );
   } else if (stage === "LIVE") {
@@ -378,7 +233,7 @@ function ClassroomStageImpl(props: StageProps) {
           </p>
         )}
 
-        {join.kind === "error" ? (
+        {joinError ? (
           <div
             role="alert"
             className="mt-2 flex max-w-md items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-left text-sm text-destructive"
@@ -389,7 +244,7 @@ function ClassroomStageImpl(props: StageProps) {
             />
             <div>
               <p className="font-medium">{t.errorTitle}</p>
-              <p>{join.message}</p>
+              <p>{joinError}</p>
             </div>
           </div>
         ) : null}

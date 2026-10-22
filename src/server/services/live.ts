@@ -46,6 +46,52 @@ export async function markLessonEnded(lessonId: string, source: LiveSource, acto
   await audit(actorId, source === "demo" ? "lesson.demo_end" : "lesson.end", "lesson", lessonId);
 }
 
+// ---------------------------------------------------------------------------------------
+// Verified provider events (Zoom webhooks). Order-safe: each update is conditional on the
+// event being newer than the state it changes, so duplicated or delayed deliveries never
+// regress the lesson. A genuine restart after the end (newer "started") goes live again.
+// ---------------------------------------------------------------------------------------
+
+export type EventOutcome = "applied" | "stale";
+
+export async function applyMeetingStarted(lessonId: string, startedAt: Date): Promise<EventOutcome> {
+  const updated = await prisma.lesson.updateMany({
+    where: {
+      id: lessonId,
+      publication: "PUBLISHED",
+      OR: [
+        { meetingStatus: { in: ["NOT_PROVISIONED", "SCHEDULED", "ERROR"] } },
+        { meetingStatus: "ENDED", liveEndedAt: { lt: startedAt } },
+      ],
+    },
+    data: { meetingStatus: "LIVE", liveStartedAt: startedAt, liveEndedAt: null },
+  });
+  if (updated.count === 0) return "stale";
+  await notifyLessonLive(lessonId, startedAt);
+  await audit(null, "lesson.live", "lesson", lessonId, { source: "zoom" });
+  return "applied";
+}
+
+export async function applyMeetingEnded(lessonId: string, endedAt: Date): Promise<EventOutcome> {
+  const updated = await prisma.lesson.updateMany({
+    where: {
+      id: lessonId,
+      meetingStatus: { not: "ENDED" },
+      // An "ended" older than the current session's start belongs to a previous session.
+      OR: [{ liveStartedAt: null }, { liveStartedAt: { lte: endedAt } }],
+    },
+    data: { meetingStatus: "ENDED", liveEndedAt: endedAt },
+  });
+  if (updated.count === 0) return "stale";
+  await prisma.notification.updateMany({
+    where: { lessonId, type: "LESSON_LIVE", OR: [{ validUntil: null }, { validUntil: { gt: endedAt } }] },
+    data: { validUntil: endedAt },
+  });
+  await publishLessonChanged(lessonId);
+  await audit(null, "lesson.end", "lesson", lessonId, { source: "zoom" });
+  return "applied";
+}
+
 /** Fan-out to currently eligible students only. Deduplicated per live occurrence. */
 async function notifyLessonLive(lessonId: string, startedAt: Date) {
   const now = new Date();
