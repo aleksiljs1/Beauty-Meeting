@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Manrope } from "next/font/google";
 import "./globals.css";
 
-// Self-hosted at build time by next/font (no runtime requests to Google). latin-ext covers ë and ç.
+// Self-hosted at build time by next/font (no runtime requests to Google). latin-ext covers Ã« and Ã§.
 const display = Cormorant_Garamond({
   variable: "--font-display",
   subsets: ["latin", "latin-ext"],
@@ -17,12 +17,12 @@ const body = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: { default: "Beauty Academy", template: "%s · Beauty Academy" },
+  title: { default: "Beauty Academy", template: "%s Â· Beauty Academy" },
   description: "Sallon bukurie dhe akademi estetike.",
 };
 
 export const viewport: Viewport = {
-  themeColor: "#faf7f4",
+  themeColor: "#17120f",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

@@ -1,13 +1,12 @@
-/* Scan only src/ for class names — automatic detection would crawl the whole project
+/* Scan only src/ for class names â€” automatic detection would crawl the whole project
    (agent worktrees, caches) and slow the CSS build to minutes. */
 @import "tailwindcss" source("..");
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
 /*
- * Brand: restrained editorial — warm off-white ground, charcoal text, muted rose/sand accents.
- * Light theme only. Contrast-checked pairs (WCAG AA for body text):
- *   foreground on background ≈ 14:1 · muted-foreground on background ≈ 5.9:1 · rose-deep on background ≈ 5.6:1
+ * Brand: restrained editorial with an espresso background, warm ivory text, and muted gold accents.
+ * Dark theme. Contrast ratios (WCAG AA): foreground 14.9:1; muted foreground 8.7:1; gold accent 9.0:1.
  */
 
 @theme inline {
@@ -46,29 +45,29 @@
 }
 
 :root {
-  --background: #faf7f4;
-  --foreground: #2b2724;
-  --card: #ffffff;
-  --card-foreground: #2b2724;
-  --popover: #ffffff;
-  --popover-foreground: #2b2724;
-  --primary: #2b2724;
-  --primary-foreground: #faf7f4;
-  --secondary: #efe7df;
-  --secondary-foreground: #2b2724;
-  --muted: #f2ece6;
-  --muted-foreground: #6b625b;
-  --accent: #f3e6e1;
-  --accent-foreground: #5e3b35;
+  --background: #17120f;
+  --foreground: #eee5da;
+  --card: #241b16;
+  --card-foreground: #eee5da;
+  --popover: #241b16;
+  --popover-foreground: #eee5da;
+  --primary: #eee5da;
+  --primary-foreground: #21180f;
+  --secondary: #2b211a;
+  --secondary-foreground: #eee5da;
+  --muted: #32261e;
+  --muted-foreground: #c5ae94;
+  --accent: #d8af50;
+  --accent-foreground: #21180f;
   --destructive: #b3261e;
-  --border: #e6ddd4;
-  --input: #ddd2c7;
-  --ring: #b5867d;
+  --border: #44352b;
+  --input: #5a4534;
+  --ring: #d8af50;
   --radius: 0.5rem;
 
-  --rose: #b5867d;
-  --rose-deep: #8c5a52;
-  --sand: #e8ded3;
+  --rose: #d8af50;
+  --rose-deep: #e4bd62;
+  --sand: #2b211a;
   /* Live-class indicator: distinct but not alarming */
   --live: #b3261e;
 }
