@@ -138,7 +138,19 @@ completed on branch `zoom-integration` (2026-10-22): see "Review fixes" below.
 - **Live state comes only from Zoom webhooks** (`/api/webhooks/zoom`): `meeting.started` → LIVE (students
   get the pop-up via Socket.IO), `meeting.ended` → ENDED. When the host ends the meeting, Zoom itself
   removes every participant; our pages switch to "ended" through the same realtime signal.
-- Code: `src/server/zoom/{client,meetings,meeting-body,host,join,webhooks,webhook-signature,meeting-sdk-signature}.ts`,
+- **Zoom app fallbacks (2026-10-23)** — deliberate secondary options, never automatic redirects:
+  - Student "Hap në aplikacionin Zoom" on the live classroom (live mode, real lesson with a meeting, never demo):
+    `POST /api/v1/lessons/:id/zoom-app-link` runs the same `JOIN_LIVE` policy check, then returns Zoom's `join_url`
+    (its `pwd` is Zoom's *encrypted* passcode, so the plain passcode would not work in a link). Stored AES-GCM
+    encrypted in `Lesson.zoomJoinUrlEncrypted` (migration `20261023125056_zoom_join_url`), taken from the create
+    response or backfilled once from `GET /meetings/{id}`; cleared when the meeting is deleted. Audited
+    (`lesson.zoom_app_join`). Trade-off: the link doesn't expire like an SDK signature and can be forwarded while
+    the meeting is open — acceptable for a fallback, and every hand-out is in the audit log.
+  - Admin "Nis në aplikacionin Zoom": `POST /api/v1/admin/lessons/:id/host-app-start` fetches a fresh `start_url`
+    (embeds a host token) from `GET /meetings/{id}`; same checks/time window as the in-browser start; never stored
+    or logged; audited (`lesson.zoom_host_app_start`). For sharing an MP4 with sound (Share Screen → Advanced → Video).
+  - Teacher guide at `/admin/ndihme` (nav + link in the Zoom panel). Feature status: `docs/zoom-feature-matrix.md`.
+- Code: `src/server/zoom/{client,meetings,meeting-body,host,join,webhooks,webhook-signature,meeting-sdk-signature,zoom-url}.ts`,
   shared frame protocol `src/hooks/use-zoom-frame.ts`, frame `public/zoom-frame.{html,js}`.
 
 ### Design rules
@@ -167,6 +179,8 @@ completed on branch `zoom-integration` (2026-10-22): see "Review fixes" below.
 5. Generate `APP_ENCRYPTION_KEY` (command in `.env.example`), set `ZOOM_MODE=live`, restart.
 6. Acceptance test on staging: create meeting, host start, student join on desktop/Android/iPhone, end meeting →
    students leave and the lesson shows ended, reschedule → Zoom updated, cancel → Zoom meeting deleted.
+   Also: host start in the Zoom desktop app + MP4 share with sound, student "open in Zoom app" link, tab-audio share
+   in the browser. Record results in `docs/zoom-feature-matrix.md` (currently nothing is tested against real Zoom).
 
 ### Review fixes (2026-10-22, on top of Eli's branch)
 - Student join was broken (`mode: "zoom"` vs frame expecting `"student"`) → one shared `useZoomFrame` hook.

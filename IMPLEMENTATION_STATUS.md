@@ -1,7 +1,7 @@
 # Implementation status
 
 Single source of truth for progress. Update at the end of every work session / stage.
-Last updated: 2026-10-22
+Last updated: 2026-10-23
 Legend: ✅ done & verified · 🟡 in progress · ⬜ not started · ⛔ blocked (reason)
 
 How to run: `README.md` · How to test: `docs/testing.md` · Decisions: `NOTES.md`
@@ -57,6 +57,10 @@ How to run: `README.md` · How to test: `docs/testing.md` · Decisions: `NOTES.m
 - ✅ Webhooks: verified, durable (WebhookEvent), deduplicated, order-safe → LIVE/ENDED + realtime pop-up
 - ✅ Passcodes encrypted at rest; ZOOM_MODE=live refuses to start half-configured
 - ✅ 15-case integration test against a fake Zoom API + unit tests (signatures, bodies, encryption)
+- ✅ "Open in Zoom app" fallback for students (policy-checked, Zoom `join_url` stored encrypted, audited) and admin
+  "start in the Zoom desktop app" (fresh `start_url`, never stored) — fake-API integration-tested
+- ✅ Teacher help page `/admin/ndihme` (start options, video with sound, Zoom controls, materials vs chat, recordings, expiry)
+- ⬜ Every Zoom feature is still untested against real Zoom — see `docs/zoom-feature-matrix.md`
 - ⬜ Real-account acceptance test (desktop/Android/iPhone, 30 participants, 3 h) — see NOTES.md "Zoom setup checklist"
 
 ## Phase 3 — cloud recording import (needs Zoom Pro)
@@ -64,7 +68,8 @@ How to run: `README.md` · How to test: `docs/testing.md` · Decisions: `NOTES.m
 
 ## Docs
 - ✅ README.md (setup, run, scripts) · ✅ docs/testing.md · ✅ docs/agent-guide.md
-- ⬜ docs/architecture.md, docs/storage-and-recordings.md, docs/zoom-setup.md, docs/zoom-feature-matrix.md
+- ✅ docs/zoom-feature-matrix.md (tested / not tested / unsupported; nothing real-Zoom tested yet)
+- ⬜ docs/architecture.md, docs/storage-and-recordings.md, docs/zoom-setup.md
 
 ## Deferred
 - ⬜ Playwright smoke tests (postponed by request)
