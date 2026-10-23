@@ -113,6 +113,30 @@ Original brief: `c:\Users\aleksiljs\Downloads\Beauty_Academy_Zoom_Claude_Megapro
   `npm run test:integration` passed (69 tests), including independent-flag, single-slot replacement,
   and all four public-query filters. `npx prisma migrate status` reported the database up to date.
 
+## Lesson materials: MP4 videos and multi-file upload (2026-10-23)
+
+- Materials may now include **MP4 videos** (`.mp4`/`.m4v`, declared `video/mp4`, verified by the `ftyp`
+  box like recordings) for short technique demos next to the lesson. `.mov`/WebM and other containers
+  stay out: MP4 (H.264/AAC) is the one format every target browser, including iPhone Safari, plays inline.
+- **Size limits per type**: videos up to **1 GB**, every other material keeps **50 MB**. Full lesson
+  recordings (up to 8 GB) still belong in Regjistrimet. Limits live on the allowlist rules
+  (`file-types.ts`, `maxBytes`); `checkDeclaredFile()` is the single check used by the server and,
+  for early feedback, by the admin UI (the server stays the authority and still verifies the bytes).
+- **Why multipart for videos**: a single presigned PUT of hundreds of MB fails as a whole on any
+  network blip and needs one URL that outlives the entire transfer. Video materials therefore reuse the
+  recordings' multipart flow (64 MB parts, part URLs in batches, per-part retries with fresh URLs,
+  ETags → complete → verify). Small documents keep the simpler single PUT. The open upload id is stored
+  on `LessonMaterial.uploadId` (migration `20261023120000_material_multipart_upload`); deleting a
+  pending material aborts the multipart upload, so cancelled uploads leave no parts behind.
+- **Playback**: "Shiko" plays the video inline in the materials panel with the same protected player as
+  recordings (`ProtectedVideo`): 5-minute inline grant bounded by the student's deadline, renewed before
+  expiry or on a media error, position restored, stops with an Albanian message once access has ended.
+  Downloads stay 60-second `attachment` grants. The video pauses when the materials panel is hidden, and
+  the classroom stage is untouched (a sibling of the panel, never remounted).
+- **Multi-file upload** (admin): `multiple` file input + drag-and-drop onto the Materialet panel; files
+  upload two at a time with per-file progress/errors and a final summary. Invalid files are rejected
+  locally without stopping the others; a cancelled or failed transfer deletes its pending record.
+
 ## Zoom docs verified 2026-10-20
 
 - https://developers.zoom.us/docs/meeting-sdk/ — March 2, 2026: apps joining meetings outside their account must be authorized (ZAK/OBF/RTMS).

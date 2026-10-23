@@ -13,7 +13,7 @@ Two kinds of testing: **automated** (commands, run before every commit) and a **
 | Command | What it checks | Needs |
 |---|---|---|
 | `npm run check` | TypeScript, lint, unit tests (access rules, deadlines, timezone/DST, file-type checks, safe redirects, polling backoff…) | nothing |
-| `npm run test:integration` | real database + storage + realtime: invitations (incl. 6 students racing for 3 spots), live alerts, materials/recordings upload & access, Socket.IO delivery, gallery uploads | `docker compose up -d` |
+| `npm run test:integration` | real database + storage + realtime: invitations (incl. 6 students racing for 3 spots), live alerts, materials (incl. multipart MP4 videos, per-type size limits, deadline-bound grants)/recordings upload & access, Socket.IO delivery, gallery uploads | `docker compose up -d` |
 | `npm run build` | production build succeeds | database running |
 
 All three must be green before committing. Integration tests use a separate database
@@ -95,6 +95,30 @@ The seed printed a link for the upcoming lesson (or create one in the admin port
 - [ ] Test the home switches independently: "Në krye të faqes kryesore" displays beside the home title; "Në galerinë e faqes kryesore" displays in the home gallery section.
 - [ ] Assign another image to the home hero, then another to About; confirm each replaces the previous image in that single-image slot while other display flags stay unchanged — the previous image's switch turns off on its card without reloading.
 - [ ] Disable "Publikuar" for an image with display switches enabled; confirm it disappears from public pages but remains in the admin gallery.
+
+### Lesson materials: several files at once and MP4 videos
+Prepare: two PDFs/images, one short `.mp4` (a phone clip works), one file over 50 MB that is not a
+video (e.g. a large PDF), and a disallowed file (e.g. `.exe`, `.mov` or `.zip`).
+- [ ] Admin → lesson → Materialet → "Ngarko materiale" → select all files at once. Each file gets its
+      own row: invalid ones fail immediately with a reason ("nuk lejohet" / "shumë i madh (maksimumi 50 MB)")
+      while the others upload, at most two at a time, each with its own progress bar.
+- [ ] When the batch ends the header shows a summary ("3 skedarë u ngarkuan · 2 dështuan"); the uploaded
+      files appear in the list in the selected order, the video with a film icon. "Mbyll listën" clears it.
+- [ ] Drag the same files from the file explorer onto the Materialet panel → a dashed outline and
+      "Lëshojini skedarët këtu…" appear; dropping starts the same batch.
+- [ ] Start a batch with the video and press "Ndalo ngarkimet" → in-flight files show "U ndalua", nothing
+      half-uploaded stays in the list. Closing the tab during a batch asks for confirmation.
+- [ ] Rename a `.pdf` file to `.mp4` and upload it → "Dështoi" (the bytes are checked, not the name).
+- [ ] Larger video (a few hundred MB): the upload continues if the Wi-Fi blips for a few seconds (parts are
+      retried). In DevTools → Network you see several PUTs to `…partNumber=…`, not one huge PUT.
+- [ ] As Ana (enrolled) open the lesson → Materialet → "Shiko" on the video → it plays inside the panel;
+      seeking works. "Shkarko" downloads the `.mp4`.
+- [ ] During a demo live class (`npm run demo -- live`, "Bashkohu"), play the video in the panel → the class
+      stage does not reload. Switch to Info/Regjistrimet (or the "Klasa" tab on a phone) → the video pauses.
+- [ ] Leave the video paused/playing for more than 5 minutes → it keeps working (the URL is renewed in the
+      background; DevTools shows a new `…/access` request before expiry).
+- [ ] As Sara (personal deadline): after her deadline passes, "Shiko"/"Shkarko" refuse with an Albanian
+      message and an open video stops at its next renewal.
 
 ### G. Security spot checks (optional, terminal)
 ```bash

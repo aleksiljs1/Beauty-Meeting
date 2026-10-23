@@ -175,7 +175,12 @@ export function Classroom({ data, autoJoin, initialTab }: { data: ClassroomData;
           {/* All panels stay mounted (hidden attribute), so an open PDF or a paused video survives tab switches. */}
           <div id="ppanel-materials" role="tabpanel" aria-labelledby="ptab-materials" hidden={panelTab !== "materials"} className="rounded-xl border bg-card/60 p-3 sm:p-4">
             <h2 className="mb-3 text-xl">{t.tabs.materials}</h2>
-            <MaterialsPanel lessonId={lesson.id} materials={data.materials} onViewerChange={setViewerOpen} />
+            <MaterialsPanel
+              lessonId={lesson.id}
+              materials={data.materials}
+              onViewerChange={setViewerOpen}
+              visible={panelTab === "materials" && (isDesktop || mobileView !== "classroom")}
+            />
           </div>
           <div id="ppanel-info" role="tabpanel" aria-labelledby="ptab-info" hidden={panelTab !== "info"} className="rounded-xl border bg-card/60 p-3 sm:p-4">
             <h2 className="mb-3 text-xl">{t.tabs.info}</h2>

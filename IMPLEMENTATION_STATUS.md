@@ -28,6 +28,7 @@ How to run: `README.md` · How to test: `docs/testing.md` · Decisions: `NOTES.m
 - ✅ Public website: home, about, services, courses (+ detail with WhatsApp/phone/email enquiry), gallery, contact, privacy/terms drafts — prerendered + tag revalidation
 - ✅ Admin content editor (`/admin/permbajtja`): academy info, services, courses, gallery uploads (verified images)
 - ✅ Gallery display controls: independent switches for `/galeria`, home hero, home gallery, and About; new uploads default to `/galeria` only; one active image per single-image slot
+- ✅ Lesson materials: MP4 video materials (≤ 1 GB, multipart upload, inline protected player with grant renewal, download, deadline-bound) and multi-file upload (multiple select + drag-and-drop, 2 at a time, per-file progress/errors, summary) — integration-tested; browser click-through pending (docs/testing.md)
 - ✅ Auth pages: login (`/hyr`), forgot password, set/reset password (incl. first-time setup link)
 - ✅ Student portal: dashboard, lessons with filters, notifications, profile/password change
 - ✅ Lesson/classroom page: demo classroom (labelled, no fake Zoom), materials panel (PDF viewer/download), recording player with grant renewal, mobile tabs, stage never remounts

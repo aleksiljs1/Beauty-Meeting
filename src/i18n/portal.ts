@@ -126,6 +126,7 @@ export const portalText = {
     openNewTab: "Hap në skedë të re",
     officeHint: "Ky skedar mund të shkarkohet dhe të hapet në kompjuter.",
     viewerFallback: "Nëse materiali nuk shfaqet, përdorni \"Shkarko\".",
+    expired: "Afati i aksesit ka përfunduar. Materiali nuk është më i disponueshëm.",
     sizeKb: (kb: number) => `${kb} KB`,
     sizeMb: (mb: string) => `${mb} MB`,
   },

@@ -319,6 +319,8 @@ model LessonMaterial {
   sizeBytes   BigInt
   position    Int          @default(0)
   status      ObjectStatus @default(PENDING)
+  /// Open multipart upload (video materials) while PENDING; cleared once completed.
+  uploadId    String?
 
   uploadedById String
   uploadedBy   User     @relation(fields: [uploadedById], references: [id], onDelete: Restrict)

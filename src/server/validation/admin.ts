@@ -93,3 +93,5 @@ export const presignPartsSchema = z.object({ partNumbers: z.array(z.number().int
 export const completeRecordingSchema = z.object({
   parts: z.array(z.object({ partNumber: z.number().int().min(1).max(10_000), etag: z.string().min(1).max(200) })).min(1).max(10_000),
 });
+/** Single-PUT materials finish with an empty body; multipart (video) materials send their parts. */
+export const finishMaterialSchema = z.object({ parts: completeRecordingSchema.shape.parts.optional() });
