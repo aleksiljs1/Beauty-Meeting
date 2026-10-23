@@ -20,8 +20,9 @@ vi.hoisted(() => {
 });
 
 // --- Fake Zoom API ------------------------------------------------------------------------
-type FakeMeeting = { id: number; password: string; agenda: string; start_time: string; status: "waiting" | "started" };
-const zoomState = { meetings: new Map<string, FakeMeeting>(), calls: [] as string[], nextId: 81_234_567_890, timeoutNextCreate: false };
+type FakeMeeting = { id: number; password: string; agenda: string; start_time: string; status: "waiting" | "started"; join_url?: string };
+const zoomState = { meetings: new Map<string, FakeMeeting>(), calls: [] as string[], nextId: 81_234_567_890, timeoutNextCreate: false, startUrls: 0 };
+const fakeJoinUrl = (id: number | string) => `https://us05web.zoom.us/j/${id}?pwd=ZoomEncryptedPwd.1`;
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
@@ -38,7 +39,8 @@ vi.stubGlobal("fetch", async (input: string | URL, init: RequestInit = {}) => {
   }
   if (url.pathname.endsWith("/meetings") && method === "POST") {
     const body = JSON.parse(String(init.body));
-    const meeting: FakeMeeting = { id: zoomState.nextId++, password: "483920", agenda: body.agenda, start_time: body.start_time.replace(".000", ""), status: "waiting" };
+    const id = zoomState.nextId++;
+    const meeting: FakeMeeting = { id, password: "483920", agenda: body.agenda, start_time: body.start_time.replace(".000", ""), status: "waiting", join_url: fakeJoinUrl(id) };
     zoomState.meetings.set(String(meeting.id), meeting);
     if (zoomState.timeoutNextCreate) {
       zoomState.timeoutNextCreate = false;
@@ -51,15 +53,16 @@ vi.stubGlobal("fetch", async (input: string | URL, init: RequestInit = {}) => {
     if (method === "DELETE") return new Response(null, { status: meeting && zoomState.meetings.delete(meetingPath[1]) ? 204 : 404 });
     if (!meeting) return json({ code: 3001 }, 404);
     if (method === "PATCH") return new Response(null, { status: 204 });
-    return json(meeting);
+    // Like Zoom: every GET returns a freshly signed start_url.
+    return json({ ...meeting, start_url: `https://us05web.zoom.us/s/${meeting.id}?zak=fresh-${++zoomState.startUrls}` });
   }
   return json({ message: "unexpected call" }, 500);
 });
 
 const { prisma } = await import("@/server/db");
 const { createZoomMeetingForLesson } = await import("./meetings");
-const { createZoomHostAuthorization } = await import("./host");
-const { authorizeLessonJoin } = await import("./join");
+const { createZoomHostAppStart, createZoomHostAuthorization } = await import("./host");
+const { authorizeLessonJoin, authorizeZoomAppJoin } = await import("./join");
 const { handleZoomWebhook } = await import("./webhooks");
 const { setLessonPublication, updateLesson } = await import("@/server/services/lessons");
 const { resetZoomTokenCache } = await import("./client");
@@ -75,6 +78,7 @@ beforeEach(async () => {
   await prisma.webhookEvent.deleteMany();
   zoomState.meetings.clear();
   zoomState.calls = [];
+  zoomState.startUrls = 0;
   resetZoomTokenCache();
   admin = await createUser("admin");
   student = await createUser("student");
@@ -162,6 +166,72 @@ describe("joining", () => {
   });
 });
 
+describe("Zoom app fallbacks", () => {
+  const joinUrlState = () => prisma.lesson.findUniqueOrThrow({ where: { id: lessonId }, select: { zoomJoinUrlEncrypted: true } });
+
+  it("stores Zoom's join_url encrypted at creation and hands it to an enrolled student", async () => {
+    const { meetingNumber } = await createZoomMeetingForLesson(lessonId, admin);
+    const { zoomJoinUrlEncrypted } = await joinUrlState();
+    expect(zoomJoinUrlEncrypted).toBeTruthy();
+    expect(zoomJoinUrlEncrypted).not.toContain(meetingNumber);
+
+    zoomState.calls = [];
+    expect(await authorizeZoomAppJoin(student, lessonId)).toEqual({ joinUrl: fakeJoinUrl(meetingNumber) });
+    expect(zoomState.calls).toEqual([]); // served from our encrypted copy
+    const log = await prisma.auditLog.findFirstOrThrow({ where: { action: "lesson.zoom_app_join", actorId: student.id } });
+    expect(JSON.stringify(log.details)).not.toContain("pwd");
+  });
+
+  it("fetches and stores the link from Zoom once when it is missing (older meetings)", async () => {
+    const { meetingNumber } = await createZoomMeetingForLesson(lessonId, admin);
+    await prisma.lesson.update({ where: { id: lessonId }, data: { zoomJoinUrlEncrypted: null } });
+    zoomState.calls = [];
+    expect((await authorizeZoomAppJoin(student, lessonId)).joinUrl).toBe(fakeJoinUrl(meetingNumber));
+    expect((await authorizeZoomAppJoin(student, lessonId)).joinUrl).toBe(fakeJoinUrl(meetingNumber));
+    expect(zoomState.calls.filter((c) => c === `GET /v2/meetings/${meetingNumber}`)).toHaveLength(1);
+    expect((await joinUrlState()).zoomJoinUrlEncrypted).toBeTruthy();
+  });
+
+  it("applies the same access policy as the embedded join", async () => {
+    await createZoomMeetingForLesson(lessonId, admin);
+    await expect(authorizeZoomAppJoin(await createUser("student"), lessonId)).rejects.toMatchObject({ code: "LESSON_NOT_AVAILABLE" });
+    await prisma.lessonEnrollment.updateMany({ where: { lessonId, userId: student.id }, data: { accessExpiresAt: new Date(Date.now() - 1000) } });
+    await expect(authorizeZoomAppJoin(student, lessonId)).rejects.toMatchObject({ code: "LESSON_ACCESS_EXPIRED" });
+  });
+
+  it("refuses demo lessons and lessons without a meeting", async () => {
+    await prisma.lesson.update({ where: { id: lessonId }, data: { meetingStatus: "SCHEDULED" } });
+    await expect(authorizeZoomAppJoin(student, lessonId)).rejects.toMatchObject({ code: "INTEGRATION_NOT_CONFIGURED" });
+    await prisma.lesson.update({ where: { id: lessonId }, data: { isDemo: true } });
+    await expect(authorizeZoomAppJoin(student, lessonId)).rejects.toMatchObject({ code: "CONFLICT" });
+    expect(zoomState.calls.some((c) => c.startsWith("GET /v2/meetings/"))).toBe(false);
+  });
+
+  it("gives the admin a fresh start_url for the desktop app, never stored, never to students", async () => {
+    await createZoomMeetingForLesson(lessonId, admin);
+    const first = await createZoomHostAppStart(lessonId, admin);
+    const second = await createZoomHostAppStart(lessonId, admin);
+    expect(first.startUrl).toMatch(/^https:\/\/us05web\.zoom\.us\/s\/\d+\?zak=fresh-\d+$/);
+    expect(second.startUrl).not.toBe(first.startUrl);
+
+    const row = await prisma.lesson.findUniqueOrThrow({ where: { id: lessonId } });
+    expect(JSON.stringify(row)).not.toContain("zak=");
+    const logs = await prisma.auditLog.findMany({ where: { action: "lesson.zoom_host_app_start" } });
+    expect(logs).toHaveLength(2);
+    expect(JSON.stringify(logs.map((l) => l.details))).not.toContain("zak");
+
+    await expect(createZoomHostAppStart(lessonId, student)).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("uses the same time window as the in-browser host start", async () => {
+    await createZoomMeetingForLesson(lessonId, admin);
+    const lesson = await prisma.lesson.findUniqueOrThrow({ where: { id: lessonId }, select: { scheduledStartAt: true, scheduledEndAt: true } });
+    await expect(createZoomHostAppStart(lessonId, admin, lesson.scheduledStartAt.getTime() - 31 * 60_000)).rejects.toMatchObject({ code: "LESSON_JOIN_NOT_OPEN" });
+    await expect(createZoomHostAppStart(lessonId, admin, lesson.scheduledEndAt.getTime())).rejects.toMatchObject({ code: "CONFLICT" });
+    expect(zoomState.calls.some((c) => c.startsWith("GET /v2/meetings/"))).toBe(false);
+  });
+});
+
 describe("webhooks", () => {
   async function liveLesson() {
     const { meetingNumber } = await createZoomMeetingForLesson(lessonId, admin);
@@ -240,5 +310,6 @@ describe("keeping Zoom in sync with the lesson", () => {
     expect(await setLessonPublication(lessonId, "CANCELLED", admin)).toEqual({ zoomDeleted: true });
     expect(zoomState.meetings.size).toBe(0);
     expect(await lessonState()).toMatchObject({ zoomMeetingNumber: null, zoomPasscodeEncrypted: null, meetingStatus: "NOT_PROVISIONED" });
+    expect((await prisma.lesson.findUniqueOrThrow({ where: { id: lessonId } })).zoomJoinUrlEncrypted).toBeNull();
   });
 });

@@ -123,6 +123,7 @@ export function Classroom({ data, autoJoin, initialTab }: { data: ClassroomData;
             stage={data.stage}
             canJoin={data.canJoin}
             joinBlockedMessage={data.joinBlockedMessage}
+            zoomAppFallback={data.zoomAppFallback}
             scheduledStartAt={lesson.scheduledStartAt}
             joinOpensAt={lesson.joinOpensAt}
             serverTime={data.serverTime}

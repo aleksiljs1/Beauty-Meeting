@@ -171,7 +171,7 @@ export async function setLessonPublication(lessonId: string, publication: Public
   if (deleted) {
     await prisma.lesson.update({
       where: { id: lessonId },
-      data: { zoomMeetingNumber: null, zoomPasscodeEncrypted: null, meetingStatus: "NOT_PROVISIONED" },
+      data: { zoomMeetingNumber: null, zoomPasscodeEncrypted: null, zoomJoinUrlEncrypted: null, meetingStatus: "NOT_PROVISIONED" },
     });
   }
   return { zoomDeleted: deleted };

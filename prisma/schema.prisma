@@ -217,6 +217,10 @@ model Lesson {
   /// Meeting passcode, AES-256-GCM encrypted with APP_ENCRYPTION_KEY. Never sent to clients
   /// except inside a join/host authorization for a user the access policy allows.
   zoomPasscodeEncrypted     String?
+  /// Zoom's `join_url` (carries Zoom's own encrypted `pwd`), AES-256-GCM encrypted like the
+  /// passcode. Only for the "open in the Zoom app" fallback, after the same policy check as an
+  /// embedded join. Filled at creation, or fetched from Zoom on first request.
+  zoomJoinUrlEncrypted      String?
   /// Set while a meeting is being created in Zoom — a lock against duplicate meetings
   /// (double clicks, retries after a timeout). Cleared when creation finishes or fails.
   zoomProvisioningStartedAt DateTime? @db.Timestamptz(3)

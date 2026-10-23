@@ -13,6 +13,7 @@ export const admin = {
       content: "Përmbajtja",
       integrations: "Integrimet",
       history: "Historiku",
+      help: "Ndihmë",
     },
   },
 
@@ -375,6 +376,10 @@ export const admin = {
       "lesson.demo_live": "Simuloi fillimin e mësimit (demo)",
       "lesson.demo_end": "Përfundoi mësimin (demo)",
       "lesson.demo_reset": "Rivendosi klasën demo",
+      "lesson.zoom_meeting_create": "Krijoi takimin Zoom",
+      "lesson.zoom_host_authorization": "Nisi klasën në shfletues (host)",
+      "lesson.zoom_host_app_start": "Mori lidhjen për të nisur klasën në aplikacionin Zoom",
+      "lesson.zoom_app_join": "Mori lidhjen për t'u bashkuar në aplikacionin Zoom",
       "enrollment.grant": "Shtoi student në mësim",
       "enrollment.revoke": "Hoqi aksesin e studentit",
       "enrollment.regrant": "Riktheu aksesin e studentit",

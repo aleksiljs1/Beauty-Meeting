@@ -4,9 +4,11 @@ import type { AppUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
 import { env, zoomLive } from "@/server/env";
 import { ApiError } from "@/server/http";
+import { audit } from "@/server/services/audit";
+import { toApiError } from "./client";
 import type { ZoomJoinConfig } from "./host";
 import { createMeetingSdkParticipantSignature } from "./meeting-sdk-signature";
-import { openPasscode } from "./meetings";
+import { fetchZoomMeetingLinks, openJoinUrl, openPasscode, sealJoinUrl } from "./meetings";
 
 export type JoinResult = { mode: "demo" } | ZoomJoinConfig;
 
@@ -38,4 +40,38 @@ export async function authorizeLessonJoin(user: AppUser, lessonId: string): Prom
     password: openPasscode(meeting.zoomPasscodeEncrypted),
     userName: user.name,
   };
+}
+
+/**
+ * "Open in the Zoom app" fallback for a device that can't run the embedded meeting: the same
+ * policy check as `authorizeLessonJoin`, then Zoom's own join_url (its `pwd` is Zoom's
+ * encrypted passcode, not ours). Read from our encrypted copy, or fetched from Zoom once and
+ * stored. Note: unlike an SDK signature this link doesn't expire, so every hand-out is audited.
+ */
+export async function authorizeZoomAppJoin(user: AppUser, lessonId: string): Promise<{ joinUrl: string }> {
+  const { lesson } = await requireLessonCapability(user, lessonId, "JOIN_LIVE");
+  if (lesson.isDemo) throw new ApiError("CONFLICT", "Klasa demo nuk hapet në aplikacionin Zoom.");
+  if (!zoomLive) throw new ApiError("INTEGRATION_NOT_CONFIGURED", "Klasa live do të aktivizohet së shpejti.");
+
+  const meeting = await prisma.lesson.findUnique({
+    where: { id: lessonId },
+    select: { zoomMeetingNumber: true, zoomJoinUrlEncrypted: true },
+  });
+  const meetingNumber = meeting?.zoomMeetingNumber;
+  if (!meetingNumber) throw new ApiError("INTEGRATION_NOT_CONFIGURED", "Ky mësim nuk ka ende një takim Zoom.");
+
+  let joinUrl = openJoinUrl(meeting?.zoomJoinUrlEncrypted ?? null);
+  if (!joinUrl) {
+    try {
+      ({ joinUrl } = await fetchZoomMeetingLinks(meetingNumber));
+    } catch (error) {
+      toApiError(error, "Zoom nuk ktheu lidhjen e takimit. Provoni përsëri.");
+    }
+    if (!joinUrl) throw new ApiError("INTEGRATION_FAILED", "Zoom nuk ktheu lidhjen e takimit. Provoni përsëri.");
+    // Conditional: never attach a link to a meeting that was replaced in the meantime.
+    await prisma.lesson.updateMany({ where: { id: lessonId, zoomMeetingNumber: meetingNumber }, data: { zoomJoinUrlEncrypted: sealJoinUrl(joinUrl) } });
+  }
+
+  await audit(user.id, "lesson.zoom_app_join", "lesson", lessonId, { meetingNumber });
+  return { joinUrl };
 }
