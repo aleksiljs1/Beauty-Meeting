@@ -7,7 +7,7 @@ import { ApiError } from "@/server/http";
 import { audit } from "@/server/services/audit";
 import { requireZoomCredentials, toApiError, zoomRequest } from "./client";
 import { createMeetingSdkHostSignature } from "./meeting-sdk-signature";
-import { openPasscode } from "./meetings";
+import { fetchZoomMeetingLinks, openPasscode } from "./meetings";
 
 /** The host may open the meeting this long before the scheduled start. */
 const HOST_EARLY_START_MS = 30 * 60_000;
@@ -24,13 +24,10 @@ export type ZoomJoinConfig = {
   zak?: string;
 };
 
-/**
- * Short-lived authorization for the academy host to start a lesson's meeting in the embedded
- * SDK (role-1 signature + ZAK). Returned only to an authenticated admin; never stored or logged.
- */
-export async function createZoomHostAuthorization(lessonId: string, admin: AppUser, now = Date.now()): Promise<ZoomJoinConfig> {
+/** Admin-only checks shared by both ways of starting a meeting (in the browser / Zoom app). */
+async function loadHostableLesson(lessonId: string, admin: AppUser, now: number) {
   if (admin.role !== "admin") throw new ApiError("FORBIDDEN", "Nuk keni leje për të nisur klasën.");
-  const { hostUserId } = requireZoomCredentials();
+  requireZoomCredentials();
 
   const lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
@@ -45,6 +42,16 @@ export async function createZoomHostAuthorization(lessonId: string, admin: AppUs
     throw new ApiError("LESSON_JOIN_NOT_OPEN", "Mund ta nisni klasën jo më herët se 30 minuta para orarit.");
   }
   if (now >= lesson.scheduledEndAt.getTime()) throw new ApiError("CONFLICT", "Orari i këtij mësimi ka përfunduar.");
+  return { ...lesson, zoomMeetingNumber: lesson.zoomMeetingNumber }; // keeps the narrowed (non-null) type
+}
+
+/**
+ * Short-lived authorization for the academy host to start a lesson's meeting in the embedded
+ * SDK (role-1 signature + ZAK). Returned only to an authenticated admin; never stored or logged.
+ */
+export async function createZoomHostAuthorization(lessonId: string, admin: AppUser, now = Date.now()): Promise<ZoomJoinConfig> {
+  const lesson = await loadHostableLesson(lessonId, admin, now);
+  const { hostUserId } = requireZoomCredentials();
 
   let zak: string;
   try {
@@ -72,4 +79,24 @@ export async function createZoomHostAuthorization(lessonId: string, admin: AppUs
     userName: admin.name,
     zak,
   };
+}
+
+/**
+ * Starts the meeting in the Zoom desktop app instead (better for sharing a video with sound):
+ * a fresh `start_url` straight from Zoom, which embeds a host token. Same checks as the
+ * in-browser start; returned only to the admin, never stored or logged.
+ */
+export async function createZoomHostAppStart(lessonId: string, admin: AppUser, now = Date.now()): Promise<{ startUrl: string }> {
+  const lesson = await loadHostableLesson(lessonId, admin, now);
+
+  let startUrl: string | null;
+  try {
+    ({ startUrl } = await fetchZoomMeetingLinks(lesson.zoomMeetingNumber));
+  } catch (error) {
+    toApiError(error, "Zoom nuk ktheu lidhjen për nisjen e takimit.");
+  }
+  if (!startUrl) throw new ApiError("INTEGRATION_FAILED", "Zoom nuk ktheu lidhjen për nisjen e takimit.");
+
+  await audit(admin.id, "lesson.zoom_host_app_start", "lesson", lesson.id, { meetingNumber: lesson.zoomMeetingNumber });
+  return { startUrl };
 }

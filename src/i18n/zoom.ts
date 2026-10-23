@@ -27,6 +27,23 @@ export const zoomText = {
     note: "Studentët njoftohen automatikisht kur Zoom konfirmon fillimin e mësimit.",
     frameTitle: "Klasa live në Zoom",
     hostError: "Nuk mund të autorizohet host-i.",
+    appStart: "Nis në aplikacionin Zoom",
+    appStartPreparing: "Po përgatitet lidhja…",
+    appStartReady: "Lidhja është gati. Ajo hap aplikacionin Zoom në kompjuter dhe vlen vetëm për pak kohë.",
+    appStartOpen: "Hap aplikacionin Zoom",
+    appStartHint:
+      "Aplikacioni Zoom në kompjuter është më i mirë për të shfaqur një video me zë (Share Screen → Advanced → Video).",
+    appStartError: "Nuk mund të merret lidhja për aplikacionin Zoom.",
+    helpLink: "Udhëzuesi për mësuesen",
+  },
+  student: {
+    appFallback: "Hap në aplikacionin Zoom",
+    appFallbackPreparing: "Po përgatitet lidhja…",
+    appFallbackNote:
+      "Rekomandohet klasa këtu në faqe. Përdoreni aplikacionin Zoom vetëm nëse klasa nuk hapet në këtë pajisje.",
+    appFallbackReady: "Lidhja është gati:",
+    appFallbackOpen: "Hap Zoom (dritare e re)",
+    appFallbackError: "Nuk mund të merret lidhja për aplikacionin Zoom.",
   },
   frame: {
     genericError: "Nuk mund të lidhemi me Zoom. Provoni përsëri.",

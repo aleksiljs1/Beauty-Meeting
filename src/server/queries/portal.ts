@@ -4,6 +4,7 @@ import { requireLessonCapability } from "@/server/access/lesson-access";
 import { checkCapability, evaluateLessonAccess, lessonPhase, type LessonAccess, type LessonPhase } from "@/server/access/policy";
 import type { AppUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
+import { zoomLive } from "@/server/env";
 import { ApiError } from "@/server/http";
 import { STARTING_SOON_MS } from "@/server/services/live";
 import { listMaterials } from "@/server/services/materials";
@@ -132,6 +133,8 @@ export type ClassroomData = {
   canJoin: boolean;
   /** User-safe reason when join is not allowed right now. */
   joinBlockedMessage: string | null;
+  /** Offer the "open in the Zoom app" fallback (live Zoom, real lesson with a meeting). */
+  zoomAppFallback: boolean;
   materials: Awaited<ReturnType<typeof listMaterials>>;
   recordings: Array<Omit<Awaited<ReturnType<typeof listRecordings>>[number], "readyAt"> & { readyAt: string | null }>;
   serverTime: string;
@@ -148,7 +151,7 @@ export async function getClassroom(user: AppUser, rawLessonId: string, now = new
 
   const extra = await prisma.lesson.findUniqueOrThrow({
     where: { id: lessonId },
-    select: { summary: true, details: true, course: { select: { title: true } }, _count: { select: { recordings: { where: { status: "READY" } } } } },
+    select: { summary: true, details: true, zoomMeetingNumber: true, course: { select: { title: true } }, _count: { select: { recordings: { where: { status: "READY" } } } } },
   });
 
   const content = checkCapability(access, "VIEW_CONTENT", base, now);
@@ -190,6 +193,7 @@ export async function getClassroom(user: AppUser, rawLessonId: string, now = new
     stage,
     canJoin: !history && join.allowed,
     joinBlockedMessage: join.allowed ? null : join.message,
+    zoomAppFallback: zoomLive && !base.isDemo && !!extra.zoomMeetingNumber,
     materials,
     recordings: recordings.map((r) => ({ ...r, readyAt: r.readyAt?.toISOString() ?? null })),
     serverTime: now.toISOString(),

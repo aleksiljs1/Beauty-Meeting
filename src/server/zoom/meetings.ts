@@ -9,6 +9,7 @@ import { publishLessonChanged } from "@/server/realtime/publish";
 import { audit } from "@/server/services/audit";
 import { toApiError, requireZoomCredentials, zoomRequest, ZoomRequestError } from "./client";
 import { createMeetingBody, lessonMarker, meetingSchedule, type LessonSchedule } from "./meeting-body";
+import { isZoomMeetingUrl } from "./zoom-url";
 
 /**
  * Zoom meetings for lessons: create (duplicate-safe), keep in sync with the lesson, delete.
@@ -22,6 +23,7 @@ const meetingSchema = z.object({
   id: z.union([z.number().int().positive(), z.string().regex(/^\d+$/)]).transform(String),
   password: z.string().nullish(),
   agenda: z.string().nullish(),
+  join_url: z.string().nullish(),
 });
 const meetingListSchema = z.object({
   meetings: z.array(z.object({ id: z.union([z.number(), z.string()]).transform(String), start_time: z.string().optional() })).default([]),
@@ -35,6 +37,10 @@ function encryptionKey(): string {
 }
 export const sealPasscode = (passcode: string | null | undefined) => (passcode ? encryptSecret(passcode, encryptionKey()) : null);
 export const openPasscode = (sealed: string | null) => (sealed ? decryptSecret(sealed, encryptionKey()) : "");
+/** Zoom's join_url, sealed the same way; anything that isn't a Zoom https link is dropped. */
+export const sealJoinUrl = (joinUrl: string | null | undefined) =>
+  joinUrl && isZoomMeetingUrl(joinUrl) ? encryptSecret(joinUrl, encryptionKey()) : null;
+export const openJoinUrl = (sealed: string | null) => (sealed ? decryptSecret(sealed, encryptionKey()) : null);
 
 // --- create ------------------------------------------------------------------------------
 
@@ -100,6 +106,7 @@ export async function createZoomMeetingForLesson(lessonId: string, admin: AppUse
       data: {
         zoomMeetingNumber: meeting.id,
         zoomPasscodeEncrypted: sealPasscode(meeting.password),
+        zoomJoinUrlEncrypted: sealJoinUrl(meeting.join_url),
         zoomProvisioningStartedAt: null,
         meetingStatus: "SCHEDULED",
       },
@@ -144,6 +151,19 @@ export async function deleteZoomMeeting(lessonId: string, meetingNumber: string 
     await audit(actorId, "zoom.delete_failed", "lesson", lessonId, { status: error instanceof ZoomRequestError ? error.status : null });
     return { deleted: false };
   }
+}
+
+/**
+ * The meeting's current links from Zoom (`GET /meetings/{id}`). `start_url` embeds a host
+ * token: callers hand it to the admin immediately and never store or log it. Links that
+ * aren't Zoom https URLs come back as null.
+ */
+export async function fetchZoomMeetingLinks(meetingNumber: string): Promise<{ joinUrl: string | null; startUrl: string | null }> {
+  const meeting = await zoomRequest(`/meetings/${meetingNumber}`, {
+    schema: z.object({ join_url: z.string().nullish(), start_url: z.string().nullish() }),
+  });
+  const safe = (value: string | null | undefined) => (value && isZoomMeetingUrl(value) ? value : null);
+  return { joinUrl: safe(meeting.join_url), startUrl: safe(meeting.start_url) };
 }
 
 /** Live status straight from Zoom — used by the admin "sync" action when a webhook was missed. */

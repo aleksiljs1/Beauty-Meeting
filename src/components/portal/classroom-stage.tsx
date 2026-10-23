@@ -25,6 +25,7 @@ import { formatTime, timezoneAbbreviation } from "@/lib/datetime";
 import { formatCountdown } from "@/lib/polling";
 import type { StageState } from "@/server/queries/portal";
 import { DemoStage } from "./demo-stage";
+import { ZoomAppLink } from "@/components/zoom/zoom-app-link";
 import { ZoomFrame } from "@/components/zoom/zoom-frame";
 import { isZoomJoinConfig, useZoomFrame } from "@/hooks/use-zoom-frame";
 import { zoomText } from "@/i18n/zoom";
@@ -37,6 +38,7 @@ export type StageProps = {
   stage: StageState;
   canJoin: boolean;
   joinBlockedMessage: string | null;
+  zoomAppFallback: boolean;
   scheduledStartAt: string;
   joinOpensAt: string;
   serverTime: string;
@@ -226,6 +228,23 @@ function ClassroomStageImpl(props: StageProps) {
                 t.join
               )}
             </Button>
+
+            {props.zoomAppFallback ? (
+              <div className="mt-4 grid max-w-md gap-2 border-t pt-4">
+                <p className="text-xs text-muted-foreground">{zoomText.student.appFallbackNote}</p>
+                <ZoomAppLink
+                  endpoint={`/lessons/${lessonId}/zoom-app-link`}
+                  field="joinUrl"
+                  labels={{
+                    request: zoomText.student.appFallback,
+                    preparing: zoomText.student.appFallbackPreparing,
+                    ready: zoomText.student.appFallbackReady,
+                    open: zoomText.student.appFallbackOpen,
+                    error: zoomText.student.appFallbackError,
+                  }}
+                />
+              </div>
+            ) : null}
           </>
         ) : (
           <p className="max-w-md text-sm text-muted-foreground">
