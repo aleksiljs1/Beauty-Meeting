@@ -30,10 +30,12 @@ async function upload(bytes: Uint8Array<ArrayBuffer>, filename = "foto.png", mim
   return grant.uploadKey;
 }
 
+const galleryOnly = { showInGallery: true, showOnHomeHero: false, showOnHomeGallery: false, showOnAbout: false };
+
 describe("gallery uploads", () => {
   it("verifies the stored image, records its size and serves it only through gallery keys", async () => {
     const uploadKey = await upload(png);
-    const item = await content.createGalleryItem(admin, { uploadKey, mimeType: "image/png", sizeBytes: png.byteLength, alt: "Manikyr", caption: "", isPublished: true });
+    const item = await content.createGalleryItem(admin, { uploadKey, mimeType: "image/png", sizeBytes: png.byteLength, alt: "Manikyr", caption: "", isPublished: true, ...galleryOnly });
     expect(item).toMatchObject({ alt: "Manikyr", caption: null, width: 2, height: 3, isPublished: true });
     expect(item).not.toHaveProperty("imageKey");
 
@@ -110,7 +112,7 @@ describe("gallery uploads", () => {
     const fake = new TextEncoder().encode("<svg onload=alert(1)>not really a png</svg>");
     const uploadKey = await upload(fake);
     await expect(
-      content.createGalleryItem(admin, { uploadKey, mimeType: "image/png", sizeBytes: fake.byteLength, alt: "x", caption: "", isPublished: true }),
+      content.createGalleryItem(admin, { uploadKey, mimeType: "image/png", sizeBytes: fake.byteLength, alt: "x", caption: "", isPublished: true, ...galleryOnly }),
     ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
     expect(await headObject(uploadKey)).toBeNull();
     expect(await prisma.galleryItem.count()).toBe(0);
@@ -118,7 +120,7 @@ describe("gallery uploads", () => {
 
   it("refuses non-gallery keys and disallowed types", async () => {
     await expect(
-      content.createGalleryItem(admin, { uploadKey: "materials/a/b", mimeType: "image/png", sizeBytes: 10, alt: "x", caption: "", isPublished: true }),
+      content.createGalleryItem(admin, { uploadKey: "materials/a/b", mimeType: "image/png", sizeBytes: 10, alt: "x", caption: "", isPublished: true, ...galleryOnly }),
     ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
     await expect(content.startGalleryUpload({ filename: "x.svg", mimeType: "image/svg+xml", sizeBytes: 10 })).rejects.toMatchObject({
       code: "VALIDATION_FAILED",

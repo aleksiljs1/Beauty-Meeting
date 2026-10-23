@@ -94,8 +94,11 @@ Original brief: `c:\Users\aleksiljs\Downloads\Beauty_Academy_Zoom_Claude_Megapro
 
 - Admin gallery images have independent public-display flags: `showInGallery`, `showOnHomeHero`,
   `showOnHomeGallery`, and `showOnAbout`. `isPublished` remains the master public-visibility switch.
-- New uploads default to all four display flags off. The admin can enable any combination, so an
-  About image only appears on `/galeria` when `showInGallery` is also enabled.
+- The upload form starts with only `showInGallery` on (the database default stays off). The admin can
+  enable any combination, so an About image only appears on `/galeria` when `showInGallery` is also on.
+- Empty single-image slots (home hero, About) fall back to the monogram placeholder, not stock photos.
+- The admin editor saves only edited fields and mirrors slot hand-overs to the other cards, so a stale
+  card can never take a slot back.
 - `/galeria`, the home hero, the home gallery section, and `/rreth-nesh` each query only images
   selected for that destination. Home hero and About each render one image; assigning a new one
   clears the previous image from that same slot. Home gallery and `/galeria` support multiple images.

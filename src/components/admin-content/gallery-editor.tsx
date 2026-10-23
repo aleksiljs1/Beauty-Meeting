@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Trash2Icon, UploadIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useForm, type Control } from "react-hook-form";
 import {
   AlertDialog,
@@ -64,7 +64,7 @@ function UploadForm({ onUploaded }: { onUploaded: (item: AdminGalleryItem) => vo
       alt: "",
       caption: "",
       isPublished: true,
-      showInGallery: false,
+      showInGallery: true,
       showOnHomeHero: false,
       showOnHomeGallery: false,
       showOnAbout: false,
@@ -174,7 +174,7 @@ function ItemCard({
   onDelete: () => void;
 }) {
   const [status, setStatus] = useState<Status>({ kind: "idle" });
-  const { register, control, handleSubmit, formState, setError, reset } = useForm<GalleryItemInput>({
+  const { register, control, handleSubmit, formState, setError, reset, resetField } = useForm<GalleryItemInput>({
     resolver: zodResolver(galleryItemSchema),
     defaultValues: {
       alt: item.alt,
@@ -208,9 +208,15 @@ function ItemCard({
     }
   };
 
-  const onSubmit = handleSubmit(({ alt, caption, showInGallery, showOnHomeHero, showOnHomeGallery, showOnAbout }) =>
-    save({ alt, caption, showInGallery, showOnHomeHero, showOnHomeGallery, showOnAbout }),
-  );
+  // Another card can take this image's single-image slot (home hero / About); follow the server.
+  useEffect(() => resetField("showOnHomeHero", { defaultValue: item.showOnHomeHero }), [item.showOnHomeHero, resetField]);
+  useEffect(() => resetField("showOnAbout", { defaultValue: item.showOnAbout }), [item.showOnAbout, resetField]);
+
+  // Send only what was edited, so a stale value can never take a slot back from another image.
+  const onSubmit = handleSubmit((values) => {
+    const changed = Object.keys(formState.dirtyFields) as (keyof GalleryItemInput)[];
+    void save(Object.fromEntries(changed.filter((name) => name !== "isPublished").map((name) => [name, values[name]])));
+  });
   const saving = status.kind === "busy";
 
   return (
@@ -257,6 +263,15 @@ function ItemCard({
   );
 }
 
+/** Home hero and About show one image each: the server clears the slot on other items, so mirror that locally. */
+function releaseSingleSlots(other: AdminGalleryItem, updated: AdminGalleryItem): AdminGalleryItem {
+  return {
+    ...other,
+    showOnHomeHero: other.showOnHomeHero && !updated.showOnHomeHero,
+    showOnAbout: other.showOnAbout && !updated.showOnAbout,
+  };
+}
+
 export function GalleryEditor({ initial }: { initial: AdminGalleryItem[] }) {
   const [items, setItems] = useState(initial);
   const [deleting, setDeleting] = useState<AdminGalleryItem | null>(null);
@@ -296,7 +311,7 @@ export function GalleryEditor({ initial }: { initial: AdminGalleryItem[] }) {
 
   return (
     <div className="grid gap-8">
-      <UploadForm onUploaded={(item) => setItems((list) => [...list, item])} />
+      <UploadForm onUploaded={(item) => setItems((list) => [...list.map((i) => releaseSingleSlots(i, item)), item])} />
       <StatusMessage status={status} />
       {items.length === 0 ? (
         <p className="rounded-md border border-dashed px-6 py-10 text-center text-muted-foreground">{t.empty}</p>
@@ -309,7 +324,7 @@ export function GalleryEditor({ initial }: { initial: AdminGalleryItem[] }) {
               index={index}
               count={items.length}
               busy={busy}
-              onChange={(updated) => setItems((list) => list.map((i) => (i.id === updated.id ? updated : i)))}
+              onChange={(updated) => setItems((list) => list.map((i) => (i.id === updated.id ? updated : releaseSingleSlots(i, updated))))}
               onMove={(delta) => void move(index, delta)}
               onDelete={() => setDeleting(item)}
             />

@@ -135,7 +135,7 @@ export function PortalShell({ user, academyName, children }: { user: { name: str
                 {unread > 0 ? (
                   <span
                     aria-hidden="true"
-                    className="absolute top-0.5 right-0.5 flex min-w-4 items-center justify-center rounded-full bg-rose-deep px-1 text-[10px] leading-4 font-semibold text-white"
+                    className="absolute top-0.5 right-0.5 flex min-w-4 items-center justify-center rounded-full bg-rose-deep px-1 text-[10px] leading-4 font-semibold text-primary-foreground"
                   >
                     {unread > 9 ? "9+" : unread}
                   </span>

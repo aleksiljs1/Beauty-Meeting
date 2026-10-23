@@ -3,7 +3,7 @@ import { z } from "zod";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { Prisma } from "@/generated/prisma/client";
 import { adminContent } from "@/i18n/admin-content";
-import type { CourseInput, GalleryItemInput, GalleryVisibilityField, ServiceInput, SettingsInput } from "@/lib/content-schemas";
+import type { CourseInput, GalleryItemInput, ServiceInput, SettingsInput } from "@/lib/content-schemas";
 import { readImageDimensions } from "@/lib/image-dimensions";
 import { parseOpeningHours } from "@/lib/public-content";
 import type { AppUser } from "@/server/auth/session";
@@ -248,7 +248,7 @@ export async function startGalleryUpload(file: { filename: string; mimeType: str
 /** Step 2: verify what actually landed in storage (size, type, magic bytes), then create the item. */
 export async function createGalleryItem(
   admin: AppUser,
-  input: Omit<GalleryItemInput, GalleryVisibilityField> & Partial<Pick<GalleryItemInput, GalleryVisibilityField>> & { uploadKey: string; mimeType: string; sizeBytes: number },
+  input: GalleryItemInput & { uploadKey: string; mimeType: string; sizeBytes: number },
 ) {
   if (!isGalleryKey(input.uploadKey)) throw new ApiError("VALIDATION_FAILED", e.badImage);
   if (await prisma.galleryItem.findUnique({ where: { imageKey: input.uploadKey }, select: { id: true } })) {
@@ -286,10 +286,10 @@ export async function createGalleryItem(
         alt: input.alt.trim(),
         caption: orNull(input.caption),
         isPublished: input.isPublished,
-        showInGallery: input.showInGallery ?? false,
-        showOnHomeHero: input.showOnHomeHero ?? false,
-        showOnHomeGallery: input.showOnHomeGallery ?? false,
-        showOnAbout: input.showOnAbout ?? false,
+        showInGallery: input.showInGallery,
+        showOnHomeHero: input.showOnHomeHero,
+        showOnHomeGallery: input.showOnHomeGallery,
+        showOnAbout: input.showOnAbout,
         width: dimensions?.width ?? null,
         height: dimensions?.height ?? null,
         position: after(await tx.galleryItem.aggregate({ _max: { position: true } })),

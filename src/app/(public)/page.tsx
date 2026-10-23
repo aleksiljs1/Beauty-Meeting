@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ContactActions } from "@/components/public/contact";
 import { CourseCard } from "@/components/public/course-card";
-import { ArrowLink, Container, Eyebrow, GalleryImage, ImagePlaceholder, LinkButton, SectionHeading } from "@/components/public/primitives";
+import { ArrowLink, Container, Eyebrow, GalleryImage, ImagePlaceholder, LinkButton, monogramOf, SectionHeading } from "@/components/public/primitives";
 import { ServiceList } from "@/components/public/service-list";
 import { publicSite } from "@/i18n/public";
 import { getPublicCourses, getPublicGallery, getPublicServices, getPublicSettings } from "@/server/queries/public";
@@ -26,7 +26,7 @@ export default async function HomePage() {
     getPublicGallery(1, "showOnHomeHero"),
     getPublicGallery(6, "showOnHomeGallery"),
   ]);
-  const heroImage = heroImages[0] ?? { src: "/images/01.jpg", alt: "Studioja e thonjve me harkun dekorativ dhe ulëset e bardha" };
+  const heroImage = heroImages[0];
 
   return (
     <>
@@ -46,12 +46,11 @@ export default async function HomePage() {
               </LinkButton>
             </div>
           </div>
-          <GalleryImage
-            item={heroImage}
-            preload
-            sizes="(min-width: 1024px) 42vw, 100vw"
-            className="aspect-[4/5] max-h-[38rem] w-full"
-          />
+          {heroImage ? (
+            <GalleryImage item={heroImage} preload sizes="(min-width: 1024px) 42vw, 100vw" className="aspect-[4/5] max-h-[38rem] w-full" />
+          ) : (
+            <ImagePlaceholder monogram={monogramOf(settings.name)} className="aspect-[4/5] max-h-[38rem] w-full" />
+          )}
         </Container>
       </section>
 
