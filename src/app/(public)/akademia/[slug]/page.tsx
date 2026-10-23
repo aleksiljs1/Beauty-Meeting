@@ -34,8 +34,13 @@ export default async function CoursePage({ params }: PageProps<"/akademia/[slug]
       <header className="border-b border-border/70">
         <Container className="py-14 sm:py-20">
           <p className="mb-8 text-sm text-muted-foreground">
-            <Link href="/akademia" className="rounded-sm hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
-              <span aria-hidden>← </span>
+            <Link
+              href="/akademia"
+              className="group inline-flex items-center gap-1.5 rounded-sm transition-colors duration-300 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            >
+              <span aria-hidden className="transition-transform duration-300 ease-out motion-safe:group-hover:-translate-x-1">
+                ←
+              </span>
               {t.backToCourses}
             </Link>
           </p>

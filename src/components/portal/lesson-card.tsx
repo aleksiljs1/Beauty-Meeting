@@ -21,7 +21,12 @@ export function LessonCard({ lesson, headingLevel = "h3" }: { lesson: StudentLes
   const href = `/portal/mesimet/${lesson.id}`;
 
   return (
-    <article className={cn("flex flex-col gap-3 rounded-lg border bg-card p-4 sm:p-5", history && "bg-card/60")}>
+    <article
+      className={cn(
+        "flex flex-col gap-3 rounded-lg border bg-card p-4 transition-[border-color,box-shadow] duration-200 sm:p-5",
+        history ? "bg-card/60" : "hover:border-rose/40 hover:shadow-[0_12px_32px_-20px_rgb(0_0_0/0.9)]",
+      )}
+    >
       <div className="flex flex-wrap items-center gap-2">
         <PhaseBadge phase={lesson.phase} />
         {lesson.isDemo ? (
@@ -34,7 +39,10 @@ export function LessonCard({ lesson, headingLevel = "h3" }: { lesson: StudentLes
         {history ? (
           lesson.title
         ) : (
-          <Link href={href} className="underline-offset-4 hover:underline">
+          <Link
+            href={href}
+            className="rounded-sm underline-offset-4 transition-colors duration-200 outline-none hover:text-rose-deep hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
             {lesson.title}
           </Link>
         )}

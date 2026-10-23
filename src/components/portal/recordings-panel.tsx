@@ -175,7 +175,7 @@ export function RecordingsPanel({ lessonId, recordings, visible }: { lessonId: s
                 aria-pressed={r.id === selected.id}
                 onClick={() => setSelectedId(r.id)}
                 className={cn(
-                  "flex w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-sm hover:bg-muted",
+                  "flex w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-sm transition-colors duration-200 hover:bg-muted",
                   r.id === selected.id && "border-foreground/40 bg-secondary",
                 )}
               >

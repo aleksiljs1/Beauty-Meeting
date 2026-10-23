@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { CourseCard } from "@/components/public/course-card";
 import { Container, EmptyState, PageHeader } from "@/components/public/primitives";
+import { Reveal } from "@/components/public/reveal";
 import { publicSite } from "@/i18n/public";
 import { getPublicCourses, getPublicSettings } from "@/server/queries/public";
 
@@ -16,10 +17,10 @@ export default async function AcademyPage() {
       <Container className="py-14 sm:py-20">
         {courses.length > 0 ? (
           <ul className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {courses.map((course) => (
-              <li key={course.slug}>
+            {courses.map((course, index) => (
+              <Reveal as="li" key={course.slug} delay={(index % 3) * 90}>
                 <CourseCard course={course} />
-              </li>
+              </Reveal>
             ))}
           </ul>
         ) : (

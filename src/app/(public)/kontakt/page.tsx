@@ -2,6 +2,7 @@ import { ExternalLinkIcon, MapPinIcon } from "lucide-react";
 import type { Metadata } from "next";
 import { ContactActions, OpeningHours } from "@/components/public/contact";
 import { Container, LinkButton, PageHeader } from "@/components/public/primitives";
+import { Reveal } from "@/components/public/reveal";
 import { publicSite } from "@/i18n/public";
 import { mailtoHref, safeExternalUrl, telHref, whatsappHref } from "@/lib/public-content";
 import { getPublicSettings } from "@/server/queries/public";
@@ -19,7 +20,7 @@ function Detail({ label, children }: { label: string; children: React.ReactNode 
   );
 }
 
-const linkClass = "rounded-sm underline decoration-rose/60 underline-offset-4 hover:decoration-rose-deep focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none";
+const linkClass = "rounded-sm underline decoration-rose/60 underline-offset-4 transition-[color,text-decoration-color] duration-300 hover:text-rose-deep hover:decoration-rose-deep focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none";
 
 export default async function ContactPage() {
   const settings = await getPublicSettings();
@@ -79,20 +80,22 @@ export default async function ContactPage() {
           )}
         </dl>
 
-        <section aria-labelledby="hours-title" className="self-start rounded-md bg-secondary p-7 sm:p-9">
-          <h2 id="hours-title" className="mb-5 text-3xl">
-            {t.hours}
-          </h2>
-          <OpeningHours rows={settings.openingHours} className="text-base" />
-          {map && (
-            <div className="mt-8">
-              <LinkButton href={map} variant="outline">
-                <MapPinIcon aria-hidden />
-                {t.map}
-              </LinkButton>
-            </div>
-          )}
-        </section>
+        <Reveal className="self-start" delay={120}>
+          <section aria-labelledby="hours-title" className="rounded-md bg-secondary p-7 sm:p-9">
+            <h2 id="hours-title" className="mb-5 text-3xl">
+              {t.hours}
+            </h2>
+            <OpeningHours rows={settings.openingHours} className="text-base" />
+            {map && (
+              <div className="mt-8">
+                <LinkButton href={map} variant="outline">
+                  <MapPinIcon aria-hidden />
+                  {t.map}
+                </LinkButton>
+              </div>
+            )}
+          </section>
+        </Reveal>
       </Container>
     </>
   );

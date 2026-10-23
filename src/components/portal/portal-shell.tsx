@@ -105,7 +105,10 @@ export function PortalShell({ user, academyName, children }: { user: { name: str
 
       <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur-sm supports-[backdrop-filter]:bg-background/85">
         <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-4 px-4">
-          <Link href="/portal" className="min-w-0 truncate font-heading text-xl tracking-tight">
+          <Link
+            href="/portal"
+            className="min-w-0 truncate rounded-sm font-heading text-xl tracking-tight transition-colors duration-300 outline-none hover:text-rose-deep focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
             {academyName}
           </Link>
 
@@ -118,8 +121,10 @@ export function PortalShell({ user, academyName, children }: { user: { name: str
                   href={item.href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-muted",
-                    active ? "font-medium text-foreground" : "text-muted-foreground",
+                    "relative rounded-md px-3 py-1.5 text-sm transition-colors duration-200 outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50",
+                    // Gold hairline under the current page, as in the public header.
+                    "after:absolute after:inset-x-3 after:-bottom-px after:h-px after:origin-left after:scale-x-0 after:bg-rose after:transition-transform after:duration-300",
+                    active ? "font-medium text-foreground after:scale-x-100" : "text-muted-foreground",
                   )}
                 >
                   {item.label}
@@ -191,8 +196,8 @@ export function PortalShell({ user, academyName, children }: { user: { name: str
                   href={item.href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "relative flex h-16 flex-col items-center justify-center gap-1 text-[11px]",
-                    active ? "font-semibold text-foreground" : "text-muted-foreground",
+                    "relative flex h-16 flex-col items-center justify-center gap-1 text-[11px] transition-colors duration-200 outline-none hover:text-foreground focus-visible:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
+                    active ? "font-semibold text-foreground [&>svg]:text-rose-deep" : "text-muted-foreground",
                   )}
                 >
                   <Icon aria-hidden="true" className="size-5" />

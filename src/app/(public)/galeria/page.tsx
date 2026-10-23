@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Container, GalleryImage, ImagePlaceholder, PageHeader } from "@/components/public/primitives";
+import { Reveal } from "@/components/public/reveal";
 import { publicSite } from "@/i18n/public";
 import { getPublicGallery, getPublicSettings } from "@/server/queries/public";
 
@@ -17,8 +18,8 @@ export default async function GalleryPage() {
           // CSS columns keep each photo's own proportions (when known) in a calm masonry layout.
           <ul className="columns-1 gap-4 min-[480px]:columns-2 lg:columns-3">
             {gallery.map((item, index) => (
-              <li key={item.id} className="mb-4 break-inside-avoid">
-                <figure>
+              <Reveal as="li" key={item.id} delay={(index % 3) * 80} className="mb-4 break-inside-avoid">
+                <figure className="group">
                   <GalleryImage
                     item={item}
                     preload={index < 2}
@@ -26,9 +27,13 @@ export default async function GalleryPage() {
                     className="w-full"
                     aspect={item.width && item.height ? `${item.width} / ${item.height}` : "4 / 5"}
                   />
-                  {item.caption && <figcaption className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.caption}</figcaption>}
+                  {item.caption && (
+                    <figcaption className="mt-2 text-sm leading-relaxed text-muted-foreground transition-colors duration-300 group-hover:text-foreground">
+                      {item.caption}
+                    </figcaption>
+                  )}
                 </figure>
-              </li>
+              </Reveal>
             ))}
           </ul>
         ) : (

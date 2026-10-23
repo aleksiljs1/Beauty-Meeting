@@ -70,7 +70,7 @@ export function NotificationsList({ initial }: { initial: LiveFeed }) {
             return (
               <li
                 key={n.id}
-                className={cn("flex items-start gap-3 rounded-lg border p-4", unreadItem ? "bg-card" : "bg-card/50")}
+                className={cn("flex items-start gap-3 rounded-lg border p-4 transition-colors duration-200 hover:border-rose/30", unreadItem ? "bg-card" : "bg-card/50")}
               >
                 <Icon aria-hidden="true" className={cn("mt-0.5 size-5 shrink-0", n.type === "LESSON_LIVE" ? "text-live" : "text-rose-deep")} />
                 <div className="min-w-0 flex-1">

@@ -23,9 +23,9 @@ export default async function ContentHomePage() {
           <li key={section.href}>
             <Link
               href={section.href}
-              className="block h-full rounded-md border bg-card p-6 transition-colors hover:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              className="group block h-full rounded-md border bg-card p-6 transition-colors duration-200 hover:border-rose/60 hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             >
-              <h2 className="text-2xl">{section.title}</h2>
+              <h2 className="text-2xl transition-colors duration-200 group-hover:text-rose-deep">{section.title}</h2>
               <p className="mt-2 text-sm text-muted-foreground">{section.description}</p>
             </Link>
           </li>

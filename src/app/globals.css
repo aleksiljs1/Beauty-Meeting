@@ -114,3 +114,59 @@
     scroll-behavior: auto !important;
   }
 }
+
+/*
+ * Motion. Restrained and editorial: 200–300 ms for hover feedback, ~700 ms for reveals, no bounce.
+ * Movement is opt-in through `motion-safe:` utilities in components; the reduced-motion block
+ * above flattens every transition/animation that is left.
+ */
+
+/* Very subtle fade of the public page content on load and on navigation ((public)/template.tsx). */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+  }
+}
+@utility animate-page-enter {
+  animation: page-enter 450ms ease-out backwards;
+}
+
+/*
+ * Scroll reveal (see components/public/reveal.tsx). Content is visible by default; the client
+ * component only sets data-reveal="hidden" on elements below the fold once JS and
+ * IntersectionObserver are available, then "shown" when they scroll into view. Transform and
+ * opacity only, so nothing shifts layout. Focused content is never left invisible.
+ */
+[data-reveal] {
+  transition:
+    opacity 700ms cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay, 0ms),
+    translate 700ms cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay, 0ms);
+}
+[data-reveal="hidden"] {
+  opacity: 0;
+  translate: 0 1rem;
+}
+[data-reveal="hidden"]:focus-within {
+  opacity: 1;
+  translate: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal] {
+    translate: none !important;
+  }
+}
+
+/* Gold hairline that grows under a text link on hover/focus (same gesture as the header nav). Wraps across lines. */
+@utility link-underline {
+  background-image: linear-gradient(var(--rose), var(--rose));
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 0% 1px;
+  transition:
+    background-size 300ms ease-out,
+    color 300ms ease-out;
+  &:hover,
+  &:focus-visible {
+    background-size: 100% 1px;
+  }
+}
