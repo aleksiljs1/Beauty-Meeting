@@ -23,7 +23,7 @@ export default async function HistoryPage({ searchParams }: PageProps<"/admin/hi
       ) : (
         <ol className="divide-y rounded-md border bg-card">
           {log.items.map((entry) => (
-            <li key={entry.id} className="grid gap-1 px-4 py-3 text-sm md:grid-cols-[12rem_1fr_12rem] md:gap-4">
+            <li key={entry.id} className="grid gap-1 px-4 py-3 text-sm transition-colors duration-200 hover:bg-muted/30 md:grid-cols-[12rem_1fr_12rem] md:gap-4">
               <time dateTime={entry.createdAt.toISOString()} className="text-muted-foreground">
                 {formatDateTime(entry.createdAt)}
               </time>

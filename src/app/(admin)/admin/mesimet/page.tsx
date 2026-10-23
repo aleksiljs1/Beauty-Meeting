@@ -33,8 +33,8 @@ function Chip({ href, active, children }: { href: string; active: boolean; child
       href={href}
       aria-current={active ? "true" : undefined}
       className={cn(
-        "rounded-full border px-3 py-1 text-sm transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-        active ? "border-foreground bg-foreground text-background" : "bg-card text-muted-foreground hover:text-foreground",
+        "rounded-full border px-3 py-1 text-sm transition-colors duration-200 outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+        active ? "border-foreground bg-foreground text-background" : "bg-card text-muted-foreground hover:border-rose/50 hover:text-foreground",
       )}
     >
       {children}
@@ -102,7 +102,7 @@ export default async function LessonsPage({ searchParams }: PageProps<"/admin/me
             <li key={lesson.id}>
               <Link
                 href={`/admin/mesimet/${lesson.id}`}
-                className="group flex flex-col gap-2 px-4 py-4 outline-none focus-visible:bg-muted md:flex-row md:items-center md:justify-between"
+                className="group flex flex-col gap-2 px-4 py-4 transition-colors duration-200 outline-none hover:bg-muted/40 focus-visible:bg-muted md:flex-row md:items-center md:justify-between"
               >
                 <div className="min-w-0 space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
