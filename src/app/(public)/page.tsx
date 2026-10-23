@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ContactActions } from "@/components/public/contact";
 import { CourseCard } from "@/components/public/course-card";
 import { ArrowLink, Container, Eyebrow, GalleryImage, ImagePlaceholder, LinkButton, monogramOf, SectionHeading } from "@/components/public/primitives";
+import { Reveal } from "@/components/public/reveal";
 import { ServiceList } from "@/components/public/service-list";
 import { publicSite } from "@/i18n/public";
 import { getPublicCourses, getPublicGallery, getPublicServices, getPublicSettings } from "@/server/queries/public";
@@ -57,12 +58,14 @@ export default async function HomePage() {
       {/* Services -------------------------------------------------------------------------- */}
       <section aria-labelledby="services-title" className="border-t border-border/70">
         <Container className="py-16 sm:py-24">
-          <SectionHeading
-            id="services-title"
-            eyebrow={t.servicesEyebrow}
-            title={t.servicesTitle}
-            action={services.length > 0 ? <ArrowLink href="/sherbimet">{t.servicesAll}</ArrowLink> : undefined}
-          />
+          <Reveal>
+            <SectionHeading
+              id="services-title"
+              eyebrow={t.servicesEyebrow}
+              title={t.servicesTitle}
+              action={services.length > 0 ? <ArrowLink href="/sherbimet">{t.servicesAll}</ArrowLink> : undefined}
+            />
+          </Reveal>
           <ServiceList services={services.slice(0, 6)} compact />
         </Container>
       </section>
@@ -70,19 +73,21 @@ export default async function HomePage() {
       {/* Academy --------------------------------------------------------------------------- */}
       <section aria-labelledby="academy-title" className="bg-secondary">
         <Container className="py-16 sm:py-24">
-          <SectionHeading
-            id="academy-title"
-            eyebrow={t.academyEyebrow}
-            title={t.academyTitle}
-            intro={t.academyIntro}
-            action={courses.length > 0 ? <ArrowLink href="/akademia">{t.academyAll}</ArrowLink> : undefined}
-          />
+          <Reveal>
+            <SectionHeading
+              id="academy-title"
+              eyebrow={t.academyEyebrow}
+              title={t.academyTitle}
+              intro={t.academyIntro}
+              action={courses.length > 0 ? <ArrowLink href="/akademia">{t.academyAll}</ArrowLink> : undefined}
+            />
+          </Reveal>
           {courses.length > 0 ? (
             <ul className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {courses.slice(0, 3).map((course) => (
-                <li key={course.slug}>
+              {courses.slice(0, 3).map((course, index) => (
+                <Reveal as="li" key={course.slug} delay={index * 90}>
                   <CourseCard course={course} />
-                </li>
+                </Reveal>
               ))}
             </ul>
           ) : (
@@ -94,7 +99,7 @@ export default async function HomePage() {
       {/* Online learning ------------------------------------------------------------------- */}
       <section aria-labelledby="online-title">
         <Container className="grid gap-12 py-16 sm:py-24 lg:grid-cols-[0.9fr_1.1fr] lg:gap-20">
-          <div>
+          <Reveal>
             <Eyebrow className="mb-3">{t.onlineEyebrow}</Eyebrow>
             <h2 id="online-title" className="text-3xl leading-tight sm:text-4xl">
               {t.onlineTitle}
@@ -105,20 +110,20 @@ export default async function HomePage() {
                 {t.onlineCta}
               </LinkButton>
             </div>
-          </div>
+          </Reveal>
           <ol className="divide-y divide-border/80 border-y border-border/80">
             {t.onlineFeatures.map((feature, index) => {
               const Icon = onlineIcons[index] ?? VideoIcon;
               return (
-                <li key={feature.title} className="flex gap-5 py-7">
-                  <span className="mt-1 flex size-10 shrink-0 items-center justify-center rounded-full bg-accent text-rose-deep">
+                <Reveal as="li" key={feature.title} delay={index * 90} className="group flex gap-5 py-7">
+                  <span className="mt-1 flex size-10 shrink-0 items-center justify-center rounded-full bg-accent text-rose-deep ring-1 ring-transparent transition-[box-shadow] duration-300 group-hover:ring-rose/60">
                     <Icon className="size-[18px]" aria-hidden />
                   </span>
                   <div>
                     <h3 className="text-2xl">{feature.title}</h3>
                     <p className="mt-2 leading-relaxed text-muted-foreground">{feature.body}</p>
                   </div>
-                </li>
+                </Reveal>
               );
             })}
           </ol>
@@ -128,20 +133,25 @@ export default async function HomePage() {
       {/* Gallery --------------------------------------------------------------------------- */}
       <section aria-labelledby="gallery-title" className="border-t border-border/70">
         <Container className="py-16 sm:py-24">
-          <SectionHeading
-            id="gallery-title"
-            eyebrow={t.galleryEyebrow}
-            title={t.galleryTitle}
-            action={selected.length > 0 ? <ArrowLink href="/galeria">{t.galleryAll}</ArrowLink> : undefined}
-          />
+          <Reveal>
+            <SectionHeading
+              id="gallery-title"
+              eyebrow={t.galleryEyebrow}
+              title={t.galleryTitle}
+              action={selected.length > 0 ? <ArrowLink href="/galeria">{t.galleryAll}</ArrowLink> : undefined}
+            />
+          </Reveal>
           {selected.length > 0 ? (
             <ul className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3">
-              {selected.map((item) => (
-                <li key={item.id}>
-                  <Link href="/galeria" className="block rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none">
+              {selected.map((item, index) => (
+                <Reveal as="li" key={item.id} delay={(index % 3) * 80}>
+                  <Link
+                    href="/galeria"
+                    className="group block rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
+                  >
                     <GalleryImage item={item} sizes="(min-width: 768px) 33vw, 50vw" className="aspect-square" />
                   </Link>
-                </li>
+                </Reveal>
               ))}
             </ul>
           ) : (
@@ -153,18 +163,18 @@ export default async function HomePage() {
       {/* Contact CTA ----------------------------------------------------------------------- */}
       <section aria-labelledby="cta-title" className="bg-sand">
         <Container className="flex flex-col gap-8 py-16 sm:py-20 md:flex-row md:items-end md:justify-between">
-          <div className="max-w-xl">
+          <Reveal className="max-w-xl">
             <h2 id="cta-title" className="text-3xl leading-tight sm:text-4xl">
               {t.contactTitle}
             </h2>
             <p className="mt-4 leading-relaxed text-foreground/75">{t.contactBody}</p>
-          </div>
-          <div className="flex flex-wrap gap-3">
+          </Reveal>
+          <Reveal delay={120} className="flex flex-wrap gap-3">
             <ContactActions settings={settings} />
             <LinkButton href="/kontakt" variant="outline">
               {t.contactCta}
             </LinkButton>
-          </div>
+          </Reveal>
         </Container>
       </section>
     </>

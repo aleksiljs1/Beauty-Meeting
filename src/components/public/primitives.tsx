@@ -56,11 +56,12 @@ export function PageHeader({ eyebrow, title, intro, children }: { eyebrow?: stri
   );
 }
 
+// Hover matches the header's "Hyr" button: a quiet gold fill or border and a slight lift.
 const buttonBase =
-  "inline-flex h-11 items-center justify-center gap-2 rounded-md px-6 text-sm font-medium tracking-wide transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none [&_svg]:size-4 [&_svg]:shrink-0";
+  "inline-flex h-11 items-center justify-center gap-2 rounded-md px-6 text-sm font-medium tracking-wide transition-[color,background-color,border-color,box-shadow,translate] duration-300 ease-out motion-safe:hover:-translate-y-0.5 motion-safe:active:translate-y-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none [&_svg]:size-4 [&_svg]:shrink-0";
 const buttonVariants = {
-  primary: "bg-primary text-primary-foreground hover:bg-primary/85",
-  outline: "border border-foreground/25 text-foreground hover:border-foreground/60 hover:bg-background/60",
+  primary: "bg-primary text-primary-foreground hover:bg-rose hover:shadow-[0_6px_20px_-8px_var(--rose)]",
+  outline: "border border-foreground/25 text-foreground hover:border-rose hover:text-rose-deep",
 } as const;
 
 export function LinkButton({
@@ -98,10 +99,10 @@ export function ArrowLink({ href, children }: { href: string; children: ReactNod
   return (
     <Link
       href={href}
-      className="group inline-flex items-center gap-2 self-start rounded-sm text-sm font-medium text-foreground underline decoration-rose/60 underline-offset-[6px] hover:decoration-rose-deep focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:self-auto"
+      className="group inline-flex items-center gap-2 self-start rounded-sm text-sm font-medium text-foreground underline decoration-rose/60 underline-offset-[6px] transition-[color,text-decoration-color] duration-300 hover:text-rose-deep hover:decoration-rose-deep focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:self-auto"
     >
       {children}
-      <span aria-hidden className="transition-transform group-hover:translate-x-0.5">
+      <span aria-hidden className="transition-transform duration-300 ease-out motion-safe:group-hover:translate-x-1">
         →
       </span>
     </Link>
@@ -112,6 +113,8 @@ export function ArrowLink({ href, children }: { href: string; children: ReactNod
  * Gallery image through the optimizer (`/_next/image` fetches our own `/media/gallery/<id>`
  * route, so visitors get resized WebP/AVIF instead of the original upload). Rendered with
  * `fill` inside a fixed aspect-ratio box, so missing dimensions never cause layout shift.
+ * Inside a `group` (a link or a figure) the photo zooms gently within its frame on hover/focus
+ * and a soft overlay with a gold hairline appears; elsewhere (hero, about) it stays still.
  */
 export function GalleryImage({
   item,
@@ -129,7 +132,18 @@ export function GalleryImage({
 }) {
   return (
     <div className={cn("relative overflow-hidden rounded-md bg-sand", className)} style={aspect ? { aspectRatio: aspect } : undefined}>
-      <Image src={item.src} alt={item.alt} fill sizes={sizes} preload={preload} className="object-cover" />
+      <Image
+        src={item.src}
+        alt={item.alt}
+        fill
+        sizes={sizes}
+        preload={preload}
+        className="object-cover transition-transform duration-700 ease-out motion-safe:group-hover:scale-[1.04] motion-safe:group-focus-visible:scale-[1.04]"
+      />
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-0 rounded-[inherit] ring-1 ring-transparent ring-inset transition-[background-color,box-shadow] duration-500 group-hover:bg-background/15 group-hover:ring-rose/50 group-focus-visible:bg-background/15 group-focus-visible:ring-rose/50"
+      />
     </div>
   );
 }

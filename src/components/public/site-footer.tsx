@@ -7,7 +7,10 @@ import { NAV_LINKS } from "./nav-links";
 import { Container } from "./primitives";
 
 const t = publicSite.footer;
-const linkClass = "rounded-sm hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none";
+const focusClass = "rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none";
+// Gold hairline grows under the link on hover (link-underline in globals.css).
+const linkClass = `${focusClass} link-underline hover:text-foreground`;
+const socialClass = `${focusClass} underline decoration-muted-foreground/50 underline-offset-4 transition-[color,text-decoration-color] duration-300 hover:text-foreground hover:decoration-rose`;
 
 export function SiteFooter({ settings }: { settings: PublicSettings }) {
   const tel = telHref(settings.phone);
@@ -29,7 +32,7 @@ export function SiteFooter({ settings }: { settings: PublicSettings }) {
             <ul className="mt-5 flex gap-5">
               {social.map((s) => (
                 <li key={s.label}>
-                  <a href={s.href} target="_blank" rel="noopener noreferrer" className={`${linkClass} text-muted-foreground underline underline-offset-4`}>
+                  <a href={s.href} target="_blank" rel="noopener noreferrer" className={`${socialClass} text-muted-foreground`}>
                     {s.label}
                   </a>
                 </li>
