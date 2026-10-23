@@ -282,11 +282,34 @@ export const admin = {
 
   materials: {
     title: "Materialet",
-    intro: "PDF, PowerPoint, Word ose imazhe (deri në 50 MB). Studentët shohin vetëm materialet e verifikuara.",
-    choose: "Ngarko material",
-    uploading: (name: string) => `Duke ngarkuar ${name}…`,
-    verifying: "Duke verifikuar skedarin…",
-    uploaded: "Materiali u ngarkua.",
+    intro:
+      "PDF, PowerPoint, Word ose imazhe (deri në 50 MB) dhe video MP4 (deri në 1 GB). Mund të zgjidhni ose të tërhiqni këtu disa skedarë njëherësh. Studentët shohin vetëm materialet e verifikuara.",
+    choose: "Ngarko materiale",
+    dropHere: "Lëshojini skedarët këtu për t'i ngarkuar",
+    queueLabel: "Ngarkimet e materialeve",
+    uploadingLabel: (name: string) => `Ngarkimi i ${name}`,
+    fileStatus: {
+      queued: "Në radhë",
+      uploading: "Duke ngarkuar",
+      verifying: "Duke verifikuar…",
+      done: "U ngarkua",
+      failed: "Dështoi",
+      cancelled: "U ndalua",
+    },
+    typeNotAllowed: "Ky lloj skedari nuk lejohet. Lejohen PDF, PowerPoint, Word, imazhe dhe video MP4.",
+    tooLarge: (limit: string) => `Skedari është shumë i madh (maksimumi ${limit}).`,
+    progress: (finished: number, total: number) => `${finished} nga ${total} skedarë të përfunduar`,
+    summary: (done: number, failed: number, cancelled: number) =>
+      [
+        done ? `${done} ${done === 1 ? "skedar u ngarkua" : "skedarë u ngarkuan"}` : null,
+        failed ? `${failed} ${failed === 1 ? "dështoi" : "dështuan"}` : null,
+        cancelled ? `${cancelled} ${cancelled === 1 ? "u ndalua" : "u ndaluan"}` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ") || "Asnjë skedar nuk u ngarkua.",
+    cancelAll: "Ndalo ngarkimet",
+    clearList: "Mbyll listën",
+    leaveWarning: "Mos e mbyllni faqen derisa të përfundojnë ngarkimet.",
     empty: "Nuk ka ende materiale.",
     status: { PENDING: "Në ngarkim", READY: "Gati", FAILED: "Dështoi" },
     pendingHint: "Ngarkimi nuk ka përfunduar. Fshijeni dhe ngarkojeni përsëri nëse nuk vazhdon.",

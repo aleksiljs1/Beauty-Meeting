@@ -6,13 +6,14 @@ import { Film, Play, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmAction } from "@/components/admin/confirm-action";
 import { EmptyState } from "@/components/admin/page-parts";
-import { formatBytes, putToPresignedUrl, runPool, UploadAbortedError, withRetries } from "@/components/admin/uploads";
+import { formatBytes, UploadAbortedError, uploadParts } from "@/components/admin/uploads";
 import { errorMessage, useApiAction } from "@/components/admin/use-api-action";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ApiClientError, apiSend } from "@/lib/api/client";
 import { formatDateTime } from "@/lib/datetime";
 import { admin } from "@/i18n/admin";
+import { declaredMimeFor } from "@/server/storage/file-types";
 import { common } from "@/i18n/common";
 import { RecordingPreview } from "./recording-preview";
 
@@ -29,66 +30,26 @@ export type RecordingRow = {
   displayName: string | null;
 };
 
-const PARALLEL_PARTS = 3;
-const PART_ATTEMPTS = 3;
-const URL_BATCH = 6;
-
 type Started = { recordingId: string; partSizeBytes: number; partCount: number };
 type PartUrl = { partNumber: number; url: string };
 
-/**
- * Multipart upload: start → part URLs in batches → 3 parallel PUTs (each retried up to 3 times
- * with a fresh URL, ETag read from the response) → complete. Cancel aborts the upload.
- */
+/** Multipart upload: start → parts (see `uploadParts`) → complete. Cancel aborts the upload. */
 async function uploadRecording(lessonId: string, file: File, signal: AbortSignal, onProgress: (loaded: number) => void, onStarted: (id: string) => void) {
   const started = await apiSend<Started>("post", `/admin/lessons/${lessonId}/recordings`, {
     filename: file.name,
-    mimeType: file.type || "video/mp4",
+    mimeType: declaredMimeFor("recording", file.name, file.type),
     sizeBytes: file.size,
   });
   onStarted(started.recordingId);
-  const loaded = new Map<number, number>();
-  const report = () => onProgress([...loaded.values()].reduce((a, b) => a + b, 0));
-  const etags: { partNumber: number; etag: string }[] = [];
-  const presign = (numbers: number[]) =>
-    apiSend<PartUrl[]>("post", `/admin/recordings/${started.recordingId}/parts`, { partNumbers: numbers });
-
-  const all = Array.from({ length: started.partCount }, (_, i) => i + 1);
-  for (let offset = 0; offset < all.length; offset += URL_BATCH) {
-    if (signal.aborted) throw new UploadAbortedError();
-    const batch = all.slice(offset, offset + URL_BATCH);
-    const urls = new Map((await presign(batch)).map((p) => [p.partNumber, p.url]));
-
-    await runPool(batch, PARALLEL_PARTS, async (partNumber) => {
-      const start = (partNumber - 1) * started.partSizeBytes;
-      const blob = file.slice(start, Math.min(file.size, start + started.partSizeBytes));
-      const { etag } = await withRetries(
-        PART_ATTEMPTS,
-        async (attempt) => {
-          loaded.set(partNumber, 0);
-          // A retry gets a fresh URL in case the previous one expired.
-          const url = attempt === 1 ? urls.get(partNumber)! : (await presign([partNumber]))[0].url;
-          const result = await putToPresignedUrl(url, blob, {
-            signal,
-            onProgress: (bytes) => {
-              loaded.set(partNumber, bytes);
-              report();
-            },
-          });
-          if (!result.etag) throw new Error("Storage did not expose the ETag header");
-          return result;
-        },
-        signal,
-      );
-      loaded.set(partNumber, blob.size);
-      report();
-      etags.push({ partNumber, etag: etag! });
-    });
-  }
-
-  return apiSend<{ status: "READY" }>("post", `/admin/recordings/${started.recordingId}/complete`, {
-    parts: etags.sort((a, b) => a.partNumber - b.partNumber),
+  const parts = await uploadParts({
+    file,
+    partSizeBytes: started.partSizeBytes,
+    partCount: started.partCount,
+    presign: (numbers) => apiSend<PartUrl[]>("post", `/admin/recordings/${started.recordingId}/parts`, { partNumbers: numbers }),
+    signal,
+    onProgress,
   });
+  return apiSend<{ status: "READY" }>("post", `/admin/recordings/${started.recordingId}/complete`, { parts });
 }
 
 type Progress = { name: string; loaded: number; total: number; phase: "upload" | "finish" };

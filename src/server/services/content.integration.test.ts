@@ -22,8 +22,15 @@ beforeEach(async () => {
   await prisma.lessonEnrollment.create({ data: { lessonId: lesson.id, userId: student.id, source: "ADMIN" } });
 });
 
+/** Documents use one presigned PUT. */
+async function startSingle(lessonId: string, file: { filename: string; mimeType: string; sizeBytes: number }) {
+  const started = await materials.startMaterialUpload(admin, lessonId, file);
+  if (started.method !== "single") throw new Error("expected a single-PUT upload");
+  return started;
+}
+
 async function uploadMaterial(bytes: Uint8Array<ArrayBuffer>, filename = "Udhëzuesi.pdf") {
-  const started = await materials.startMaterialUpload(admin, lesson.id, { filename, mimeType: "application/pdf", sizeBytes: bytes.byteLength });
+  const started = await startSingle(lesson.id, { filename, mimeType: "application/pdf", sizeBytes: bytes.byteLength });
   const put = await fetch(started.uploadUrl, { method: "PUT", body: bytes, headers: started.headers });
   expect(put.ok).toBe(true);
   return started.materialId;
@@ -72,7 +79,7 @@ describe("lesson materials", () => {
 
   it("cannot reach another lesson's material through a lesson the student can access", async () => {
     const other = await createLesson(admin.id);
-    const started = await materials.startMaterialUpload(admin, other.id, { filename: "a.pdf", mimeType: "application/pdf", sizeBytes: pdf.byteLength });
+    const started = await startSingle(other.id, { filename: "a.pdf", mimeType: "application/pdf", sizeBytes: pdf.byteLength });
     await fetch(started.uploadUrl, { method: "PUT", body: pdf, headers: started.headers });
     await materials.finishMaterialUpload(admin, started.materialId);
 
@@ -85,6 +92,103 @@ describe("lesson materials", () => {
     const tenSecondsLeft = new Date(lesson.accessExpiresAt.getTime() - 10_000);
     const { url } = await materials.grantMaterialAccess(student, lesson.id, id, "view", tenSecondsLeft);
     expect(new URL(url).searchParams.get("X-Amz-Expires")).toBe("10");
+  });
+});
+
+describe("video materials (MP4, multipart)", () => {
+  const MB = 1024 * 1024;
+
+  async function uploadVideoMaterial(bytes: Uint8Array<ArrayBuffer>, filename = "Teknika e grimit.mp4") {
+    const started = await materials.startMaterialUpload(admin, lesson.id, { filename, mimeType: "video/mp4", sizeBytes: bytes.byteLength });
+    if (started.method !== "multipart") throw new Error("expected a multipart upload");
+    expect(started.partCount).toBe(1);
+    const [part] = await materials.presignMaterialParts(started.materialId, [1]);
+    const put = await fetch(part.url, { method: "PUT", body: bytes });
+    expect(put.ok).toBe(true);
+    return { materialId: started.materialId, etag: put.headers.get("etag") ?? "" };
+  }
+
+  it("applies per-type size limits: 1 GB for video, 50 MB for everything else", async () => {
+    const video = await materials.startMaterialUpload(admin, lesson.id, { filename: "demo.mp4", mimeType: "video/mp4", sizeBytes: 200 * MB });
+    expect(video).toMatchObject({ method: "multipart", partCount: 4 });
+    await materials.deleteMaterial(admin, video.materialId);
+
+    await expect(materials.startMaterialUpload(admin, lesson.id, { filename: "demo.mp4", mimeType: "video/mp4", sizeBytes: 1024 * MB + 1 })).rejects.toMatchObject({
+      code: "VALIDATION_FAILED",
+      message: expect.stringContaining("1 GB"),
+    });
+    await expect(materials.startMaterialUpload(admin, lesson.id, { filename: "a.pdf", mimeType: "application/pdf", sizeBytes: 50 * MB + 1 })).rejects.toMatchObject({
+      code: "VALIDATION_FAILED",
+      message: expect.stringContaining("50 MB"),
+    });
+    expect(await materials.startMaterialUpload(admin, lesson.id, { filename: "a.pdf", mimeType: "application/pdf", sizeBytes: 1000 })).toMatchObject({ method: "single" });
+    // Other video containers stay out of the allowlist.
+    await expect(materials.startMaterialUpload(admin, lesson.id, { filename: "klip.mov", mimeType: "video/quicktime", sizeBytes: 1000 })).rejects.toMatchObject({
+      code: "VALIDATION_FAILED",
+    });
+  });
+
+  it("becomes READY after completion + verification and streams with Range requests", async () => {
+    const { materialId, etag } = await uploadVideoMaterial(mp4);
+    expect(await materials.listMaterials(student, lesson.id)).toHaveLength(0); // still PENDING
+
+    await expect(materials.finishMaterialUpload(admin, materialId)).rejects.toMatchObject({ code: "VALIDATION_FAILED" }); // parts missing
+    await materials.finishMaterialUpload(admin, materialId, [{ partNumber: 1, etag }]);
+    expect(await prisma.lessonMaterial.findUniqueOrThrow({ where: { id: materialId } })).toMatchObject({ status: "READY", uploadId: null });
+    expect(await materials.listMaterials(student, lesson.id)).toMatchObject([{ id: materialId, mimeType: "video/mp4", viewable: true }]);
+
+    // Watching: inline, playback-length URL (renewed by the player) and seekable.
+    const view = await materials.grantMaterialAccess(student, lesson.id, materialId, "view");
+    expect(view.expiresInSeconds).toBe(300);
+    expect(new URL(view.url).searchParams.get("X-Amz-Expires")).toBe("300");
+    const range = await fetch(view.url, { headers: { Range: "bytes=4-11" } });
+    expect(range.status).toBe(206);
+    expect(range.headers.get("content-type")).toBe("video/mp4");
+    expect(range.headers.get("content-disposition")).toMatch(/^inline/);
+    expect(new TextDecoder().decode(await range.arrayBuffer())).toBe("ftypisom");
+
+    // Downloading: an attachment with the usual 60 s grant.
+    const download = await materials.grantMaterialAccess(student, lesson.id, materialId, "download");
+    expect(new URL(download.url).searchParams.get("X-Amz-Expires")).toBe("60");
+    const file = await fetch(download.url);
+    expect(file.headers.get("content-disposition")).toMatch(/^attachment/);
+  });
+
+  it("marks a non-MP4 upload declared as video as failed", async () => {
+    const { materialId, etag } = await uploadVideoMaterial(pdf, "video.mp4");
+    await expect(materials.finishMaterialUpload(admin, materialId, [{ partNumber: 1, etag }])).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+    expect(await prisma.lessonMaterial.findUniqueOrThrow({ where: { id: materialId } })).toMatchObject({ status: "FAILED" });
+    expect(await materials.listMaterials(student, lesson.id)).toHaveLength(0);
+  });
+
+  it("cancelling (deleting) an unfinished upload aborts it", async () => {
+    const { materialId } = await uploadVideoMaterial(mp4);
+    await materials.deleteMaterial(admin, materialId);
+    await expect(materials.presignMaterialParts(materialId, [1])).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("rejects part numbers outside the declared size", async () => {
+    const { materialId } = await uploadVideoMaterial(mp4);
+    await expect(materials.presignMaterialParts(materialId, [2])).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+  });
+
+  it("enforces the access deadline: grants shrink near it and stop at it", async () => {
+    const { materialId, etag } = await uploadVideoMaterial(mp4);
+    await materials.finishMaterialUpload(admin, materialId, [{ partNumber: 1, etag }]);
+
+    const tenSecondsLeft = new Date(lesson.accessExpiresAt.getTime() - 10_000);
+    const near = await materials.grantMaterialAccess(student, lesson.id, materialId, "view", tenSecondsLeft);
+    expect(near.expiresInSeconds).toBe(10);
+    expect(new URL(near.url).searchParams.get("X-Amz-Expires")).toBe("10");
+
+    for (const mode of ["view", "download"] as const) {
+      await expect(materials.grantMaterialAccess(student, lesson.id, materialId, mode, lesson.accessExpiresAt)).rejects.toMatchObject({
+        code: "LESSON_ACCESS_EXPIRED",
+      });
+    }
+    // A personal deadline (shorter than the lesson's) is honoured as well.
+    await prisma.lessonEnrollment.updateMany({ where: { userId: student.id }, data: { accessExpiresAt: new Date(Date.now() - 1000) } });
+    await expect(materials.grantMaterialAccess(student, lesson.id, materialId, "view")).rejects.toMatchObject({ code: "LESSON_ACCESS_EXPIRED" });
   });
 });
 
