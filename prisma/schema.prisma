@@ -466,8 +466,16 @@ model GalleryItem {
   height      Int?
   position    Int      @default(0)
   isPublished Boolean  @default(true)
+  showInGallery    Boolean  @default(false)
+  showOnHomeHero   Boolean  @default(false)
+  showOnHomeGallery Boolean @default(false)
+  showOnAbout      Boolean  @default(false)
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime @updatedAt @db.Timestamptz(3)
 
   @@index([isPublished, position])
+  @@index([isPublished, showInGallery, position])
+  @@index([isPublished, showOnHomeHero, position])
+  @@index([isPublished, showOnHomeGallery, position])
+  @@index([isPublished, showOnAbout, position])
 }

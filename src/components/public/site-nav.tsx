@@ -25,8 +25,10 @@ export function DesktopNav() {
                 href={link.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "rounded-sm py-1 text-sm tracking-wide text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-                  active && "text-foreground underline decoration-rose underline-offset-8",
+                  // Gold underline that grows from the left on hover and stays under the current page.
+                  "relative rounded-sm py-1 text-sm tracking-wide text-muted-foreground transition-colors duration-300 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                  "after:absolute after:inset-x-0 after:-bottom-1 after:h-px after:origin-left after:scale-x-0 after:bg-rose after:transition-transform after:duration-300 hover:after:scale-x-100",
+                  active && "text-foreground after:scale-x-100",
                 )}
               >
                 {link.label}
@@ -46,7 +48,7 @@ export function MobileNav({ academyName }: { academyName: string }) {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger
-        className="inline-flex size-11 items-center justify-center rounded-md text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:hidden"
+        className="inline-flex size-11 items-center justify-center rounded-md text-foreground transition-colors hover:bg-muted hover:text-rose-deep focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:hidden"
         aria-label={t.openMenu}
       >
         <MenuIcon className="size-5" aria-hidden />
@@ -74,7 +76,7 @@ export function MobileNav({ academyName }: { academyName: string }) {
                       href={link.href}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        "block rounded-md px-3 py-3 font-heading text-2xl text-foreground/80 hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                        "block rounded-md px-3 py-3 font-heading text-2xl text-foreground/80 transition-[color,background-color,translate] duration-200 hover:bg-muted hover:text-foreground motion-safe:hover:translate-x-1 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
                         active && "text-rose-deep",
                       )}
                     >
@@ -90,7 +92,7 @@ export function MobileNav({ academyName }: { academyName: string }) {
           <SheetClose asChild>
             <Link
               href="/hyr"
-              className="inline-flex h-11 w-full items-center justify-center rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground hover:bg-primary/85 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+              className="inline-flex h-11 w-full items-center justify-center rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground transition-colors duration-200 hover:bg-rose focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
             >
               {t.signIn}
             </Link>

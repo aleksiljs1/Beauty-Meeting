@@ -29,5 +29,9 @@ export type AdminGalleryItem = {
   height: number | null;
   isPublished: boolean;
   position: number;
+  showInGallery: boolean;
+  showOnHomeHero: boolean;
+  showOnHomeGallery: boolean;
+  showOnAbout: boolean;
   previewSrc: string;
 };

@@ -90,6 +90,29 @@ Original brief: `c:\Users\aleksiljs\Downloads\Beauty_Academy_Zoom_Claude_Megapro
 
 - [ ] Get real name, logo, address, copy, photos from client.
 
+## Public gallery display controls (2026-10-22)
+
+- Admin gallery images have independent public-display flags: `showInGallery`, `showOnHomeHero`,
+  `showOnHomeGallery`, and `showOnAbout`. `isPublished` remains the master public-visibility switch.
+- The upload form starts with only `showInGallery` on (the database default stays off). The admin can
+  enable any combination, so an About image only appears on `/galeria` when `showInGallery` is also on.
+- Empty single-image slots (home hero, About) fall back to the monogram placeholder, not stock photos.
+- The admin editor saves only edited fields and mirrors slot hand-overs to the other cards, so a stale
+  card can never take a slot back.
+- `/galeria`, the home hero, the home gallery section, and `/rreth-nesh` each query only images
+  selected for that destination. Home hero and About each render one image; assigning a new one
+  clears the previous image from that same slot. Home gallery and `/galeria` support multiple images.
+- Migration history: `20261022190000_gallery_placement` introduced a single-placement enum;
+  `20261022200000_gallery_visibility_flags` converted it to independent booleans, backfilled each
+  existing image from its old placement, then removed the enum. Keep both migrations in the repo;
+  do not rewrite already-applied migration history.
+- The migrations were applied to the configured local `academy` database (`localhost:5433`).
+  Run `npm run db:generate` after schema edits and restart a running Next dev server after Prisma
+  schema/client changes so it does not keep using an old generated client.
+- Verification on 2026-10-22: `npm run check` passed (84 unit tests);
+  `npm run test:integration` passed (69 tests), including independent-flag, single-slot replacement,
+  and all four public-query filters. `npx prisma migrate status` reported the database up to date.
+
 ## Zoom docs verified 2026-10-20
 
 - https://developers.zoom.us/docs/meeting-sdk/ — March 2, 2026: apps joining meetings outside their account must be authorized (ZAK/OBF/RTMS).

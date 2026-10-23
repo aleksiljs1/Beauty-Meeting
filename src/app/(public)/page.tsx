@@ -19,14 +19,14 @@ export async function generateMetadata(): Promise<Metadata> {
 const onlineIcons = [VideoIcon, FileTextIcon, PlayCircleIcon];
 
 export default async function HomePage() {
-  const [settings, services, courses, gallery] = await Promise.all([
+  const [settings, services, courses, heroImages, selected] = await Promise.all([
     getPublicSettings(),
     getPublicServices(),
     getPublicCourses(),
-    getPublicGallery(7),
+    getPublicGallery(1, "showOnHomeHero"),
+    getPublicGallery(6, "showOnHomeGallery"),
   ]);
-  const [heroImage, ...moreImages] = gallery;
-  const selected = moreImages.length >= 3 ? moreImages.slice(0, 6) : gallery.slice(0, 6);
+  const heroImage = heroImages[0];
 
   return (
     <>
@@ -132,7 +132,7 @@ export default async function HomePage() {
             id="gallery-title"
             eyebrow={t.galleryEyebrow}
             title={t.galleryTitle}
-            action={gallery.length > 0 ? <ArrowLink href="/galeria">{t.galleryAll}</ArrowLink> : undefined}
+            action={selected.length > 0 ? <ArrowLink href="/galeria">{t.galleryAll}</ArrowLink> : undefined}
           />
           {selected.length > 0 ? (
             <ul className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3">

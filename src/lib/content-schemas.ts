@@ -57,12 +57,19 @@ export const galleryUploadStartSchema = z.object({
   sizeBytes: z.number().int().positive(),
 });
 
+export const galleryVisibilityFields = ["showInGallery", "showOnHomeHero", "showOnHomeGallery", "showOnAbout"] as const;
+
 export const galleryItemSchema = z.object({
   alt: requiredText(200),
   caption: text(300),
   isPublished: z.boolean(),
+  showInGallery: z.boolean(),
+  showOnHomeHero: z.boolean(),
+  showOnHomeGallery: z.boolean(),
+  showOnAbout: z.boolean(),
 });
 export type GalleryItemInput = z.infer<typeof galleryItemSchema>;
+export type GalleryVisibilityField = (typeof galleryVisibilityFields)[number];
 
 export const galleryCreateSchema = galleryItemSchema.extend({
   uploadKey: z.string().min(1).max(200),

@@ -2,6 +2,7 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 import { common } from "@/i18n/common";
 import { parseOpeningHours, type OpeningHoursRow } from "@/lib/public-content";
+import type { GalleryVisibilityField } from "@/lib/content-schemas";
 import { prisma } from "@/server/db";
 
 /**
@@ -97,16 +98,18 @@ export const getPublicCourse = cached(
 
 export type PublicGalleryItem = { id: string; src: string; alt: string; caption: string | null; width: number | null; height: number | null };
 
-export const getPublicGallery = cached(async (limit?: number): Promise<PublicGalleryItem[]> => {
+export async function queryPublicGallery(limit?: number, visibilityField: GalleryVisibilityField = "showInGallery"): Promise<PublicGalleryItem[]> {
   const rows = await prisma.galleryItem.findMany({
-    where: { isPublished: true },
+    where: { isPublished: true, [visibilityField]: true },
     orderBy: [{ position: "asc" }, { createdAt: "asc" }],
     select: { id: true, alt: true, caption: true, width: true, height: true },
     take: Math.min(limit ?? 200, 200),
   });
   // Only the id-based media route is exposed — never the storage key.
   return rows.map((row) => ({ ...row, src: galleryImageSrc(row.id) }));
-}, "gallery");
+}
+
+export const getPublicGallery = cached(queryPublicGallery, "gallery");
 
 export function galleryImageSrc(id: string) {
   return `/media/gallery/${id}`;
