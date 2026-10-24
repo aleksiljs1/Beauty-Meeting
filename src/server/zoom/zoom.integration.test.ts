@@ -33,7 +33,7 @@ vi.stubGlobal("fetch", async (input: string | URL, init: RequestInit = {}) => {
   if (url.hostname === "zoom.us") return json({ access_token: "s2s-token", expires_in: 3600 });
 
   const meetingPath = url.pathname.match(/^\/v2\/meetings\/(\d+)$/);
-  if (url.pathname.endsWith("/token")) return json({ token: "zak-token" });
+  if (url.pathname.endsWith("/zak")) return json({ token: "zak-token" });
   if (url.pathname.endsWith("/meetings") && method === "GET") {
     return json({ meetings: [...zoomState.meetings.values()].map(({ id, start_time }) => ({ id, start_time })) });
   }

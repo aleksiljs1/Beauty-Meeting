@@ -195,8 +195,12 @@ completed on branch `zoom-integration` (2026-10-22): see "Review fixes" below.
 ### Zoom setup checklist (client / production)
 1. Academy Zoom account on a plan with long meetings (Pro+); cloud recording if `ZOOM_AUTO_RECORDING=cloud`.
 2. General app → Embed → Meeting SDK → `ZOOM_CLIENT_ID`, `ZOOM_CLIENT_SECRET`.
-3. Server-to-Server OAuth app (same account), activated, scopes for meetings (create/read/update/delete) and
-   user ZAK token → `ZOOM_S2S_ACCOUNT_ID`, `ZOOM_S2S_CLIENT_ID`, `ZOOM_S2S_CLIENT_SECRET`; host email → `ZOOM_HOST_USER_ID`.
+3. Server-to-Server OAuth app (same account), activated. Only these scopes are needed (verified 2026-10-24 on a
+   free test account): `meeting:write:meeting:admin`, `meeting:read:meeting:admin`, `meeting:update:meeting:admin`,
+   `meeting:delete:meeting:admin`, `meeting:read:list_meetings:admin`, `user:read:zak:admin` (ZAK via
+   `GET /users/{id}/zak`; `/users/{id}/token` would need the broader `user:read:token:admin`).
+   → `ZOOM_S2S_ACCOUNT_ID`, `ZOOM_S2S_CLIENT_ID`, `ZOOM_S2S_CLIENT_SECRET`; host email (or `me` for the account
+   owner, verified) → `ZOOM_HOST_USER_ID`. Free accounts work for testing (40-minute meetings, no cloud recording).
 4. In the S2S (or General) app: Event Subscriptions → endpoint `<APP_URL>/api/webhooks/zoom`, events
    **Meeting Started** and **Meeting Ended**; copy the Secret Token → `ZOOM_WEBHOOK_SECRET_TOKEN`. Zoom validates
    the URL immediately, so the site must be deployed on public HTTPS first.

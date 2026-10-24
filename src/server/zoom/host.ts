@@ -55,8 +55,9 @@ export async function createZoomHostAuthorization(lessonId: string, admin: AppUs
 
   let zak: string;
   try {
-    ({ token: zak } = await zoomRequest(`/users/${encodeURIComponent(hostUserId)}/token`, {
-      query: { type: "zak", ttl: String(ZAK_TTL_SECONDS) },
+    // Dedicated ZAK endpoint: needs only the narrow `user:read:zak:admin` scope (verified with a real account).
+    ({ token: zak } = await zoomRequest(`/users/${encodeURIComponent(hostUserId)}/zak`, {
+      query: { ttl: String(ZAK_TTL_SECONDS) },
       schema: z.object({ token: z.string().min(1) }),
     }));
   } catch (error) {
