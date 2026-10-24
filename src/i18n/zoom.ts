@@ -35,6 +35,12 @@ export const zoomText = {
       "Aplikacioni Zoom në kompjuter është më i mirë për të shfaqur një video me zë (Share Screen → Advanced → Video).",
     appStartError: "Nuk mund të merret lidhja për aplikacionin Zoom.",
     helpLink: "Udhëzuesi për mësuesen",
+    roomHint: "Klasa hapet në një skedë më vete, që të mund ta përdorni portalin këtu pa dalë nga takimi.",
+  },
+  room: {
+    title: "Klasa live",
+    back: "Mësimi",
+    idle: "Klasa nuk është e hapur.",
   },
   student: {
     appFallback: "Hap në aplikacionin Zoom",
