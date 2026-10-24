@@ -7,7 +7,7 @@ import { ConfirmAction } from "@/components/admin/confirm-action";
 import { useApiAction } from "@/components/admin/use-api-action";
 import { Button } from "@/components/ui/button";
 import { ZoomAppLink } from "@/components/zoom/zoom-app-link";
-import { ZoomFrame } from "@/components/zoom/zoom-frame";
+import { ZoomFrame, ZoomFullscreenButton } from "@/components/zoom/zoom-frame";
 import type { MeetingStatus, PublicationStatus } from "@/generated/prisma/enums";
 import { isZoomJoinConfig, useZoomFrame } from "@/hooks/use-zoom-frame";
 import { zoomText } from "@/i18n/zoom";
@@ -155,7 +155,10 @@ export function ZoomHostPanel({ lessonId, zoomLive, meetingNumber, publication, 
       )}
 
       {zoom.open && (
-        <ZoomFrame frameRef={zoom.frameRef} frameKey={zoom.frameKey} title={t.frameTitle} className="h-[72vh] min-h-[28rem] rounded-lg border" />
+        <div className="space-y-2">
+          <ZoomFrame frameRef={zoom.frameRef} frameKey={zoom.frameKey} title={t.frameTitle} className="h-[72vh] min-h-[28rem] rounded-lg border" />
+          <ZoomFullscreenButton frameRef={zoom.frameRef} />
+        </div>
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-2">

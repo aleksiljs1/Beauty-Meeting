@@ -48,5 +48,6 @@ export const zoomText = {
   frame: {
     genericError: "Nuk mund të lidhemi me Zoom. Provoni përsëri.",
     invalidResponse: "Përgjigjja e serverit për hyrjen në klasë është e pavlefshme.",
+    fullscreen: "Ekran i plotë",
   },
 } as const;

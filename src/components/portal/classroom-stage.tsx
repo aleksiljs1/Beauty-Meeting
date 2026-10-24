@@ -26,7 +26,7 @@ import { formatCountdown } from "@/lib/polling";
 import type { StageState } from "@/server/queries/portal";
 import { DemoStage } from "./demo-stage";
 import { ZoomAppLink } from "@/components/zoom/zoom-app-link";
-import { ZoomFrame } from "@/components/zoom/zoom-frame";
+import { ZoomFrame, ZoomFullscreenButton } from "@/components/zoom/zoom-frame";
 import { isZoomJoinConfig, useZoomFrame } from "@/hooks/use-zoom-frame";
 import { zoomText } from "@/i18n/zoom";
 
@@ -200,6 +200,9 @@ function ClassroomStageImpl(props: StageProps) {
     content = (
       <div className="flex min-h-[22rem] flex-1 flex-col bg-black lg:min-h-[32rem]">
         <ZoomFrame frameRef={zoom.frameRef} frameKey={zoom.frameKey} title={zoomText.admin.frameTitle} className="h-[65vh] min-h-[28rem] flex-1" />
+        <div className="flex justify-end p-2">
+          <ZoomFullscreenButton frameRef={zoom.frameRef} className="border-white/30 bg-transparent text-white hover:bg-white/10" />
+        </div>
       </div>
     );
   } else if (stage === "LIVE") {
