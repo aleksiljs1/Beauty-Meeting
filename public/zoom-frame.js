@@ -1,6 +1,14 @@
 "use strict";
 
 (() => {
+  // Zoom's own error code/message (no secrets in it), shown so a failed join can be diagnosed.
+  const zoomReason = (failure) => {
+    const code = failure?.errorCode ?? failure?.result?.errorCode;
+    const text = failure?.errorMessage ?? failure?.reason ?? failure?.result?.errorMessage;
+    console.error("[zoom-frame] Zoom error", failure);
+    return code || text ? ` (Zoom: ${[code, text].filter(Boolean).join(" – ")})` : "";
+  };
+
   const VERSION = "6.5.0";
   const message = document.getElementById("message");
   const errorElement = document.getElementById("error");
@@ -120,15 +128,15 @@
               notifyParent("BEAUTY_ZOOM_JOINED", { mode });
             },
 
-            error: () => {
-              showError("Zoom nuk mundi të të fusë në takim. Kontrolloni autorizimin dhe konfigurimin.");
+            error: (failure) => {
+              showError(`Zoom nuk mundi të të fusë në takim. Kontrolloni autorizimin dhe konfigurimin.${zoomReason(failure)}`);
               joinStarted = false;
             },
           });
         },
 
-        error: () => {
-          showError("Inicializimi i Zoom dështoi.");
+        error: (failure) => {
+          showError(`Inicializimi i Zoom dështoi.${zoomReason(failure)}`);
           joinStarted = false;
         },
       });

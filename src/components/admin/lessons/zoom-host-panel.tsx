@@ -2,7 +2,7 @@
 
 import { AlertCircle, CheckCircle2, CircleHelp, LoaderCircle, RefreshCw, Video } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ConfirmAction } from "@/components/admin/confirm-action";
 import { useApiAction } from "@/components/admin/use-api-action";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,29 @@ export function ZoomHostPanel({ lessonId, zoomLive, meetingNumber, publication, 
   const { run, pending } = useApiAction();
   const zoom = useZoomFrame(t.hostError);
   const [authorizing, setAuthorizing] = useState(false);
+
+  // Once the host is in the meeting, ask Zoom for its status straight away instead of waiting
+  // for the "meeting started" webhook, so students see the lesson as LIVE within seconds (and
+  // it still works when the webhook is late or can't reach us). Zoom may take a moment to
+  // report "started", so retry a few times.
+  const hostJoined = zoom.status === "joined";
+  useEffect(() => {
+    if (!hostJoined || meetingStatus === "LIVE") return;
+    let cancelled = false;
+    void (async () => {
+      for (const delayMs of [1_500, 4_000, 8_000, 15_000]) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        if (cancelled) return;
+        const result = await run(() => apiSend<{ meetingStatus: MeetingStatus }>("patch", `/admin/lessons/${lessonId}/zoom-meeting`), {
+          onError: () => true, // background check: stay quiet, the manual button remains
+        });
+        if (result?.meetingStatus === "LIVE") return;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [hostJoined, meetingStatus, lessonId, run]);
 
   if (!zoomLive) return <p className="text-sm text-muted-foreground">{t.notLive}</p>;
 
