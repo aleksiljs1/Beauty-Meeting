@@ -15,7 +15,7 @@ export const helpText = {
     {
       id: "nisja",
       title: "Si ta nisni klasën",
-      intro: "Hapni Mësimet → mësimin → seksionin \"Klasa live në Zoom\". Klasa mund të niset jo më herët se 30 minuta para orarit.",
+      intro: "Hapni Mësimet → mësimin → seksionin \"Klasa live në Zoom\". Klasa mund të niset në çdo kohë para përfundimit të orarit.",
       items: [
         {
           text: "Në shfletues (rekomandohet për mësime të zakonshme): klikoni \"Nis klasën live\". Takimi hapet brenda faqes, pa instaluar asgjë.",

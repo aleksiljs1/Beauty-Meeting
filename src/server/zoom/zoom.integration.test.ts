@@ -223,10 +223,11 @@ describe("Zoom app fallbacks", () => {
     await expect(createZoomHostAppStart(lessonId, student)).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
-  it("uses the same time window as the in-browser host start", async () => {
+  it("lets the host start any time before the scheduled end, like the in-browser start", async () => {
     await createZoomMeetingForLesson(lessonId, admin);
     const lesson = await prisma.lesson.findUniqueOrThrow({ where: { id: lessonId }, select: { scheduledStartAt: true, scheduledEndAt: true } });
-    await expect(createZoomHostAppStart(lessonId, admin, lesson.scheduledStartAt.getTime() - 31 * 60_000)).rejects.toMatchObject({ code: "LESSON_JOIN_NOT_OPEN" });
+    await expect(createZoomHostAppStart(lessonId, admin, lesson.scheduledStartAt.getTime() - 24 * 3600_000)).resolves.toMatchObject({ startUrl: expect.any(String) });
+    zoomState.calls.length = 0;
     await expect(createZoomHostAppStart(lessonId, admin, lesson.scheduledEndAt.getTime())).rejects.toMatchObject({ code: "CONFLICT" });
     expect(zoomState.calls.some((c) => c.startsWith("GET /v2/meetings/"))).toBe(false);
   });

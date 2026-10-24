@@ -9,8 +9,6 @@ import { requireZoomCredentials, toApiError, zoomRequest } from "./client";
 import { createMeetingSdkHostSignature } from "./meeting-sdk-signature";
 import { fetchZoomMeetingLinks, openPasscode } from "./meetings";
 
-/** The host may open the meeting this long before the scheduled start. */
-const HOST_EARLY_START_MS = 30 * 60_000;
 /** ZAK lifetime requested from Zoom — only needed to start the meeting. */
 const ZAK_TTL_SECONDS = 300;
 
@@ -38,9 +36,6 @@ async function loadHostableLesson(lessonId: string, admin: AppUser, now: number)
   if (lesson.publication !== "PUBLISHED") throw new ApiError("CONFLICT", "Publikoni mësimin para se të nisni klasën live.");
   if (!lesson.zoomMeetingNumber) throw new ApiError("INTEGRATION_NOT_CONFIGURED", "Ky mësim nuk ka ende një takim Zoom.");
   if (lesson.meetingStatus === "ENDED" || lesson.meetingStatus === "ERROR") throw new ApiError("CONFLICT", "Ky takim ka përfunduar.");
-  if (now < lesson.scheduledStartAt.getTime() - HOST_EARLY_START_MS) {
-    throw new ApiError("LESSON_JOIN_NOT_OPEN", "Mund ta nisni klasën jo më herët se 30 minuta para orarit.");
-  }
   if (now >= lesson.scheduledEndAt.getTime()) throw new ApiError("CONFLICT", "Orari i këtij mësimi ka përfunduar.");
   return { ...lesson, zoomMeetingNumber: lesson.zoomMeetingNumber }; // keeps the narrowed (non-null) type
 }
