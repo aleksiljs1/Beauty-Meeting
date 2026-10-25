@@ -30,6 +30,22 @@ export function accountSetupEmail(params: { to: string; name: string; url: strin
   };
 }
 
+export function lessonLiveEmail(params: { to: string; name: string; lessonTitle: string; url: string; academyName: string }): MailMessage {
+  const heading = `Mësimi ka filluar: ${params.lessonTitle}`;
+  const paragraphs = [
+    `Përshëndetje ${params.name},`,
+    `Klasa live "${params.lessonTitle}" në ${params.academyName} sapo filloi.`,
+    "Hapni lidhjen më poshtë dhe hyni me llogarinë tuaj për t'u bashkuar me klasën.",
+  ];
+  const footnote = "Lidhja funksionon vetëm për llogarinë tuaj dhe vetëm sa keni akses në këtë mësim.";
+  return {
+    to: params.to,
+    subject: heading,
+    text: `${paragraphs.join("\n\n")}\n\n${params.url}\n\n${footnote}`,
+    html: layout(heading, paragraphs, { label: "Bashkohu me klasën", url: params.url }, footnote),
+  };
+}
+
 export function passwordResetEmail(params: { to: string; name: string; url: string }): MailMessage {
   const heading = "Rivendosni fjalëkalimin";
   const paragraphs = [

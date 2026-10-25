@@ -9,7 +9,7 @@ import { NextResponse, type NextRequest } from "next/server";
 export function proxy(request: NextRequest) {
   if (!getSessionCookie(request, { cookiePrefix: "academy" })) {
     const login = new URL("/hyr", request.url);
-    login.searchParams.set("next", request.nextUrl.pathname);
+    login.searchParams.set("next", request.nextUrl.pathname + request.nextUrl.search);
     return NextResponse.redirect(login);
   }
   return NextResponse.next();

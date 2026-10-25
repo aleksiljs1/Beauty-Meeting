@@ -14,7 +14,18 @@ export default defineConfig({
     environment: "node",
     include: ["src/**/*.integration.test.ts"],
     globalSetup: ["src/test/integration-setup.ts"],
-    env: { DATABASE_URL: "postgresql://academy:academy_dev_password@localhost:5433/academy_test" },
+    env: {
+      DATABASE_URL: "postgresql://academy:academy_dev_password@localhost:5433/academy_test",
+      // Always the local Mailpit inbox, whatever .env points at (e.g. a real SMTP account).
+      SMTP_HOST: "localhost",
+      SMTP_PORT: "1025",
+      SMTP_USER: "",
+      SMTP_PASSWORD: "",
+      SMTP_SECURE: "false",
+      MAIL_FROM: "Beauty Academy <no-reply@localhost>",
+      // Demo unless a test opts in (the Zoom tests set live mode themselves, before imports).
+      ZOOM_MODE: "demo",
+    },
     testTimeout: 20_000,
     fileParallelism: false,
   },

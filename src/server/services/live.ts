@@ -2,7 +2,10 @@ import "server-only";
 import { checkCapability, evaluateLessonAccess, isExpired } from "@/server/access/policy";
 import type { AppUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
+import { env } from "@/server/env";
 import { ApiError } from "@/server/http";
+import { sendMail } from "@/server/mail";
+import { lessonLiveEmail } from "@/server/mail/templates";
 import { publishFeedChanged, publishLessonChanged } from "@/server/realtime/publish";
 import { audit } from "./audit";
 
@@ -111,6 +114,32 @@ async function notifyLessonLive(lessonId: string, startedAt: Date) {
     }));
   if (rows.length) await prisma.notification.createMany({ data: rows, skipDuplicates: true });
   await publishFeedChanged(rows.map((r) => r.userId));
+  // Runs once per live occurrence (the caller's state change is the guard). In the background:
+  // Zoom expects the webhook answer within seconds, and a slow mail server must not delay it.
+  void emailLessonLive(lessonId, rows.map((r) => r.userId)).catch((error) =>
+    console.error("[live] lesson-live emails failed", { lessonId, error: (error as Error).message }),
+  );
+}
+
+/** "The class has started" email with a link that opens the lesson and joins automatically. */
+async function emailLessonLive(lessonId: string, userIds: string[]) {
+  if (!userIds.length) return;
+  const [lesson, settings, users] = await Promise.all([
+    prisma.lesson.findUnique({ where: { id: lessonId }, select: { title: true } }),
+    prisma.academySettings.findUnique({ where: { id: 1 }, select: { name: true } }),
+    prisma.user.findMany({ where: { id: { in: userIds } }, select: { email: true, name: true } }),
+  ]);
+  if (!lesson) return;
+  const url = new URL(`/portal/mesimet/${lessonId}?bashkohu=1`, env.APP_URL).toString();
+  let failed = 0;
+  for (const user of users) {
+    try {
+      await sendMail(lessonLiveEmail({ to: user.email, name: user.name, lessonTitle: lesson.title, url, academyName: settings?.name ?? "Beauty Academy" }));
+    } catch {
+      failed += 1; // one bad address must not stop the others; addresses are never logged
+    }
+  }
+  if (failed) console.error("[live] some lesson-live emails failed", { lessonId, failed, total: users.length });
 }
 
 export async function notifyRecordingReady(lessonId: string, recordingId: string) {

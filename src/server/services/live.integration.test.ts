@@ -50,6 +50,35 @@ describe("live lesson alerts", () => {
     expect((await getLiveFeed(stranger)).notifications).toHaveLength(0);
   });
 
+  it("emails eligible students once, with a link that opens the lesson and joins", async () => {
+    const lesson = await demoLessonStartingNow();
+    const [enrolled, revoked] = await Promise.all([1, 2].map(() => createUser("student")));
+    await enroll(lesson.id, enrolled.id);
+    await enroll(lesson.id, revoked.id, { revokedAt: new Date() });
+
+    await markLessonLive(lesson.id, "demo", admin.id);
+    await markLessonLive(lesson.id, "demo", admin.id); // duplicate event: no second email
+
+    // Sent in the background to the local Mailpit inbox (pinned in vitest.integration.config).
+    const inbox = async (to: string) => {
+      const res = await fetch(`http://localhost:8025/api/v1/search?query=${encodeURIComponent(`to:"${to}"`)}`);
+      return ((await res.json()) as { messages: { ID: string; Subject: string }[] }).messages;
+    };
+    let received: { ID: string; Subject: string }[] = [];
+    for (let i = 0; i < 25 && received.length === 0; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      received = await inbox(enrolled.email);
+    }
+    expect(received).toHaveLength(1);
+    expect(received[0].Subject).toContain(lesson.title);
+    const message = (await (await fetch(`http://localhost:8025/api/v1/message/${received[0].ID}`)).json()) as { Text: string };
+    expect(message.Text).toContain(`/portal/mesimet/${lesson.id}?bashkohu=1`);
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    expect(await inbox(enrolled.email)).toHaveLength(1);
+    expect(await inbox(revoked.email)).toHaveLength(0);
+  });
+
   it("catches up after login: a student who signs in mid-lesson still sees the live alert", async () => {
     const lesson = await demoLessonStartingNow();
     const student = await createUser("student");
