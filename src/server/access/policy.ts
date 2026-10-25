@@ -102,7 +102,9 @@ export function checkCapability(access: LessonAccess, capability: Capability, le
   if (lesson.meetingStatus === "NOT_PROVISIONED" || lesson.meetingStatus === "ERROR") {
     return { allowed: false, code: "LESSON_JOIN_NOT_OPEN", message: "Klasa live nuk është gati ende." };
   }
-  if (access.status === "granted" && now.getTime() < lesson.joinOpensAt.getTime()) {
+  // The join window only applies before the host starts: once the class is LIVE (the teacher may
+  // start early), enrolled students can join straight away. Access deadlines still apply above.
+  if (access.status === "granted" && lesson.meetingStatus !== "LIVE" && now.getTime() < lesson.joinOpensAt.getTime()) {
     return { allowed: false, code: "LESSON_JOIN_NOT_OPEN", message: "Hyrja në mësim nuk është hapur ende." };
   }
   return { allowed: true };

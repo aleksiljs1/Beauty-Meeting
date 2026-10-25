@@ -106,12 +106,14 @@ describe("checkCapability", () => {
     }
   });
 
-  it("opens joining only from joinOpensAt", () => {
+  it("opens joining from joinOpensAt, or earlier once the host has started the class", () => {
+    const scheduled = lesson({ meetingStatus: "SCHEDULED" });
     const live = lesson({ meetingStatus: "LIVE" });
     const before = ms(JOIN_OPENS, -1);
-    expect(checkCapability(evaluateLessonAccess(student, live, enrolled(), before), "JOIN_LIVE", live, before)).toMatchObject({
+    expect(checkCapability(evaluateLessonAccess(student, scheduled, enrolled(), before), "JOIN_LIVE", scheduled, before)).toMatchObject({
       code: "LESSON_JOIN_NOT_OPEN",
     });
+    expect(checkCapability(evaluateLessonAccess(student, live, enrolled(), before), "JOIN_LIVE", live, before)).toEqual({ allowed: true });
     expect(checkCapability(evaluateLessonAccess(student, live, enrolled(), JOIN_OPENS), "JOIN_LIVE", live, JOIN_OPENS)).toEqual({
       allowed: true,
     });
