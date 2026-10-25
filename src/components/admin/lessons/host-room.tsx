@@ -68,11 +68,12 @@ export function HostRoom({
     void startClass();
   }, [startClass]);
 
-  // Ask Zoom for the status right after joining, so students see the lesson as LIVE within
-  // seconds even when the "meeting started" webhook is late or can't reach us.
-  const hostJoined = zoom.status === "joined";
+  // Ask Zoom for the status right after joining and right after leaving, so students see the
+  // lesson go LIVE / ENDED within seconds even when the webhook is late or can't reach us.
+  // Zoom may take a moment to report the change, so retry a few times.
+  const expected: MeetingStatus | null = zoom.status === "joined" ? "LIVE" : zoom.status === "left" ? "ENDED" : null;
   useEffect(() => {
-    if (!hostJoined || meetingStatus === "LIVE") return;
+    if (!expected || meetingStatus === expected) return;
     let cancelled = false;
     void (async () => {
       for (const delayMs of [1_500, 4_000, 8_000, 15_000]) {
@@ -81,13 +82,14 @@ export function HostRoom({
         const result = await run(() => apiSend<{ meetingStatus: MeetingStatus }>("patch", `/admin/lessons/${lessonId}/zoom-meeting`), {
           onError: () => true, // background check: stay quiet, the manual button remains
         });
-        if (result?.meetingStatus === "LIVE") return;
+        // Leaving without ending keeps the meeting running: LIVE is a final answer then too.
+        if (result?.meetingStatus === expected || (expected === "ENDED" && result?.meetingStatus === "LIVE" && delayMs >= 8_000)) return;
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [hostJoined, meetingStatus, lessonId, run]);
+  }, [expected, meetingStatus, lessonId, run]);
 
   // Closing or reloading the tab leaves the meeting: ask first while connected.
   const inMeeting = zoom.status === "connecting" || zoom.status === "joined";
@@ -123,12 +125,12 @@ export function HostRoom({
           <span aria-live="polite" className="text-muted-foreground">
             {busy && t.connecting}
             {zoom.status === "joined" && <span className="text-live">{t.joined}</span>}
-            {zoom.status === "left" && t.left}
+            {zoom.status === "left" && (meetingStatus === "ENDED" ? t.ended : t.left)}
           </span>
           {(zoom.status === "left" || zoom.status === "error") && (
             <Button size="sm" onClick={() => void startClass()} disabled={busy}>
               {busy ? <LoaderCircle className="animate-spin" aria-hidden /> : <Video aria-hidden />}
-              {t.rejoin}
+              {meetingStatus === "ENDED" ? t.restart : t.rejoin}
             </Button>
           )}
           <Button

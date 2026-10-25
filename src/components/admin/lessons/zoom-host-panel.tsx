@@ -32,7 +32,8 @@ export function ZoomHostPanel({ lessonId, zoomLive, meetingNumber, publication, 
 
   const finished = meetingStatus === "ENDED" || meetingStatus === "ERROR";
   const canCreate = !meetingNumber && publication !== "CANCELLED" && publication !== "ARCHIVED" && !finished;
-  const canHost = !!meetingNumber && publication === "PUBLISHED" && !finished;
+  const ended = meetingStatus === "ENDED";
+  const canHost = !!meetingNumber && publication === "PUBLISHED" && meetingStatus !== "ERROR";
 
   return (
     <div className="space-y-4">
@@ -65,7 +66,7 @@ export function ZoomHostPanel({ lessonId, zoomLive, meetingNumber, publication, 
           <Button asChild>
             <a href={`/klasa/${lessonId}`} target={`klasa-${lessonId}`} rel="noopener">
               <Video aria-hidden />
-              {meetingStatus === "LIVE" ? t.rejoin : t.start}
+              {meetingStatus === "LIVE" ? t.rejoin : ended ? t.restart : t.start}
             </a>
           </Button>
         )}
@@ -95,7 +96,8 @@ export function ZoomHostPanel({ lessonId, zoomLive, meetingNumber, publication, 
       )}
 
       {meetingNumber && publication !== "PUBLISHED" && !finished && <p className="text-sm text-muted-foreground">{t.needsPublish}</p>}
-      {finished && <p className="text-sm text-muted-foreground">{t.finished}</p>}
+      {ended && <p className="text-sm text-muted-foreground">{t.ended}</p>}
+      {meetingStatus === "ERROR" && <p className="text-sm text-muted-foreground">{t.finished}</p>}
 
       {canHost && <p className="text-sm text-muted-foreground">{t.roomHint}</p>}
 

@@ -35,7 +35,8 @@ async function loadHostableLesson(lessonId: string, admin: AppUser, now: number)
   if (lesson.isDemo) throw new ApiError("CONFLICT", "Kjo klasë është demonstrim dhe nuk përdor Zoom real.");
   if (lesson.publication !== "PUBLISHED") throw new ApiError("CONFLICT", "Publikoni mësimin para se të nisni klasën live.");
   if (!lesson.zoomMeetingNumber) throw new ApiError("INTEGRATION_NOT_CONFIGURED", "Ky mësim nuk ka ende një takim Zoom.");
-  if (lesson.meetingStatus === "ENDED" || lesson.meetingStatus === "ERROR") throw new ApiError("CONFLICT", "Ky takim ka përfunduar.");
+  // An ENDED meeting may be restarted (e.g. ended by mistake) until the scheduled end below.
+  if (lesson.meetingStatus === "ERROR") throw new ApiError("CONFLICT", "Ky takim ka një gabim dhe nuk mund të niset.");
   if (now >= lesson.scheduledEndAt.getTime()) throw new ApiError("CONFLICT", "Orari i këtij mësimi ka përfunduar.");
   return { ...lesson, zoomMeetingNumber: lesson.zoomMeetingNumber }; // keeps the narrowed (non-null) type
 }
