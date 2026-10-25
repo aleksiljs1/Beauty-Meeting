@@ -22,7 +22,7 @@ export default defineConfig({
       SMTP_USER: "",
       SMTP_PASSWORD: "",
       SMTP_SECURE: "false",
-      MAIL_FROM: "Beauty Academy <no-reply@localhost>",
+      MAIL_FROM: "Akademia CEM <no-reply@localhost>",
       // Demo unless a test opts in (the Zoom tests set live mode themselves, before imports).
       ZOOM_MODE: "demo",
     },

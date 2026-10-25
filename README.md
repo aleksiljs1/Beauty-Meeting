@@ -1,4 +1,4 @@
-# Beauty Academy
+# Akademia CEM
 
 Website and academy portal for a beauty salon / aesthetics academy: a public marketing site
 (Albanian), a student portal with live lessons, materials and recordings, and an admin portal.

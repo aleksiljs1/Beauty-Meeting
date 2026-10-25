@@ -1,6 +1,6 @@
 /** Shared UI words (Albanian). Area-specific text lives in src/i18n/<area>.ts. */
 export const common = {
-  brandFallback: "Beauty Academy",
+  brandFallback: "Akademia CEM",
   actions: {
     save: "Ruaj",
     cancel: "Anulo",

@@ -434,7 +434,7 @@ model AuditLog {
 /// Singleton row (id = 1).
 model AcademySettings {
   id           Int      @id @default(1)
-  name         String   @default("Beauty Academy")
+  name         String   @default("Akademia CEM")
   tagline      String?
   about        String?
   address      String?

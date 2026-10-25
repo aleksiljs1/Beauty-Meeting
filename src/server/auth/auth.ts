@@ -15,7 +15,7 @@ import { ac, roles } from "./roles";
 export const ACCESS_TOKEN_TTL_SECONDS = 5 * 60;
 
 export const auth = betterAuth({
-  appName: "Beauty Academy",
+  appName: "Akademia CEM",
   baseURL: env.APP_URL,
   secret: env.BETTER_AUTH_SECRET,
   trustedOrigins: [env.APP_URL],

@@ -134,7 +134,7 @@ async function emailLessonLive(lessonId: string, userIds: string[]) {
   let failed = 0;
   for (const user of users) {
     try {
-      await sendMail(lessonLiveEmail({ to: user.email, name: user.name, lessonTitle: lesson.title, url, academyName: settings?.name ?? "Beauty Academy" }));
+      await sendMail(lessonLiveEmail({ to: user.email, name: user.name, lessonTitle: lesson.title, url, academyName: settings?.name ?? "Akademia CEM" }));
     } catch {
       failed += 1; // one bad address must not stop the others; addresses are never logged
     }

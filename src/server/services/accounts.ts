@@ -33,7 +33,7 @@ export async function createAccountSetupLink(userId: string, validHours = ACCOUN
 
 async function academyName() {
   const settings = await prisma.academySettings.findUnique({ where: { id: 1 }, select: { name: true } });
-  return settings?.name ?? "Beauty Academy";
+  return settings?.name ?? "Akademia CEM";
 }
 
 export async function sendAccountSetupEmail(user: { id: string; email: string; name: string }) {

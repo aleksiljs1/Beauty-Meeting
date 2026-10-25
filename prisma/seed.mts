@@ -42,7 +42,7 @@ await prisma.academySettings.upsert({
   where: { id: 1 },
   update: {},
   create: {
-    name: "Beauty Academy",
+    name: "Akademia CEM",
     tagline: "[Slogani i akademisë]",
     about: "[Historia e sallonit dhe e akademisë — do të plotësohet nga pronari.]",
     address: "[Adresa], Tiranë",
@@ -139,7 +139,7 @@ function samplePdf(title: string): Uint8Array<ArrayBuffer> {
 }
 
 for (const l of [demo, replay, upcoming]) {
-  const bytes = samplePdf("Material demonstrues - Beauty Academy");
+  const bytes = samplePdf("Material demonstrues - Akademia CEM");
   const objectKey = newObjectKey("materials", l.id);
   const url = await presignPut({ key: objectKey, contentType: "application/pdf", contentLength: bytes.byteLength });
   const put = await fetch(url, { method: "PUT", body: bytes, headers: { "Content-Type": "application/pdf" } });

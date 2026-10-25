@@ -17,7 +17,7 @@ const body = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: { default: "Beauty Academy", template: "%s · Beauty Academy" },
+  title: { default: "Akademia CEM", template: "%s · Akademia CEM" },
   description: "Sallon bukurie dhe akademi estetike.",
 };
 

@@ -1,6 +1,6 @@
-# Project notes — Beauty Academy
+# Project notes — Akademia CEM
 
-Client: salon/aesthetics academy (owner's wife teaches). Placeholder name "Beauty Academy" until real name/branding supplied.
+Client: salon/aesthetics academy (owner's wife teaches). Brand name: "Akademia CEM".
 
 Original brief: `c:\Users\aleksiljs\Downloads\Beauty_Academy_Zoom_Claude_Megaprompt.md`
 

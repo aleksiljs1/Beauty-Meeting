@@ -28,7 +28,7 @@ export function parseLessonId(raw: string): string {
 
 export async function getAcademyName(): Promise<string> {
   const settings = await prisma.academySettings.findUnique({ where: { id: 1 }, select: { name: true } });
-  return settings?.name ?? "Beauty Academy";
+  return settings?.name ?? "Akademia CEM";
 }
 
 export type StudentLessonCard = {
