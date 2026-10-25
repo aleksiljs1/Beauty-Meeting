@@ -41,6 +41,9 @@ export const zoomText = {
     title: "Klasa live",
     back: "Mësimi",
     idle: "Klasa nuk është e hapur.",
+    classTab: "Klasa",
+    views: "Pamjet e klasës",
+    tools: "Mjetet e mësimit",
   },
   student: {
     appFallback: "Hap në aplikacionin Zoom",
