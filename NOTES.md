@@ -48,6 +48,13 @@ Original brief: `c:\Users\aleksiljs\Downloads\Beauty_Academy_Zoom_Claude_Megapro
 
   Opening the link (GET / link previews) never enrolls. Optional redemption limit + redeem deadline per link.
 
+- **"The class has started" email (decided by user, 2026-10-25).** When a lesson goes LIVE (Zoom webhook,
+  host-room status check or demo go-live), every currently eligible student (same rule as the in-site alert)
+  gets one email per live occurrence with a link to `/portal/mesimet/<id>?bashkohu=1`. It opens the lesson and
+  joins automatically, after sign-in if needed (the sign-in redirect keeps the query). Sent in the background so
+  the webhook answers fast; one failing address doesn't stop the others; addresses are never logged.
+  Integration tests always use Mailpit and demo mode (pinned in `vitest.integration.config.mts`), whatever `.env` says.
+
 ## Technical decisions (2026-10-20)
 
 - Versions: newest stable ≥2 weeks old, pinned exactly. Next 16.3.8 + React 19.2.8 (as pinned by create-next-app 16.3.8),
