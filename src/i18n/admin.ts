@@ -45,6 +45,7 @@ export const admin = {
     stalledRecording: "Ngarkim regjistrimi i papërfunduar (mbi 1 orë)",
     failedMaterial: "Materiali nuk u verifikua",
     stalledMaterial: "Ngarkim materiali i papërfunduar (mbi 1 orë)",
+    zoomMeetingMissing: "Mësim i publikuar pa takim Zoom: studentët nuk mund të bashkohen. Krijoni takimin.",
     openLesson: "Hap mësimin",
     newLesson: "Mësim i ri",
     newStudent: "Student i ri",

@@ -168,6 +168,10 @@ enum NotificationType {
   LESSON_STARTING_SOON
   LESSON_LIVE
   RECORDING_READY
+  /// The admin cancelled a published lesson.
+  LESSON_CANCELLED
+  /// The admin moved a published lesson to another time.
+  LESSON_RESCHEDULED
 }
 
 /// Optional grouping of lessons; also powers the public Courses page.

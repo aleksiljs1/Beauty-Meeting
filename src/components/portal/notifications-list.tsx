@@ -1,6 +1,6 @@
 "use client";
 
-import { BellOff, CheckCheck, Clock3, PlayCircle, Radio } from "lucide-react";
+import { BellOff, CalendarClock, CalendarX, CheckCheck, Clock3, PlayCircle, Radio } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -14,7 +14,13 @@ import { EmptyState } from "./empty-state";
 
 const t = portalText.notifications;
 
-const ICONS = { LESSON_LIVE: Radio, LESSON_STARTING_SOON: Clock3, RECORDING_READY: PlayCircle } as const;
+const ICONS = {
+  LESSON_LIVE: Radio,
+  LESSON_STARTING_SOON: Clock3,
+  RECORDING_READY: PlayCircle,
+  LESSON_CANCELLED: CalendarX,
+  LESSON_RESCHEDULED: CalendarClock,
+} as const;
 
 function lessonHref(n: FeedNotification) {
   if (!n.lessonId || !n.lessonTitle) return null;

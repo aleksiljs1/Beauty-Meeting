@@ -165,6 +165,8 @@ export const portalText = {
       LESSON_LIVE: "Mësimi ka filluar",
       LESSON_STARTING_SOON: "Mësimi fillon së shpejti",
       RECORDING_READY: "Regjistrimi është gati",
+      LESSON_CANCELLED: "Mësimi u anulua",
+      LESSON_RESCHEDULED: "Orari i mësimit ndryshoi",
     },
     loadError: "Njoftimet nuk u ngarkuan.",
   },

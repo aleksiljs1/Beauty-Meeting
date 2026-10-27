@@ -12,7 +12,7 @@ import { deleteObject } from "@/server/storage/storage";
 import { deleteZoomMeeting, syncZoomMeetingSchedule } from "@/server/zoom/meetings";
 import { audit } from "./audit";
 import { assertActiveStudents, enrollStudents } from "./course-members";
-import { markLessonEnded, markLessonLive } from "./live";
+import { markLessonEnded, markLessonLive, notifyLessonCancelled, notifyLessonRescheduled } from "./live";
 
 /**
  * Lesson administration: create/edit, publication lifecycle and the demo classroom controls.
@@ -106,7 +106,8 @@ export async function updateLesson(lessonId: string, patch: LessonPatch, confirm
   }
 
   const changed = Object.keys(patch).filter((key) => {
-    const next = patch[key as keyof LessonPatch];
+    const raw = patch[key as keyof LessonPatch];
+    const next = key === "summary" || key === "details" ? clean(raw as string | null | undefined) : raw;
     const prev = current[key as keyof typeof current];
     if (next instanceof Date && prev instanceof Date) return next.getTime() !== prev.getTime();
     return next !== undefined && (next ?? null) !== (prev ?? null);
@@ -128,6 +129,12 @@ export async function updateLesson(lessonId: string, patch: LessonPatch, confirm
   if (changed.length) {
     await audit(admin.id, "lesson.update", "lesson", lessonId, { fields: changed });
     await publishLessonChanged(lessonId);
+  }
+
+  // Students who can see the lesson hear about a new time, as long as the lesson isn't over.
+  const rescheduled = changed.includes("scheduledStartAt") || changed.includes("scheduledEndAt");
+  if (rescheduled && current.publication === "PUBLISHED" && schedule.scheduledEndAt.getTime() > Date.now()) {
+    await notifyLessonRescheduled(lessonId, schedule.scheduledStartAt);
   }
 
   // Keep the Zoom meeting's title/time in step. Best effort: the lesson is already saved.
@@ -171,7 +178,12 @@ export async function setLessonPublication(lessonId: string, publication: Public
   const result = await prisma.lesson.updateMany({ where: { id: lessonId, publication: lesson.publication }, data: { publication } });
   if (result.count === 0) throw new ApiError("CONFLICT", "Mësimi u ndryshua ndërkohë. Rifreskoni faqen.");
   await audit(admin.id, PUBLICATION_ACTION[publication], "lesson", lessonId, { from: lesson.publication });
-  await publishLessonChanged(lessonId);
+  // Students only knew about it if it was published; a lesson that's already over needs no notice.
+  if (publication === "CANCELLED" && lesson.publication === "PUBLISHED" && lesson.scheduledEndAt.getTime() > Date.now()) {
+    await notifyLessonCancelled(lessonId);
+  } else {
+    await publishLessonChanged(lessonId);
+  }
 
   // A cancelled lesson's Zoom meeting is removed so nobody can still join it from Zoom.
   if (publication !== "CANCELLED" || !lesson.zoomMeetingNumber) return { zoomDeleted: true };

@@ -66,6 +66,7 @@ const { authorizeLessonJoin, authorizeZoomAppJoin } = await import("./join");
 const { handleZoomWebhook, resetStartChecks } = await import("./webhooks");
 const { setLessonPublication, updateLesson } = await import("@/server/services/lessons");
 const { resetZoomTokenCache } = await import("./client");
+const { getAdminDashboard } = await import("@/server/queries/admin");
 
 afterAll(() => vi.unstubAllGlobals());
 
@@ -201,6 +202,15 @@ describe("a lost 'meeting started' event", () => {
     zoomState.calls = [];
     await authorizeLessonJoin(student, lessonId);
     expect(zoomState.calls.filter((c) => c.startsWith("GET /v2/meetings/"))).toHaveLength(0);
+  });
+});
+
+describe("admin dashboard", () => {
+  it("warns about a published lesson students can't join because it has no Zoom meeting", async () => {
+    const missing = () => getAdminDashboard().then((d) => d.issues.filter((i) => i.kind === "ZOOM_MEETING_MISSING").map((i) => i.lessonId));
+    expect(await missing()).toEqual([lessonId]);
+    await createZoomMeetingForLesson(lessonId, admin);
+    expect(await missing()).toEqual([]);
   });
 });
 

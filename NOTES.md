@@ -160,6 +160,20 @@ or "live" for up to 30 days. Now:
   Zoom says the host hasn't started (SDK error 3008) the student sees "Mësuesja nuk e ka nisur ende
   klasën" and can retry. The pop-up's "Bashkohu" now joins in this state too.
 
+## Students hear about cancelled or moved lessons (2026-10-27)
+
+- **Cancelling a published lesson** (not yet over) → in-site notice "Mësimi u anulua" + email; its live and
+  "starts soon" pop-ups close. Cancelling a draft notifies nobody (students never saw it).
+- **Moving a published lesson** (start or end changed, not yet over) → notice "Orari i mësimit ndryshoi" +
+  email with the new time; "starts soon" notices for the old time close. Once per new time.
+- All notices (live, recording ready, cancelled, moved) go to the same students: active enrolment, active
+  account, deadline not passed (`eligibleRecipients` in `services/live.ts`). Recording-ready notices now
+  also skip expired students and unpublished lessons. Emails are sent in the background.
+- Saving the lesson form unchanged is no longer logged as "summary/details changed" (empty vs. null).
+- **Zoom warnings reach the admin:** if Zoom can't be updated after a move, or the meeting can't be
+  removed after a cancel, the change is saved and a warning toast says so.
+- **Dashboard → "Kërkon vëmendje"** lists published, upcoming lessons without a Zoom meeting (live mode).
+
 ## Lesson materials: MP4 videos and multi-file upload (2026-10-23)
 
 - Materials may now include **MP4 videos** (`.mp4`/`.m4v`, declared `video/mp4`, verified by the `ftyp`

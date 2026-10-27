@@ -5,7 +5,9 @@ import { prisma } from "@/server/db";
 import { env } from "@/server/env";
 import { ApiError } from "@/server/http";
 import { sendMail } from "@/server/mail";
-import { lessonLiveEmail } from "@/server/mail/templates";
+import type { MailMessage } from "@/server/mail";
+import { lessonCancelledEmail, lessonLiveEmail, lessonRescheduledEmail } from "@/server/mail/templates";
+import { formatTimeRange, formatWeekdayDate, timezoneAbbreviation } from "@/lib/datetime";
 import { publishFeedChanged, publishLessonChanged } from "@/server/realtime/publish";
 import { audit } from "./audit";
 
@@ -100,64 +102,130 @@ export async function applyMeetingEnded(lessonId: string, endedAt: Date): Promis
   return "applied";
 }
 
-/** Fan-out to currently eligible students only. Deduplicated per live occurrence. */
-async function notifyLessonLive(lessonId: string, startedAt: Date) {
-  const now = new Date();
+// ---------------------------------------------------------------------------------------
+// Fan-out. Every notice goes to the same students: an active enrolment on an active student
+// account whose (lesson or personal) deadline hasn't passed.
+// ---------------------------------------------------------------------------------------
+
+type Recipient = { userId: string; deadline: Date };
+
+async function eligibleRecipients(lessonId: string, now: Date): Promise<Recipient[]> {
   const enrollments = await prisma.lessonEnrollment.findMany({
     where: { lessonId, revokedAt: null, user: { banned: { not: true }, role: "student" } },
     select: { userId: true, accessExpiresAt: true, lesson: { select: { accessExpiresAt: true } } },
   });
-  const rows = enrollments
+  return enrollments
     .map((e) => ({ userId: e.userId, deadline: e.accessExpiresAt && e.accessExpiresAt < e.lesson.accessExpiresAt ? e.accessExpiresAt : e.lesson.accessExpiresAt }))
-    .filter((e) => !isExpired(e.deadline, now))
-    .map((e) => ({
-      userId: e.userId,
-      lessonId,
-      type: "LESSON_LIVE" as const,
-      dedupeKey: `LESSON_LIVE:${lessonId}:${startedAt.toISOString()}`,
-      validUntil: e.deadline,
-    }));
+    .filter((e) => !isExpired(e.deadline, now));
+}
+
+type EmailLesson = { id: string; title: string; scheduledStartAt: Date; scheduledEndAt: Date };
+type EmailBuilder = (to: { email: string; name: string }, lesson: EmailLesson, academyName: string) => MailMessage;
+
+/**
+ * One email per student, in the background: Zoom expects a webhook answer within seconds and
+ * an admin action must not wait for a slow mail server. Failures are logged, never thrown, and
+ * addresses are never logged.
+ */
+function emailInBackground(kind: string, lessonId: string, userIds: string[], build: EmailBuilder) {
+  if (!userIds.length) return;
+  void (async () => {
+    const [lesson, settings, users] = await Promise.all([
+      prisma.lesson.findUnique({ where: { id: lessonId }, select: { id: true, title: true, scheduledStartAt: true, scheduledEndAt: true } }),
+      prisma.academySettings.findUnique({ where: { id: 1 }, select: { name: true } }),
+      prisma.user.findMany({ where: { id: { in: userIds } }, select: { email: true, name: true } }),
+    ]);
+    if (!lesson) return;
+    let failed = 0;
+    for (const user of users) {
+      try {
+        await sendMail(build(user, lesson, settings?.name ?? "Akademia CEM"));
+      } catch {
+        failed += 1; // one bad address must not stop the others
+      }
+    }
+    if (failed) console.error(`[live] some ${kind} emails failed`, { lessonId, failed, total: users.length });
+  })().catch((error) => console.error(`[live] ${kind} emails failed`, { lessonId, error: (error as Error).message }));
+}
+
+const lessonUrl = (lessonId: string, query = "") => new URL(`/portal/mesimet/${lessonId}${query}`, env.APP_URL).toString();
+const scheduleText = (lesson: EmailLesson) =>
+  `${formatWeekdayDate(lesson.scheduledStartAt)}, ${formatTimeRange(lesson.scheduledStartAt, lesson.scheduledEndAt)} (${timezoneAbbreviation(lesson.scheduledStartAt)})`;
+
+/** Ends this lesson's still-open pop-up notices of these types (they describe a time that no longer applies). */
+async function closeNotices(lessonId: string, types: ("LESSON_LIVE" | "LESSON_STARTING_SOON")[], at: Date) {
+  await prisma.notification.updateMany({
+    where: { lessonId, type: { in: types }, OR: [{ validUntil: null }, { validUntil: { gt: at } }] },
+    data: { validUntil: at },
+  });
+}
+
+/** Deduplicated per live occurrence; runs once per occurrence (the caller's state change is the guard). */
+async function notifyLessonLive(lessonId: string, startedAt: Date) {
+  const recipients = await eligibleRecipients(lessonId, new Date());
+  const rows = recipients.map((r) => ({
+    userId: r.userId,
+    lessonId,
+    type: "LESSON_LIVE" as const,
+    dedupeKey: `LESSON_LIVE:${lessonId}:${startedAt.toISOString()}`,
+    validUntil: r.deadline,
+  }));
   if (rows.length) await prisma.notification.createMany({ data: rows, skipDuplicates: true });
   await publishFeedChanged(rows.map((r) => r.userId));
-  // Runs once per live occurrence (the caller's state change is the guard). In the background:
-  // Zoom expects the webhook answer within seconds, and a slow mail server must not delay it.
-  void emailLessonLive(lessonId, rows.map((r) => r.userId)).catch((error) =>
-    console.error("[live] lesson-live emails failed", { lessonId, error: (error as Error).message }),
+  // "The class has started", with a link that opens the lesson and joins automatically.
+  emailInBackground("lesson-live", lessonId, rows.map((r) => r.userId), (to, lesson, academyName) =>
+    lessonLiveEmail({ to: to.email, name: to.name, lessonTitle: lesson.title, url: lessonUrl(lesson.id, "?bashkohu=1"), academyName }),
   );
 }
 
-/** "The class has started" email with a link that opens the lesson and joins automatically. */
-async function emailLessonLive(lessonId: string, userIds: string[]) {
-  if (!userIds.length) return;
-  const [lesson, settings, users] = await Promise.all([
-    prisma.lesson.findUnique({ where: { id: lessonId }, select: { title: true } }),
-    prisma.academySettings.findUnique({ where: { id: 1 }, select: { name: true } }),
-    prisma.user.findMany({ where: { id: { in: userIds } }, select: { email: true, name: true } }),
-  ]);
-  if (!lesson) return;
-  const url = new URL(`/portal/mesimet/${lessonId}?bashkohu=1`, env.APP_URL).toString();
-  let failed = 0;
-  for (const user of users) {
-    try {
-      await sendMail(lessonLiveEmail({ to: user.email, name: user.name, lessonTitle: lesson.title, url, academyName: settings?.name ?? "Akademia CEM" }));
-    } catch {
-      failed += 1; // one bad address must not stop the others; addresses are never logged
-    }
-  }
-  if (failed) console.error("[live] some lesson-live emails failed", { lessonId, failed, total: users.length });
-}
-
 export async function notifyRecordingReady(lessonId: string, recordingId: string) {
-  const enrollments = await prisma.lessonEnrollment.findMany({
-    where: { lessonId, revokedAt: null, user: { banned: { not: true }, role: "student" } },
-    select: { userId: true },
-  });
-  if (!enrollments.length) return;
+  const lesson = await prisma.lesson.findUnique({ where: { id: lessonId }, select: { publication: true } });
+  if (lesson?.publication !== "PUBLISHED") return; // students can't open it anyway
+  const recipients = await eligibleRecipients(lessonId, new Date());
+  if (!recipients.length) return;
   await prisma.notification.createMany({
-    data: enrollments.map((e) => ({ userId: e.userId, lessonId, type: "RECORDING_READY" as const, dedupeKey: `RECORDING_READY:${recordingId}` })),
+    data: recipients.map((r) => ({ userId: r.userId, lessonId, type: "RECORDING_READY" as const, dedupeKey: `RECORDING_READY:${recordingId}` })),
     skipDuplicates: true,
   });
-  await publishFeedChanged(enrollments.map((e) => e.userId));
+  await publishFeedChanged(recipients.map((r) => r.userId));
+}
+
+/** A published lesson was cancelled: tell its students (in the site and by email) and close its pop-ups. */
+export async function notifyLessonCancelled(lessonId: string, now = new Date()) {
+  await closeNotices(lessonId, ["LESSON_LIVE", "LESSON_STARTING_SOON"], now);
+  const recipients = await eligibleRecipients(lessonId, now);
+  if (recipients.length) {
+    await prisma.notification.createMany({
+      data: recipients.map((r) => ({ userId: r.userId, lessonId, type: "LESSON_CANCELLED" as const, dedupeKey: `LESSON_CANCELLED:${lessonId}:${now.toISOString()}` })),
+      skipDuplicates: true,
+    });
+  }
+  await publishLessonChanged(lessonId);
+  emailInBackground("lesson-cancelled", lessonId, recipients.map((r) => r.userId), (to, lesson, academyName) =>
+    lessonCancelledEmail({ to: to.email, name: to.name, lessonTitle: lesson.title, when: scheduleText(lesson), url: lessonUrl(lesson.id), academyName }),
+  );
+}
+
+/** A published lesson moved: tell its students the new time and drop "starts soon" notices for the old one. */
+export async function notifyLessonRescheduled(lessonId: string, newStart: Date, now = new Date()) {
+  await closeNotices(lessonId, ["LESSON_STARTING_SOON"], now);
+  const recipients = await eligibleRecipients(lessonId, now);
+  if (recipients.length) {
+    await prisma.notification.createMany({
+      data: recipients.map((r) => ({
+        userId: r.userId,
+        lessonId,
+        type: "LESSON_RESCHEDULED" as const,
+        // Once per new time: saving the same schedule twice doesn't notify twice.
+        dedupeKey: `LESSON_RESCHEDULED:${lessonId}:${newStart.toISOString()}`,
+      })),
+      skipDuplicates: true,
+    });
+  }
+  await publishLessonChanged(lessonId);
+  emailInBackground("lesson-rescheduled", lessonId, recipients.map((r) => r.userId), (to, lesson, academyName) =>
+    lessonRescheduledEmail({ to: to.email, name: to.name, lessonTitle: lesson.title, when: scheduleText(lesson), url: lessonUrl(lesson.id), academyName }),
+  );
 }
 
 // ---------------------------------------------------------------------------------------
@@ -166,7 +234,7 @@ export async function notifyRecordingReady(lessonId: string, recordingId: string
 
 export type FeedNotification = {
   id: string;
-  type: "LESSON_STARTING_SOON" | "LESSON_LIVE" | "RECORDING_READY";
+  type: "LESSON_STARTING_SOON" | "LESSON_LIVE" | "RECORDING_READY" | "LESSON_CANCELLED" | "LESSON_RESCHEDULED";
   lessonId: string | null;
   /** Null when the student no longer has access — the notice stays as harmless history. */
   lessonTitle: string | null;

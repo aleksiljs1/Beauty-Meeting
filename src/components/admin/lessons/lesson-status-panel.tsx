@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Archive, Ban, Eye, EyeOff, FlaskConical, RotateCcw, Square, Trash2, Undo2 } from "lucide-react";
 import { ConfirmAction } from "@/components/admin/confirm-action";
 import { DemoBadge, MeetingBadge, PublicationBadge } from "@/components/admin/page-parts";
@@ -30,8 +31,12 @@ export function LessonStatusPanel({
 }) {
   const router = useRouter();
   const { run, pending } = useApiAction();
-  const setPublication = (publication: Publication) =>
-    run(() => apiSend("post", `/admin/lessons/${lesson.id}/publication`, { publication }), { success: t.done[publication] });
+  const setPublication = async (publication: Publication) => {
+    const result = await run(() => apiSend<{ zoomWarning: string | null }>("post", `/admin/lessons/${lesson.id}/publication`, { publication }));
+    // Changed either way; the warning says the Zoom meeting couldn't be removed.
+    if (result?.zoomWarning) toast.warning(result.zoomWarning);
+    else if (result) toast.success(t.done[publication]);
+  };
   const demo = (action: "live" | "end" | "reset", success: string) =>
     run(() => apiSend("post", `/admin/lessons/${lesson.id}/demo`, { action }), { success });
 

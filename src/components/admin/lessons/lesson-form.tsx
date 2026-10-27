@@ -161,8 +161,10 @@ export function LessonForm({
     };
     try {
       if (lesson) {
-        await apiSend("patch", `/admin/lessons/${lesson.id}`, body);
-        toast.success(t.saved);
+        const { zoomWarning } = await apiSend<{ zoomWarning: string | null }>("patch", `/admin/lessons/${lesson.id}`, body);
+        // Saved either way; the warning says Zoom still has the old title/time.
+        if (zoomWarning) toast.warning(zoomWarning);
+        else toast.success(t.saved);
         form.reset(values);
         router.refresh();
       } else {

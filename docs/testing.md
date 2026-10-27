@@ -99,6 +99,13 @@ The seed printed a link for the upcoming lesson (or create one in the admin port
 - [ ] Lesson shown as LIVE after class → Admin → Detaje → "Shëno si të përfunduar" → students' Join and
       pop-up disappear.
 
+### Cancelled / moved lessons
+- [ ] Cancel a published lesson → enrolled students get "Mësimi u anulua" in Njoftimet and an email; a
+      student whose access was removed gets nothing. Cancelling a draft sends nothing.
+- [ ] Move a published lesson to another day → "Orari i mësimit ndryshoi" + email with the new time. Saving
+      again without changes sends nothing more.
+- [ ] Live mode: publish a lesson without creating its Zoom meeting → Paneli shows it under "Kërkon vëmendje".
+
 ### Course students
 - [ ] Studentët → "Student i ri" → tick a course → the student is created and (option on) added to that
       course's upcoming lessons; the toast says how many. The list shows the course; the course chips filter it.

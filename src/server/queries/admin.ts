@@ -4,7 +4,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import type { PublicationStatus } from "@/generated/prisma/enums";
 import { END_GRACE_MS, effectiveMeetingStatus } from "@/server/access/policy";
 import { prisma } from "@/server/db";
-import { env, ZOOM_LIVE_VARIABLES } from "@/server/env";
+import { env, ZOOM_LIVE_VARIABLES, zoomLive } from "@/server/env";
 import { ApiError } from "@/server/http";
 import { s3 } from "@/server/storage/storage";
 import { invitationStatus, rosterEntryState } from "./invitation-status";
@@ -45,7 +45,7 @@ const dashboardLessonSelect = {
 } as const;
 
 export type DashboardIssue = {
-  kind: "RECORDING_FAILED" | "RECORDING_STALLED" | "MATERIAL_FAILED" | "MATERIAL_STALLED";
+  kind: "RECORDING_FAILED" | "RECORDING_STALLED" | "MATERIAL_FAILED" | "MATERIAL_STALLED" | "ZOOM_MEETING_MISSING";
   id: string;
   lessonId: string;
   lessonTitle: string;
@@ -56,7 +56,7 @@ export type DashboardIssue = {
 
 export async function getAdminDashboard(now = new Date()) {
   const stale = new Date(now.getTime() - HOUR);
-  const [activeStudents, live, upcoming, upcomingCount, failedRecordings, stalledRecordings, failedMaterials, stalledMaterials] = await Promise.all([
+  const [activeStudents, live, upcoming, upcomingCount, failedRecordings, stalledRecordings, failedMaterials, stalledMaterials, withoutMeeting] = await Promise.all([
     prisma.user.count({ where: activeStudentWhere }),
     prisma.lesson.findMany({
       // Same rule as effectiveMeetingStatus: a LIVE lesson is over END_GRACE_MS after its scheduled end.
@@ -96,6 +96,15 @@ export async function getAdminDashboard(now = new Date()) {
       take: 20,
       select: { id: true, lessonId: true, displayName: true, createdAt: true, lesson: { select: { title: true } } },
     }),
+    // Published, still ahead, and students can't join: no Zoom meeting yet (live mode only).
+    zoomLive
+      ? prisma.lesson.findMany({
+          where: { publication: "PUBLISHED", isDemo: false, zoomMeetingNumber: null, scheduledEndAt: { gt: now } },
+          orderBy: { scheduledStartAt: "asc" },
+          take: 20,
+          select: { id: true, title: true, scheduledStartAt: true },
+        })
+      : Promise.resolve([]),
   ]);
 
   const issues: DashboardIssue[] = [
@@ -103,6 +112,7 @@ export async function getAdminDashboard(now = new Date()) {
     ...stalledRecordings.map((r) => ({ kind: "RECORDING_STALLED" as const, id: r.id, lessonId: r.lessonId, lessonTitle: r.lesson.title, name: r.displayName, message: null, at: r.updatedAt })),
     ...failedMaterials.map((m) => ({ kind: "MATERIAL_FAILED" as const, id: m.id, lessonId: m.lessonId, lessonTitle: m.lesson.title, name: m.displayName, message: null, at: m.updatedAt })),
     ...stalledMaterials.map((m) => ({ kind: "MATERIAL_STALLED" as const, id: m.id, lessonId: m.lessonId, lessonTitle: m.lesson.title, name: m.displayName, message: null, at: m.createdAt })),
+    ...withoutMeeting.map((l) => ({ kind: "ZOOM_MEETING_MISSING" as const, id: l.id, lessonId: l.id, lessonTitle: l.title, name: null, message: null, at: l.scheduledStartAt })),
   ].sort((a, b) => b.at.getTime() - a.at.getTime());
 
   const toCard = ({ _count, ...lesson }: (typeof live)[number]) => ({ ...lesson, students: _count.enrollments });

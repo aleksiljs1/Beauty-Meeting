@@ -1,0 +1,3 @@
+-- AlterEnum
+ALTER TYPE "NotificationType" ADD VALUE 'LESSON_CANCELLED';
+ALTER TYPE "NotificationType" ADD VALUE 'LESSON_RESCHEDULED';

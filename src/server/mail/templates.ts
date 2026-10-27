@@ -46,6 +46,39 @@ export function lessonLiveEmail(params: { to: string; name: string; lessonTitle:
   };
 }
 
+type LessonChangeEmail = { to: string; name: string; lessonTitle: string; when: string; url: string; academyName: string };
+const lessonChangeFootnote = "Ky email ju dërgohet sepse jeni regjistruar në këtë mësim.";
+
+export function lessonCancelledEmail(params: LessonChangeEmail): MailMessage {
+  const heading = `Mësimi u anulua: ${params.lessonTitle}`;
+  const paragraphs = [
+    `Përshëndetje ${params.name},`,
+    `Mësimi "${params.lessonTitle}" në ${params.academyName}, i planifikuar për ${params.when}, u anulua.`,
+    "Për çdo pyetje, kontaktoni akademinë.",
+  ];
+  return {
+    to: params.to,
+    subject: heading,
+    text: `${paragraphs.join("\n\n")}\n\n${params.url}\n\n${lessonChangeFootnote}`,
+    html: layout(heading, paragraphs, { label: "Shiko mësimin", url: params.url }, lessonChangeFootnote),
+  };
+}
+
+export function lessonRescheduledEmail(params: LessonChangeEmail): MailMessage {
+  const heading = `Orari i mësimit ndryshoi: ${params.lessonTitle}`;
+  const paragraphs = [
+    `Përshëndetje ${params.name},`,
+    `Mësimi "${params.lessonTitle}" në ${params.academyName} u zhvendos.`,
+    `Orari i ri: ${params.when}.`,
+  ];
+  return {
+    to: params.to,
+    subject: heading,
+    text: `${paragraphs.join("\n\n")}\n\n${params.url}\n\n${lessonChangeFootnote}`,
+    html: layout(heading, paragraphs, { label: "Shiko mësimin", url: params.url }, lessonChangeFootnote),
+  };
+}
+
 export function passwordResetEmail(params: { to: string; name: string; url: string }): MailMessage {
   const heading = "Rivendosni fjalëkalimin";
   const paragraphs = [
