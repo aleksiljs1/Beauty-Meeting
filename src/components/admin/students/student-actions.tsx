@@ -1,9 +1,10 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { GraduationCap, Mail, MoreHorizontal, Pencil, UserCheck, UserX } from "lucide-react";
+import { GraduationCap, Mail, MoreHorizontal, Pencil, Trash2, UserCheck, UserX } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { CheckList } from "@/components/admin/check-list";
@@ -12,7 +13,7 @@ import { FormField } from "@/components/admin/form-field";
 import { useApiAction } from "@/components/admin/use-api-action";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { apiSend } from "@/lib/api/client";
@@ -26,8 +27,9 @@ type Student = { id: string; name: string; email: string; active: boolean; cours
 type Course = { id: string; title: string };
 
 export function StudentActions({ student, courses }: { student: Student; courses: Course[] }) {
-  const [dialog, setDialog] = useState<null | "rename" | "courses" | "deactivate" | "reactivate">(null);
+  const [dialog, setDialog] = useState<null | "rename" | "email" | "courses" | "deactivate" | "reactivate" | "delete">(null);
   const { run, pending } = useApiAction();
+  const router = useRouter();
   const form = useForm<{ name: string }>({ resolver: zodResolver(nameSchema), values: { name: student.name } });
   const url = `/admin/students/${encodeURIComponent(student.id)}`;
 
@@ -47,6 +49,9 @@ export function StudentActions({ student, courses }: { student: Student; courses
         <DropdownMenuContent align="end" className="min-w-64">
           <DropdownMenuItem onSelect={() => setDialog("rename")}>
             <Pencil aria-hidden /> {t.edit.open}
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setDialog("email")}>
+            <Mail aria-hidden /> {t.email.open}
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setDialog("courses")}>
             <GraduationCap aria-hidden /> {t.courses.open}
@@ -68,6 +73,10 @@ export function StudentActions({ student, courses }: { student: Student; courses
               <UserCheck aria-hidden /> {t.reactivate.action}
             </DropdownMenuItem>
           )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem variant="destructive" onSelect={() => setDialog("delete")}>
+            <Trash2 aria-hidden /> {t.delete.action}
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -95,6 +104,8 @@ export function StudentActions({ student, courses }: { student: Student; courses
 
       {dialog === "courses" && <CoursesDialog student={student} courses={courses} onClose={() => setDialog(null)} />}
 
+      <EmailEditDialog open={dialog === "email"} student={student} onClose={() => setDialog(null)} />
+
       <ConfirmAction
         open={dialog === "deactivate"}
         onOpenChange={(open) => setDialog(open ? "deactivate" : null)}
@@ -112,7 +123,67 @@ export function StudentActions({ student, courses }: { student: Student; courses
         confirmLabel={t.reactivate.confirm}
         onConfirm={() => run(() => apiSend("patch", url, { active: true }), { success: t.reactivate.success })}
       />
+      <ConfirmAction
+        open={dialog === "delete"}
+        onOpenChange={(open) => setDialog(open ? "delete" : null)}
+        title={t.delete.title}
+        description={t.delete.description(student.name)}
+        confirmLabel={t.delete.confirm}
+        destructive
+        onConfirm={async () => {
+          const result = await run(() => apiSend("delete", url), { refresh: false });
+          if (!result) return false;
+          toast.success(t.delete.success);
+          router.refresh();
+          return true;
+        }}
+      />
     </>
+  );
+}
+
+const emailSchema = z.object({ email: z.email(t.validation.email).max(200, t.validation.email) });
+
+function EmailEditDialog({ open, student, onClose }: { open: boolean; student: Student; onClose: () => void }) {
+  const router = useRouter();
+  const { run } = useApiAction();
+  const form = useForm<{ email: string }>({ resolver: zodResolver(emailSchema), values: { email: student.email } });
+
+  const submit = form.handleSubmit(async ({ email }) => {
+    const result = await run<{ emailChanged: boolean; mailSent: boolean }>(
+      () => apiSend("patch", `/admin/students/${encodeURIComponent(student.id)}`, { email }),
+      { refresh: false },
+    );
+    if (!result) return;
+    if (!result.emailChanged) toast.info(t.email.unchanged);
+    else if (result.mailSent) toast.success(t.email.success);
+    else toast.warning(student.active ? t.email.mailFailed : t.email.inactive);
+    onClose();
+    if (result.emailChanged) router.refresh();
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t.email.title}</DialogTitle>
+          <DialogDescription>{t.email.description(student.name)}</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-4" noValidate>
+          <FormField label={t.email.label} error={form.formState.errors.email?.message}>
+            <Input type="email" autoComplete="off" inputMode="email" {...form.register("email")} />
+          </FormField>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              {common.actions.cancel}
+            </Button>
+            <Button type="submit" disabled={form.formState.isSubmitting || !form.formState.isDirty}>
+              {form.formState.isSubmitting ? common.actions.loading : common.actions.save}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

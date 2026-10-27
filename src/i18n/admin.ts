@@ -94,6 +94,16 @@ export const admin = {
       name: "Emri dhe mbiemri",
       success: "Emri u ruajt.",
     },
+    email: {
+      open: "Ndrysho emailin",
+      title: "Ndrysho emailin",
+      description: (name: string) => `Emaili i ${name} do të ndryshohet. Llogarive aktive u dërgohet një lidhje e re për vendosjen e fjalëkalimit.`,
+      label: "Emaili i ri",
+      success: "Emaili u ndryshua dhe lidhja e re u dërgua.",
+      mailFailed: "Emaili u ndryshua, por lidhja nuk u dërgua. Përdorni veprimin për ridërgim.",
+      inactive: "Emaili u ndryshua. Riaktivizoni llogarinë për të dërguar lidhjen e fjalëkalimit.",
+      unchanged: "Emaili nuk ndryshoi.",
+    },
     resend: {
       action: "Dërgo përsëri emailin e fjalëkalimit",
       success: "Emaili për fjalëkalimin u dërgua përsëri.",
@@ -112,6 +122,13 @@ export const admin = {
       description: (name: string) => `${name} do të mund të hyjë përsëri me fjalëkalimin e vet.`,
       confirm: "Riaktivizo",
       success: "Llogaria u riaktivizua.",
+    },
+    delete: {
+      action: "Fshi",
+      title: "Të fshihet llogaria e studentit?",
+      description: (name: string) => `${name} dhe llogaria e tij/saj do të fshihen përgjithmonë. Regjistrimet në mësime, kurset dhe sesionet e hyrjes të këtij studenti do të hiqen. Ky veprim nuk mund të zhbëhet.`,
+      confirm: "Fshi llogarinë",
+      success: "Llogaria e studentit u fshi.",
     },
     validation: {
       name: "Shkruani emrin (2–100 karaktere).",

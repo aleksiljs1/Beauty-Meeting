@@ -42,9 +42,10 @@ export const studentCoursesSchema = z.object({ courseIds, addToUpcoming: z.boole
 export const updateStudentSchema = z
   .object({
     name: z.string().trim().min(2).max(100).optional(),
+    email: z.email("Email i pavlefshëm.").max(200).transform((value) => value.trim().toLowerCase()).optional(),
     active: z.boolean().optional(),
   })
-  .refine((v) => v.name !== undefined || v.active !== undefined, "Asgjë për të ndryshuar.");
+  .refine((v) => v.name !== undefined || v.email !== undefined || v.active !== undefined, "Asgjë për të ndryshuar.");
 
 const lessonFields = {
   title: z.string().trim().min(2, "Shkruani titullin.").max(200),

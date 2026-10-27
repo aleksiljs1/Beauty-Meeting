@@ -46,8 +46,8 @@ export function ConfirmAction({
   async function confirm() {
     setBusy(true);
     try {
-      await onConfirm();
-      setOpen(false);
+      const shouldClose = await onConfirm();
+      if (shouldClose !== false) setOpen(false);
     } finally {
       setBusy(false);
     }

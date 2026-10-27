@@ -1,6 +1,7 @@
 import "server-only";
 import { auth } from "@/server/auth/auth";
 import type { AppUser } from "@/server/auth/session";
+import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/server/db";
 import { ApiError } from "@/server/http";
 import { publishFeedChanged } from "@/server/realtime/publish";
@@ -19,6 +20,65 @@ export async function renameStudent(userId: string, name: string, admin: AppUser
   await findStudent(userId);
   await prisma.user.update({ where: { id: userId }, data: { name: name.trim() } });
   await audit(admin.id, "account.rename", "user", userId);
+}
+
+/** Corrects a student's email, invalidates old credentials/setup links, and sends a fresh setup link. */
+export async function updateStudentEmail(userId: string, email: string, admin: AppUser) {
+  const student = await findStudent(userId);
+  const normalizedEmail = email.trim().toLowerCase();
+  if (student.email.toLowerCase() === normalizedEmail) return { emailChanged: false, mailSent: false };
+
+  const existing = await prisma.user.findUnique({ where: { email: normalizedEmail }, select: { id: true } });
+  if (existing && existing.id !== userId) throw new ApiError("CONFLICT", "Ekziston tashmë një llogari me këtë email.");
+
+  try {
+    await prisma.$transaction([
+      prisma.user.update({ where: { id: userId }, data: { email: normalizedEmail, emailVerified: false, updatedAt: new Date() } }),
+      prisma.session.deleteMany({ where: { userId } }),
+      prisma.verification.deleteMany({ where: { value: userId } }),
+    ]);
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new ApiError("CONFLICT", "Ekziston tashmë një llogari me këtë email.");
+    }
+    throw error;
+  }
+
+  await audit(admin.id, "account.email_change", "user", userId, { emailChanged: true });
+  await publishFeedChanged([userId]);
+
+  let mailSent = false;
+  if (!student.banned) {
+    try {
+      await sendAccountSetupEmail({ ...student, email: normalizedEmail });
+      await audit(admin.id, "account.setup_email", "user", userId);
+      mailSent = true;
+    } catch (error) {
+      console.error("[mail] setup email failed after email change", userId, error);
+    }
+  }
+  return { emailChanged: true, mailSent };
+}
+
+/** Permanently removes a student and their dependent access records. */
+export async function deleteStudent(userId: string, admin: AppUser) {
+  if (userId === admin.id) throw new ApiError("FORBIDDEN", "Nuk mund të fshini llogarinë tuaj.");
+  const student = await findStudent(userId);
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.user.delete({ where: { id: userId } });
+      await tx.auditLog.create({
+        data: { actorId: admin.id, action: "account.delete", targetType: "user", targetId: userId, details: { deleted: true } },
+      });
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+      throw new ApiError("CONFLICT", "Llogaria nuk mund të fshihet derisa të zgjidhen të dhënat që varen prej saj.");
+    }
+    throw error;
+  }
+  await publishFeedChanged([userId]);
+  return { id: student.id, deleted: true };
 }
 
 /**
