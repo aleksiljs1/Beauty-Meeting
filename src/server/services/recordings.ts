@@ -4,6 +4,7 @@ import { requireLessonCapability } from "@/server/access/lesson-access";
 import type { AppUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
 import { ApiError } from "@/server/http";
+import { publishLessonChanged } from "@/server/realtime/publish";
 import { bytesMatch, MAX_UPLOAD_BYTES, ruleForDeclaredFile, sanitizeDisplayName, SNIFF_BYTES } from "@/server/storage/file-types";
 import {
   abortMultipart,
@@ -128,6 +129,7 @@ export async function deleteRecording(admin: AppUser, recordingId: string) {
     await deleteObject(recording.objectKey).catch((error) => console.error("[storage] orphan recording object", recording.objectKey, error));
   }
   await audit(admin.id, "recording.delete", "lesson", recording.lessonId, { recordingId });
+  await publishLessonChanged(recording.lessonId);
 }
 
 /** Students see READY recordings only; admins also see processing/failed ones with their state. */

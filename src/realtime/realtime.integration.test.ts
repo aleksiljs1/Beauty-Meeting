@@ -6,6 +6,7 @@ import { createRealtimeServer, REALTIME_PATH, type TokenClaims } from "./server"
 
 const { publishFeedChanged } = await import("@/server/realtime/publish");
 const { markLessonLive } = await import("@/server/services/live");
+const { deleteMaterial } = await import("@/server/services/materials");
 const { prisma } = await import("@/server/db");
 
 const PORT = 3199;
@@ -88,6 +89,27 @@ describe("realtime service", () => {
     const got = nextEvent(socket, "feed:changed");
     await markLessonLive(lesson.id, "demo", admin.id);
     expect(await got).toBe(true);
+  });
+
+  it("signals enrolled students when a lesson's materials change, so open pages update", async () => {
+    const admin = await createUser("admin");
+    const [student, stranger] = [await createUser("student"), await createUser("student")];
+    const lesson = await createLesson(admin.id);
+    await prisma.lessonEnrollment.create({ data: { lessonId: lesson.id, userId: student.id, source: "ADMIN" } });
+    const material = await prisma.lessonMaterial.create({
+      data: { lessonId: lesson.id, objectKey: `test/${lesson.id}/notes.pdf`, displayName: "notes.pdf", mimeType: "application/pdf", sizeBytes: BigInt(10), status: "READY", uploadedById: admin.id },
+    });
+
+    tokens.set("student", { userId: student.id, exp: future() });
+    tokens.set("stranger", { userId: stranger.id, exp: future() });
+    const [enrolledSocket, strangerSocket] = [connect("student"), connect("stranger")];
+    await Promise.all([connected(enrolledSocket), connected(strangerSocket)]);
+
+    const got = nextEvent(enrolledSocket, "feed:changed");
+    const strangerGot = nextEvent(strangerSocket, "feed:changed", 600);
+    await deleteMaterial(admin, material.id);
+    expect(await got).toBe(true);
+    expect(await strangerGot).toBe(false);
   });
 
   it("disconnects a socket that tries to re-authenticate as someone else", async () => {

@@ -2,6 +2,7 @@ import "server-only";
 import type { AppUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
 import { ApiError } from "@/server/http";
+import { publishLessonChanged } from "@/server/realtime/publish";
 import { sanitizeDisplayName } from "@/server/storage/file-types";
 import { audit } from "./audit";
 
@@ -12,6 +13,7 @@ export async function renameMaterial(materialId: string, displayName: string, ad
   if (!material) throw new ApiError("NOT_FOUND", "Materiali nuk u gjet.");
   await prisma.lessonMaterial.update({ where: { id: materialId }, data: { displayName: sanitizeDisplayName(displayName) } });
   await audit(admin.id, "material.rename", "lesson", material.lessonId, { materialId });
+  await publishLessonChanged(material.lessonId);
 }
 
 /** Swaps a material with its neighbour. Positions are renumbered 0..n-1 so gaps/duplicates heal. */
@@ -35,4 +37,5 @@ export async function moveMaterial(materialId: string, direction: "up" | "down",
     }
   });
   await audit(admin.id, "material.reorder", "lesson", material.lessonId, { materialId, direction });
+  await publishLessonChanged(material.lessonId);
 }

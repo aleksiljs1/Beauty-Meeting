@@ -81,6 +81,10 @@ Original brief: `c:\Users\aleksiljs\Downloads\Beauty_Academy_Zoom_Claude_Megapro
 
   Events carry no data ("feed:changed"); clients refetch the policy-checked API. Resync on (re)connect + slow safety poll.
 
+  Open student lesson pages also re-render on any signal (user request, 2026-10-27): uploading, renaming,
+
+  reordering or deleting materials/recordings signals the enrolled students, so new files appear without a reload.
+
   Hosting must support long-lived connections (VPS fine; plain serverless not).
 
 - Local S3: **SeaweedFS** (MinIO community images discontinued). Code uses plain S3 API → R2/S3 in production.

@@ -4,6 +4,7 @@ import { requireLessonCapability } from "@/server/access/lesson-access";
 import type { AppUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
 import { ApiError } from "@/server/http";
+import { publishLessonChanged } from "@/server/realtime/publish";
 import { bytesMatch, checkDeclaredFile, formatLimit, isInlineSafe, sanitizeDisplayName, SNIFF_BYTES } from "@/server/storage/file-types";
 import {
   abortMultipart,
@@ -124,6 +125,7 @@ export async function finishMaterialUpload(admin: AppUser, materialId: string, p
   }
   await prisma.lessonMaterial.update({ where: { id: materialId }, data: { status: "READY" } });
   await audit(admin.id, "material.upload", "lesson", material.lessonId, { materialId });
+  await publishLessonChanged(material.lessonId); // open lesson pages show it without a reload
   return { status: "READY" as const };
 }
 
@@ -135,6 +137,7 @@ export async function deleteMaterial(admin: AppUser, materialId: string) {
   await prisma.lessonMaterial.delete({ where: { id: materialId } });
   await deleteObject(material.objectKey).catch((error) => console.error("[storage] orphan material object", material.objectKey, error));
   await audit(admin.id, "material.delete", "lesson", material.lessonId, { materialId });
+  await publishLessonChanged(material.lessonId);
 }
 
 /** Students (and admins): READY materials of a lesson they can currently access. */
