@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { CheckList } from "@/components/admin/check-list";
 import { FormField } from "@/components/admin/form-field";
+import { ImportStudentsPanel } from "@/components/admin/students/import-students-panel";
 import { useApiAction } from "@/components/admin/use-api-action";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -28,6 +29,7 @@ type Values = z.infer<typeof schema>;
 
 export function CreateStudentDialog({ defaultOpen = false, courses }: { defaultOpen?: boolean; courses: { id: string; title: string }[] }) {
   const [open, setOpen] = useState(defaultOpen);
+  const [mode, setMode] = useState<"single" | "import">("single");
   const [courseIds, setCourseIds] = useState<Set<string>>(new Set());
   const [addToUpcoming, setAddToUpcoming] = useState(true);
   const router = useRouter();
@@ -38,6 +40,7 @@ export function CreateStudentDialog({ defaultOpen = false, courses }: { defaultO
 
   function changeOpen(next: boolean) {
     setOpen(next);
+    if (!next) setMode("single");
     if (!next && searchParams.has("krijo")) {
       const params = new URLSearchParams(searchParams);
       params.delete("krijo");
@@ -65,11 +68,29 @@ export function CreateStudentDialog({ defaultOpen = false, courses }: { defaultO
           <Plus aria-hidden /> {t.create.open}
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className={mode === "import" ? "sm:max-w-2xl" : "sm:max-w-md"}>
         <DialogHeader>
           <DialogTitle>{t.create.title}</DialogTitle>
           <DialogDescription>{t.create.description}</DialogDescription>
         </DialogHeader>
+        <div className="flex gap-2">
+          <Button type="button" size="sm" variant={mode === "single" ? "default" : "outline"} onClick={() => setMode("single")}>
+            Shto një student
+          </Button>
+          <Button type="button" size="sm" variant={mode === "import" ? "default" : "outline"} onClick={() => setMode("import")}>
+            Importo nga Excel
+          </Button>
+        </div>
+        {mode === "import" ? (
+          <ImportStudentsPanel
+            courses={courses}
+            onCancel={() => setMode("single")}
+            onImported={() => {
+              changeOpen(false);
+              router.refresh();
+            }}
+          />
+        ) : (
         <form onSubmit={submit} className="space-y-4" noValidate>
           <FormField label={t.create.name} error={form.formState.errors.name?.message}>
             <Input autoComplete="off" {...form.register("name")} />
@@ -105,6 +126,7 @@ export function CreateStudentDialog({ defaultOpen = false, courses }: { defaultO
             </Button>
           </DialogFooter>
         </form>
+        )}
       </DialogContent>
     </Dialog>
   );
