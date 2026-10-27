@@ -73,22 +73,19 @@ export function evaluateLessonAccess(
   return { status: "granted", deadline };
 }
 
-/** How long past its scheduled end a LIVE lesson is still trusted as live without Zoom confirming the end (overruns). */
-export const LIVE_OVERRUN_MS = 2 * 60 * 60_000;
+/** How long after its scheduled end a lesson keeps its reported state (overruns, a late start). */
+export const END_GRACE_MS = 2 * 60 * 60_000;
 
 /**
  * The meeting state to act on. The stored status comes from provider events (Zoom webhooks,
- * the host's sync, the demo controls, the admin ending the class); when an event never
- * arrives, the schedule decides:
- *  - a lesson that never went live is over once its scheduled end has passed;
- *  - a LIVE lesson whose end was never reported is over `LIVE_OVERRUN_MS` after that.
- * Time never makes a lesson LIVE: only a real start does.
+ * the host's sync, the demo controls, the admin ending the class). Events can be lost, so
+ * `END_GRACE_MS` after the scheduled end the schedule decides: the lesson is over, whether it
+ * was shown as live or still waiting. Until then a class that overruns, or whose "started"
+ * event was lost, stays joinable. Time never makes a lesson LIVE: only a real start does.
  */
 export function effectiveMeetingStatus(lesson: Pick<AccessLesson, "meetingStatus" | "scheduledEndAt">, now: Date): MeetingStatus {
-  const end = lesson.scheduledEndAt.getTime();
-  if (lesson.meetingStatus === "LIVE") return now.getTime() >= end + LIVE_OVERRUN_MS ? "ENDED" : "LIVE";
-  if (lesson.meetingStatus === "ENDED") return "ENDED";
-  return now.getTime() >= end ? "ENDED" : lesson.meetingStatus;
+  if (now.getTime() >= lesson.scheduledEndAt.getTime() + END_GRACE_MS) return "ENDED";
+  return lesson.meetingStatus;
 }
 
 const NOT_AVAILABLE: CapabilityResult = {

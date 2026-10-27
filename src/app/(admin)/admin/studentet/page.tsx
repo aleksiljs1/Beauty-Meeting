@@ -85,7 +85,7 @@ export default async function StudentsPage({ searchParams }: PageProps<"/admin/s
         <EmptyState>{q || courseId ? t.emptySearch : t.empty}</EmptyState>
       ) : (
         <div className="rounded-md border bg-card">
-          <div className="hidden grid-cols-[2fr_2fr_1fr_6rem_3rem] gap-4 border-b px-4 py-2 text-xs font-medium text-muted-foreground md:grid">
+          <div className="hidden grid-cols-[2fr_2fr_1.5fr_1fr_6rem_3rem] gap-4 border-b px-4 py-2 text-xs font-medium text-muted-foreground md:grid">
             <span>{t.columns.name}</span>
             <span>{t.columns.email}</span>
             <span>{t.columns.courses}</span>

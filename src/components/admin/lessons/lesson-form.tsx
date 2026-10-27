@@ -263,7 +263,8 @@ export function LessonForm({
       )}
 
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={isSubmitting || (isEdit && !form.formState.isDirty)}>
+        {/* While the course's students load, wait: creating now would add nobody. */}
+        <Button type="submit" disabled={isSubmitting || (isEdit && !form.formState.isDirty) || courseStudents.status === "loading"}>
           {isSubmitting ? common.actions.loading : isEdit ? t.save : t.create}
         </Button>
         {isEdit && form.formState.isDirty && (

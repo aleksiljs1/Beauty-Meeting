@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import type { PublicationStatus } from "@/generated/prisma/enums";
+import { effectiveMeetingStatus } from "@/server/access/policy";
 import { validateLessonSchedule, type LessonSchedule, type ScheduleIssue } from "@/lib/admin/lesson-rules";
 import type { AppUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
@@ -57,7 +58,7 @@ export async function createLesson(input: LessonInput, confirmEarlyDeadline: boo
   throwScheduleIssues(validateLessonSchedule(input, confirmEarlyDeadline));
   await assertCourse(input.courseId);
   assertDemoAllowed(input.isDemo);
-  await assertActiveStudents([...new Set(studentIds)]); // before creating, so a bad list never leaves a half-made lesson
+  await assertActiveStudents([...new Set(studentIds)]); // checked first, so a bad list is refused before anything is created
 
   const lesson = await prisma.lesson.create({
     data: {
@@ -97,7 +98,7 @@ export async function updateLesson(lessonId: string, patch: LessonPatch, confirm
 
   let meetingStatus = current.meetingStatus;
   if (patch.isDemo !== undefined && patch.isDemo !== current.isDemo) {
-    if (current.meetingStatus === "LIVE") throw new ApiError("CONFLICT", "Nuk mund të ndryshoni llojin e klasës ndërsa mësimi është live.");
+    if (effectiveMeetingStatus(current, new Date()) === "LIVE") throw new ApiError("CONFLICT", "Nuk mund të ndryshoni llojin e klasës ndërsa mësimi është live.");
     if (patch.isDemo && current.zoomMeetingNumber) throw new ApiError("CONFLICT", "Ky mësim ka një takim Zoom. Anulojeni mësimin për ta fshirë takimin.");
     assertDemoAllowed(patch.isDemo);
     if (patch.isDemo && current.meetingStatus === "NOT_PROVISIONED") meetingStatus = "SCHEDULED";
@@ -155,11 +156,14 @@ const TRANSITIONS: Record<PublicationStatus, PublicationStatus[]> = {
 };
 
 export async function setLessonPublication(lessonId: string, publication: PublicationStatus, admin: AppUser) {
-  const lesson = await prisma.lesson.findUnique({ where: { id: lessonId }, select: { publication: true, meetingStatus: true, zoomMeetingNumber: true } });
+  const lesson = await prisma.lesson.findUnique({
+    where: { id: lessonId },
+    select: { publication: true, meetingStatus: true, scheduledEndAt: true, zoomMeetingNumber: true },
+  });
   if (!lesson) throw new ApiError("NOT_FOUND", "Mësimi nuk u gjet.");
   if (lesson.publication === publication) return { zoomDeleted: true };
   if (!TRANSITIONS[lesson.publication].includes(publication)) throw new ApiError("CONFLICT", "Ky ndryshim statusi nuk lejohet.");
-  if (lesson.meetingStatus === "LIVE" && publication !== "PUBLISHED") {
+  if (effectiveMeetingStatus(lesson, new Date()) === "LIVE" && publication !== "PUBLISHED") {
     throw new ApiError("CONFLICT", "Përfundoni fillimisht mësimin live.");
   }
 

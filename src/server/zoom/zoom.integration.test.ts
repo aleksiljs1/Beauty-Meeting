@@ -63,7 +63,7 @@ const { prisma } = await import("@/server/db");
 const { createZoomMeetingForLesson } = await import("./meetings");
 const { createZoomHostAppStart, createZoomHostAuthorization } = await import("./host");
 const { authorizeLessonJoin, authorizeZoomAppJoin } = await import("./join");
-const { handleZoomWebhook } = await import("./webhooks");
+const { handleZoomWebhook, resetStartChecks } = await import("./webhooks");
 const { setLessonPublication, updateLesson } = await import("@/server/services/lessons");
 const { resetZoomTokenCache } = await import("./client");
 
@@ -80,6 +80,7 @@ beforeEach(async () => {
   zoomState.calls = [];
   zoomState.startUrls = 0;
   resetZoomTokenCache();
+  resetStartChecks();
   admin = await createUser("admin");
   student = await createUser("student");
   // Starts in 10 minutes: inside the host's 30-minute window and the students' join window.
@@ -181,8 +182,17 @@ describe("a lost 'meeting started' event", () => {
     await expect(authorizeLessonJoin(student, lessonId)).resolves.toMatchObject({ mode: "student" });
     expect((await lessonState()).meetingStatus).toBe("SCHEDULED");
 
+    resetStartChecks();
     zoomState.meetings.delete(meetingNumber); // Zoom answers 404
     await expect(authorizeLessonJoin(student, lessonId)).resolves.toMatchObject({ mode: "student" });
+  });
+
+  it("asks Zoom at most once per lesson while a whole class clicks Join", async () => {
+    await createZoomMeetingForLesson(lessonId, admin);
+    zoomState.calls = [];
+    await Promise.all([1, 2, 3, 4, 5].map(() => authorizeLessonJoin(student, lessonId)));
+    await authorizeLessonJoin(student, lessonId); // a retry right after
+    expect(zoomState.calls.filter((c) => c.startsWith("GET /v2/meetings/"))).toHaveLength(1);
   });
 
   it("doesn't ask Zoom again once the lesson is live", async () => {

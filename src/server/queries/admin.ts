@@ -2,6 +2,7 @@ import "server-only";
 import { HeadBucketCommand } from "@aws-sdk/client-s3";
 import type { Prisma } from "@/generated/prisma/client";
 import type { PublicationStatus } from "@/generated/prisma/enums";
+import { END_GRACE_MS, effectiveMeetingStatus } from "@/server/access/policy";
 import { prisma } from "@/server/db";
 import { env, ZOOM_LIVE_VARIABLES } from "@/server/env";
 import { ApiError } from "@/server/http";
@@ -57,7 +58,13 @@ export async function getAdminDashboard(now = new Date()) {
   const stale = new Date(now.getTime() - HOUR);
   const [activeStudents, live, upcoming, upcomingCount, failedRecordings, stalledRecordings, failedMaterials, stalledMaterials] = await Promise.all([
     prisma.user.count({ where: activeStudentWhere }),
-    prisma.lesson.findMany({ where: { meetingStatus: "LIVE" }, orderBy: { liveStartedAt: "desc" }, select: dashboardLessonSelect, take: 10 }),
+    prisma.lesson.findMany({
+      // Same rule as effectiveMeetingStatus: a LIVE lesson is over END_GRACE_MS after its scheduled end.
+      where: { meetingStatus: "LIVE", scheduledEndAt: { gt: new Date(now.getTime() - END_GRACE_MS) } },
+      orderBy: { liveStartedAt: "desc" },
+      select: dashboardLessonSelect,
+      take: 10,
+    }),
     prisma.lesson.findMany({
       where: { scheduledStartAt: { gt: now }, publication: { in: ["PUBLISHED", "DRAFT"] }, meetingStatus: { not: "LIVE" } },
       orderBy: { scheduledStartAt: "asc" },
@@ -210,13 +217,20 @@ export async function listLessons(filter: LessonListFilter, now = new Date()) {
     prisma.lesson.count({ where }),
   ]);
   return paged(
-    rows.map(({ _count, course, ...lesson }) => ({ ...lesson, courseTitle: course?.title ?? null, students: _count.enrollments, materials: _count.materials })),
+    rows.map(({ _count, course, ...lesson }) => ({
+      ...lesson,
+      meetingStatus: effectiveMeetingStatus(lesson, now),
+      courseTitle: course?.title ?? null,
+      students: _count.enrollments,
+      materials: _count.materials,
+    })),
     total,
     page,
   );
 }
 
-export async function getAdminLesson(lessonId: string) {
+/** `meetingStatus` is the effective one (see effectiveMeetingStatus), the same state students see. */
+export async function getAdminLesson(lessonId: string, now = new Date()) {
   const lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
     select: {
@@ -243,7 +257,7 @@ export async function getAdminLesson(lessonId: string) {
   });
   if (!lesson) return null;
   const { _count, course, ...rest } = lesson;
-  return { ...rest, courseTitle: course?.title ?? null, enrollmentCount: _count.enrollments };
+  return { ...rest, meetingStatus: effectiveMeetingStatus(lesson, now), courseTitle: course?.title ?? null, enrollmentCount: _count.enrollments };
 }
 
 export async function requireAdminLesson(lessonId: string) {

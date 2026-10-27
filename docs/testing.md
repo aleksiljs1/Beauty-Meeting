@@ -94,8 +94,8 @@ The seed printed a link for the upcoming lesson (or create one in the admin port
       ende klasën", retry works once the teacher starts.
 - [ ] Start the class from the Zoom app with the webhook off → the first student who clicks Bashkohu makes
       the lesson LIVE and the others get the pop-up.
-- [ ] A lesson whose scheduled end has passed and that never went live shows as ended (or replay once a
-      recording is uploaded), not "waiting".
+- [ ] A lesson that never went live shows as ended (or replay once a recording is uploaded) 2 hours after
+      its scheduled end, not "waiting".
 - [ ] Lesson shown as LIVE after class → Admin → Detaje → "Shëno si të përfunduar" → students' Join and
       pop-up disappear.
 

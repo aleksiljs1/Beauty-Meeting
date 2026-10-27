@@ -135,16 +135,11 @@ async function applyEvent(
 
 type ZoomMeetingStatus = Awaited<ReturnType<typeof fetchZoomMeetingStatus>>;
 
-/**
- * Asks Zoom for the meeting's current status and applies it, recovering from a missed webhook
- * (e.g. the server was down when the class started). Throws Zoom's error to the caller.
- */
-async function refreshMeetingFromZoom(lessonId: string, meetingNumber: string, stored: MeetingStatus): Promise<ZoomMeetingStatus> {
-  const zoomStatus = await fetchZoomMeetingStatus(meetingNumber);
+/** Applies the status Zoom reported, recovering from a missed webhook (e.g. the server was down). */
+async function applyZoomStatus(lessonId: string, zoomStatus: ZoomMeetingStatus, stored: MeetingStatus) {
   const now = new Date();
   if (zoomStatus === "started" && stored !== "LIVE") await applyMeetingStarted(lessonId, now);
   if (zoomStatus === "waiting" && stored === "LIVE") await applyMeetingEnded(lessonId, now);
-  return zoomStatus;
 }
 
 /** Admin "sync" action. */
@@ -155,15 +150,20 @@ export async function syncLessonFromZoom(lessonId: string, admin: AppUser) {
 
   let zoomStatus: ZoomMeetingStatus;
   try {
-    zoomStatus = await refreshMeetingFromZoom(lessonId, lesson.zoomMeetingNumber, lesson.meetingStatus);
+    zoomStatus = await fetchZoomMeetingStatus(lesson.zoomMeetingNumber);
   } catch (error) {
     toApiError(error, "Statusi nuk u lexua dot nga Zoom.");
   }
+  await applyZoomStatus(lessonId, zoomStatus, lesson.meetingStatus);
   await audit(admin.id, "lesson.zoom_sync", "lesson", lessonId, { zoomStatus });
 
   const updated = await prisma.lesson.findUniqueOrThrow({ where: { id: lessonId }, select: { meetingStatus: true } });
   return { zoomStatus, meetingStatus: updated.meetingStatus };
 }
+
+const START_CHECK_INTERVAL_MS = 20_000;
+/** Per server instance; a missed check only means the next one comes a little later. */
+const lastStartCheck = new Map<string, number>();
 
 /**
  * A student asks to join before the site knows the class started: check with Zoom, so a lost
@@ -172,9 +172,19 @@ export async function syncLessonFromZoom(lessonId: string, admin: AppUser) {
  */
 export async function catchUpMeetingStart(lessonId: string, meetingNumber: string, stored: MeetingStatus) {
   if (!zoomLive || stored === "LIVE") return;
+  // A whole class clicks Join (and retries) at once: ask Zoom at most once per lesson per interval.
+  const now = Date.now();
+  if (now - (lastStartCheck.get(lessonId) ?? 0) < START_CHECK_INTERVAL_MS) return;
+  lastStartCheck.set(lessonId, now);
+
   try {
-    await refreshMeetingFromZoom(lessonId, meetingNumber, stored);
+    await applyZoomStatus(lessonId, await fetchZoomMeetingStatus(meetingNumber), stored);
   } catch (error) {
     console.warn("[zoom] status check before join failed", lessonId, (error as Error).message);
   }
+}
+
+/** For tests: forget recent checks. */
+export function resetStartChecks() {
+  lastStartCheck.clear();
 }

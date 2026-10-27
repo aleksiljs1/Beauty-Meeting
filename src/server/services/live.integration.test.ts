@@ -3,9 +3,10 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createLesson, createUser, resetDatabase } from "@/test/fixtures";
 
 const { dismissNotification, getLiveFeed, markLessonEnded, markLessonLive, markNotificationsRead } = await import("./live");
-const { endLiveLesson } = await import("./lessons");
+const { endLiveLesson, setLessonPublication } = await import("./lessons");
+const { getAdminDashboard, getAdminLesson } = await import("@/server/queries/admin");
 const { getClassroom } = await import("@/server/queries/portal");
-const { LIVE_OVERRUN_MS } = await import("@/server/access/policy");
+const { END_GRACE_MS } = await import("@/server/access/policy");
 const { prisma } = await import("@/server/db");
 
 const MIN = 60_000;
@@ -134,18 +135,34 @@ describe("live lesson alerts", () => {
 
     // Overrunning a little: still live. Long after the scheduled end: over, no Join, no pop-up.
     const overrun = new Date(lesson.scheduledEndAt.getTime() + 30 * MIN);
-    const stale = new Date(lesson.scheduledEndAt.getTime() + LIVE_OVERRUN_MS);
+    const stale = new Date(lesson.scheduledEndAt.getTime() + END_GRACE_MS);
     expect((await getLiveFeed(student, overrun)).notifications[0]).toMatchObject({ active: true, canJoin: true });
     expect((await getLiveFeed(student, stale)).notifications[0]).toMatchObject({ active: false, canJoin: false });
     expect(await getClassroom(student, lesson.id, stale)).toMatchObject({ stage: "ENDED", canJoin: false, lesson: { phase: "ENDED" } });
   });
 
-  it("moves a lesson that never went live to 'ended' after its scheduled end", async () => {
+  it("moves a lesson that never went live to 'ended' once the grace after its end passes", async () => {
     const lesson = await demoLessonStartingNow();
     const student = await createUser("student");
     await enroll(lesson.id, student.id);
-    expect(await getClassroom(student, lesson.id)).toMatchObject({ stage: "WAITING", canJoin: true });
-    expect(await getClassroom(student, lesson.id, lesson.scheduledEndAt)).toMatchObject({ stage: "ENDED", lesson: { phase: "ENDED" } });
+    // A class whose start was never reported stays joinable while it may still be running…
+    expect(await getClassroom(student, lesson.id, new Date(lesson.scheduledEndAt.getTime() + 30 * MIN))).toMatchObject({ stage: "WAITING", canJoin: true });
+    // …and is over after that.
+    const late = new Date(lesson.scheduledEndAt.getTime() + END_GRACE_MS);
+    expect(await getClassroom(student, lesson.id, late)).toMatchObject({ stage: "ENDED", canJoin: false, lesson: { phase: "ENDED" } });
+  });
+
+  it("shows the admin the same state, so nothing stays locked after a lost 'ended' event", async () => {
+    const start = new Date(Date.now() - 6 * 60 * MIN);
+    const lesson = await createLesson(admin.id, {
+      scheduledStartAt: start,
+      scheduledEndAt: new Date(start.getTime() + 3 * 60 * MIN), // ended 3 h ago, beyond the grace period
+      joinOpensAt: new Date(start.getTime() - 15 * MIN),
+      meetingStatus: "LIVE",
+    });
+    expect((await getAdminLesson(lesson.id))?.meetingStatus).toBe("ENDED");
+    expect((await getAdminDashboard()).live).toHaveLength(0);
+    await expect(setLessonPublication(lesson.id, "ARCHIVED", admin)).resolves.toBeDefined();
   });
 
   it("lets the admin end a class the site still shows as live", async () => {

@@ -147,11 +147,11 @@ Original brief: `c:\Users\aleksiljs\Downloads\Beauty_Academy_Zoom_Claude_Megapro
 
 Live state comes from Zoom events; if one is lost, the lesson used to stay "waiting for the teacher"
 or "live" for up to 30 days. Now:
-- **One rule, one place:** `effectiveMeetingStatus` in `src/server/access/policy.ts`. A lesson that never
-  went live is over once its scheduled end passes; a LIVE lesson whose end was never reported is over
-  `LIVE_OVERRUN_MS` (2 h) after the scheduled end. Time never makes a lesson LIVE. Every reader (join
-  permission, lesson phase, classroom stage, live pop-up) uses it, so a recording uploaded later shows as
-  a replay.
+- **One rule, one place:** `effectiveMeetingStatus` in `src/server/access/policy.ts`. `END_GRACE_MS` (2 h)
+  after the scheduled end a lesson is over, whatever Zoom last reported (live or never started); until
+  then an overrunning class stays joinable. Time never makes a lesson LIVE. Every reader uses it: join
+  permission, lesson phase, classroom stage, live pop-up and the admin pages (dashboard, lesson status,
+  publication and demo guards), so a recording uploaded later shows as a replay and nothing stays locked.
 - **Admin → lesson → "Shëno si të përfunduar"** (`DELETE /api/v1/admin/lessons/:id/live`) ends a class the
   site still shows as live; alerts close at once. It doesn't close a meeting still open in Zoom.
 - **Students can join while "waiting for the teacher"** (the join window is open). Before handing out the
