@@ -9,6 +9,8 @@
  *  - All comparisons use server time passed in as `now` (injectable for tests).
  *  - A deadline is exclusive: `now >= deadline` means expired.
  *  - Effective deadline = the earlier of the lesson deadline and the student's own deadline.
+ *  - Meeting state comes from provider events, but never outlives the schedule: see
+ *    `effectiveMeetingStatus`. Decisions use that, never the stored `meetingStatus` directly.
  */
 import type { MeetingStatus, PublicationStatus } from "@/generated/prisma/enums";
 import type { ApiErrorCode } from "@/lib/api/types";
@@ -19,6 +21,7 @@ export type AccessLesson = {
   publication: PublicationStatus;
   meetingStatus: MeetingStatus;
   joinOpensAt: Date;
+  scheduledEndAt: Date;
   accessExpiresAt: Date;
 };
 
@@ -70,6 +73,24 @@ export function evaluateLessonAccess(
   return { status: "granted", deadline };
 }
 
+/** How long past its scheduled end a LIVE lesson is still trusted as live without Zoom confirming the end (overruns). */
+export const LIVE_OVERRUN_MS = 2 * 60 * 60_000;
+
+/**
+ * The meeting state to act on. The stored status comes from provider events (Zoom webhooks,
+ * the host's sync, the demo controls, the admin ending the class); when an event never
+ * arrives, the schedule decides:
+ *  - a lesson that never went live is over once its scheduled end has passed;
+ *  - a LIVE lesson whose end was never reported is over `LIVE_OVERRUN_MS` after that.
+ * Time never makes a lesson LIVE: only a real start does.
+ */
+export function effectiveMeetingStatus(lesson: Pick<AccessLesson, "meetingStatus" | "scheduledEndAt">, now: Date): MeetingStatus {
+  const end = lesson.scheduledEndAt.getTime();
+  if (lesson.meetingStatus === "LIVE") return now.getTime() >= end + LIVE_OVERRUN_MS ? "ENDED" : "LIVE";
+  if (lesson.meetingStatus === "ENDED") return "ENDED";
+  return now.getTime() >= end ? "ENDED" : lesson.meetingStatus;
+}
+
 const NOT_AVAILABLE: CapabilityResult = {
   allowed: false,
   code: "LESSON_NOT_AVAILABLE",
@@ -96,15 +117,16 @@ export function checkCapability(access: LessonAccess, capability: Capability, le
   if (capability === "VIEW_CONTENT") return { allowed: true };
 
   // JOIN_LIVE — admins host through a separate, admin-only path, but may also preview.
-  if (lesson.meetingStatus === "ENDED") {
+  const meeting = effectiveMeetingStatus(lesson, now);
+  if (meeting === "ENDED") {
     return { allowed: false, code: "LESSON_JOIN_NOT_OPEN", message: "Mësimi live ka përfunduar." };
   }
-  if (lesson.meetingStatus === "NOT_PROVISIONED" || lesson.meetingStatus === "ERROR") {
+  if (meeting === "NOT_PROVISIONED" || meeting === "ERROR") {
     return { allowed: false, code: "LESSON_JOIN_NOT_OPEN", message: "Klasa live nuk është gati ende." };
   }
   // The join window only applies before the host starts: once the class is LIVE (the teacher may
   // start early), enrolled students can join straight away. Access deadlines still apply above.
-  if (access.status === "granted" && lesson.meetingStatus !== "LIVE" && now.getTime() < lesson.joinOpensAt.getTime()) {
+  if (access.status === "granted" && meeting !== "LIVE" && now.getTime() < lesson.joinOpensAt.getTime()) {
     return { allowed: false, code: "LESSON_JOIN_NOT_OPEN", message: "Hyrja në mësim nuk është hapur ende." };
   }
   return { allowed: true };
@@ -132,8 +154,9 @@ export function lessonPhase(
 ): LessonPhase {
   if (lesson.publication === "CANCELLED") return "CANCELLED";
   if (access.status === "denied" && access.reason === "EXPIRED") return "EXPIRED";
-  if (lesson.meetingStatus === "LIVE") return "LIVE";
-  if (lesson.meetingStatus === "ENDED") return hasReadyRecording ? "REPLAY" : "ENDED";
+  const meeting = effectiveMeetingStatus(lesson, now);
+  if (meeting === "LIVE") return "LIVE";
+  if (meeting === "ENDED") return hasReadyRecording ? "REPLAY" : "ENDED";
   const msToStart = lesson.scheduledStartAt.getTime() - now.getTime();
   if (now.getTime() >= lesson.joinOpensAt.getTime() && msToStart <= 0) return "WAITING_FOR_HOST";
   if (msToStart <= startingSoonMs) return "STARTING_SOON";

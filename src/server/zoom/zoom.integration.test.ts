@@ -166,6 +166,34 @@ describe("joining", () => {
   });
 });
 
+describe("a lost 'meeting started' event", () => {
+  it("is caught up when a student joins: the lesson goes live and everyone is alerted", async () => {
+    const { meetingNumber } = await createZoomMeetingForLesson(lessonId, admin);
+    zoomState.meetings.get(meetingNumber)!.status = "started"; // the teacher started; the webhook never came
+
+    await expect(authorizeLessonJoin(student, lessonId)).resolves.toMatchObject({ mode: "student" });
+    expect((await lessonState()).meetingStatus).toBe("LIVE");
+    expect(await prisma.notification.count({ where: { lessonId, type: "LESSON_LIVE" } })).toBe(1);
+  });
+
+  it("still lets the student join when the teacher hasn't started or Zoom can't be reached", async () => {
+    const { meetingNumber } = await createZoomMeetingForLesson(lessonId, admin);
+    await expect(authorizeLessonJoin(student, lessonId)).resolves.toMatchObject({ mode: "student" });
+    expect((await lessonState()).meetingStatus).toBe("SCHEDULED");
+
+    zoomState.meetings.delete(meetingNumber); // Zoom answers 404
+    await expect(authorizeLessonJoin(student, lessonId)).resolves.toMatchObject({ mode: "student" });
+  });
+
+  it("doesn't ask Zoom again once the lesson is live", async () => {
+    await createZoomMeetingForLesson(lessonId, admin);
+    await prisma.lesson.update({ where: { id: lessonId }, data: { meetingStatus: "LIVE" } });
+    zoomState.calls = [];
+    await authorizeLessonJoin(student, lessonId);
+    expect(zoomState.calls.filter((c) => c.startsWith("GET /v2/meetings/"))).toHaveLength(0);
+  });
+});
+
 describe("Zoom app fallbacks", () => {
   const joinUrlState = () => prisma.lesson.findUniqueOrThrow({ where: { id: lessonId }, select: { zoomJoinUrlEncrypted: true } });
 

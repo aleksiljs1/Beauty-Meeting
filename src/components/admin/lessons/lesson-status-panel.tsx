@@ -121,6 +121,19 @@ export function LessonStatusPanel({
             onConfirm={() => setPublication("ARCHIVED")}
           />
         )}
+        {isLive && !lesson.isDemo && (
+          <ConfirmAction
+            trigger={
+              <Button variant="outline" disabled={pending}>
+                <Square aria-hidden /> {t.endLive}
+              </Button>
+            }
+            title={t.endLiveTitle}
+            description={t.endLiveBody}
+            confirmLabel={t.endLive}
+            onConfirm={() => run(() => apiSend("delete", `/admin/lessons/${lesson.id}/live`), { success: t.endLiveDone })}
+          />
+        )}
         {p === "DRAFT" && lesson.enrollmentCount === 0 && (
           <ConfirmAction
             trigger={

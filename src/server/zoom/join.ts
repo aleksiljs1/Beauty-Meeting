@@ -9,6 +9,7 @@ import { toApiError } from "./client";
 import type { ZoomJoinConfig } from "./host";
 import { createMeetingSdkParticipantSignature } from "./meeting-sdk-signature";
 import { fetchZoomMeetingLinks, openJoinUrl, openPasscode, sealJoinUrl } from "./meetings";
+import { catchUpMeetingStart } from "./webhooks";
 
 export type JoinResult = { mode: "demo" } | ZoomJoinConfig;
 
@@ -27,6 +28,7 @@ export async function authorizeLessonJoin(user: AppUser, lessonId: string): Prom
     select: { zoomMeetingNumber: true, zoomPasscodeEncrypted: true },
   });
   if (!meeting?.zoomMeetingNumber) throw new ApiError("INTEGRATION_NOT_CONFIGURED", "Ky mësim nuk ka ende një takim Zoom.");
+  await catchUpMeetingStart(lessonId, meeting.zoomMeetingNumber, lesson.meetingStatus);
 
   return {
     mode: "student",

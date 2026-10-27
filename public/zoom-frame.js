@@ -10,6 +10,8 @@
   };
 
   const VERSION = "6.5.0";
+  // Web SDK error when a participant joins before the host started (join before host is off).
+  const MEETING_NOT_STARTED = 3008;
   const message = document.getElementById("message");
   const errorElement = document.getElementById("error");
 
@@ -129,6 +131,11 @@
             },
 
             error: (failure) => {
+              if ((failure?.errorCode ?? failure?.result?.errorCode) === MEETING_NOT_STARTED) {
+                showError("Mësuesja nuk e ka nisur ende klasën. Provoni përsëri pas pak.");
+                joinStarted = false;
+                return;
+              }
               showError(`Zoom nuk mundi të të fusë në takim. Kontrolloni autorizimin dhe konfigurimin.${zoomReason(failure)}`);
               joinStarted = false;
             },

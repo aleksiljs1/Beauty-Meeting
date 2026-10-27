@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createLesson, createUser, resetDatabase } from "@/test/fixtures";
 
 const { dismissNotification, getLiveFeed, markLessonEnded, markLessonLive, markNotificationsRead } = await import("./live");
+const { endLiveLesson } = await import("./lessons");
+const { getClassroom } = await import("@/server/queries/portal");
+const { LIVE_OVERRUN_MS } = await import("@/server/access/policy");
 const { prisma } = await import("@/server/db");
 
 const MIN = 60_000;
@@ -121,6 +124,42 @@ describe("live lesson alerts", () => {
 
     expect((await getLiveFeed(student)).notifications[0]).toMatchObject({ active: false, canJoin: false });
     await expect(markLessonLive(lesson.id, "demo", admin.id)).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+  it("never leaves a lesson stuck when Zoom's 'ended' event is lost", async () => {
+    const lesson = await demoLessonStartingNow();
+    const student = await createUser("student");
+    await enroll(lesson.id, student.id);
+    await markLessonLive(lesson.id, "demo", admin.id);
+
+    // Overrunning a little: still live. Long after the scheduled end: over, no Join, no pop-up.
+    const overrun = new Date(lesson.scheduledEndAt.getTime() + 30 * MIN);
+    const stale = new Date(lesson.scheduledEndAt.getTime() + LIVE_OVERRUN_MS);
+    expect((await getLiveFeed(student, overrun)).notifications[0]).toMatchObject({ active: true, canJoin: true });
+    expect((await getLiveFeed(student, stale)).notifications[0]).toMatchObject({ active: false, canJoin: false });
+    expect(await getClassroom(student, lesson.id, stale)).toMatchObject({ stage: "ENDED", canJoin: false, lesson: { phase: "ENDED" } });
+  });
+
+  it("moves a lesson that never went live to 'ended' after its scheduled end", async () => {
+    const lesson = await demoLessonStartingNow();
+    const student = await createUser("student");
+    await enroll(lesson.id, student.id);
+    expect(await getClassroom(student, lesson.id)).toMatchObject({ stage: "WAITING", canJoin: true });
+    expect(await getClassroom(student, lesson.id, lesson.scheduledEndAt)).toMatchObject({ stage: "ENDED", lesson: { phase: "ENDED" } });
+  });
+
+  it("lets the admin end a class the site still shows as live", async () => {
+    const lesson = await createLesson(admin.id, { scheduledStartAt: new Date(Date.now() - MIN), joinOpensAt: new Date(Date.now() - 15 * MIN) });
+    const student = await createUser("student");
+    await enroll(lesson.id, student.id);
+    await prisma.lesson.update({ where: { id: lesson.id }, data: { meetingStatus: "LIVE" } });
+    await prisma.notification.create({ data: { userId: student.id, lessonId: lesson.id, type: "LESSON_LIVE", dedupeKey: "live-1" } });
+
+    await endLiveLesson(lesson.id, admin);
+    expect((await prisma.lesson.findUniqueOrThrow({ where: { id: lesson.id } })).meetingStatus).toBe("ENDED");
+    expect((await getLiveFeed(student)).notifications[0]).toMatchObject({ active: false, canJoin: false });
+    expect(await prisma.auditLog.count({ where: { action: "lesson.end_manual", targetId: lesson.id } })).toBe(1);
+    await expect(endLiveLesson(lesson.id, admin)).rejects.toMatchObject({ code: "CONFLICT" });
   });
 
   it("refuses the demo simulation on real (non-demo) lessons", async () => {

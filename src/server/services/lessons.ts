@@ -208,6 +208,17 @@ export async function deleteDraftLesson(lessonId: string, admin: AppUser) {
   await audit(admin.id, "lesson.delete", "lesson", lessonId, { title: lesson.title });
 }
 
+/**
+ * The admin ends a class the site still shows as live, e.g. when Zoom's "meeting ended" event
+ * never arrived. Only our state changes: a meeting still open in Zoom must be closed there.
+ */
+export async function endLiveLesson(lessonId: string, admin: AppUser) {
+  const lesson = await prisma.lesson.findUnique({ where: { id: lessonId }, select: { meetingStatus: true } });
+  if (!lesson) throw new ApiError("NOT_FOUND", "Mësimi nuk u gjet.");
+  if (lesson.meetingStatus !== "LIVE") throw new ApiError("CONFLICT", "Mësimi nuk është live.");
+  await markLessonEnded(lessonId, "admin", admin.id);
+}
+
 // --- Demo classroom (ZOOM_MODE=demo, isDemo lessons only) -------------------------------
 
 export async function runDemoAction(lessonId: string, action: "live" | "end" | "reset", admin: AppUser) {

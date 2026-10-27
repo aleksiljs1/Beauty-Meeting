@@ -1,7 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { requireLessonCapability } from "@/server/access/lesson-access";
-import { checkCapability, evaluateLessonAccess, lessonPhase, type LessonAccess, type LessonPhase } from "@/server/access/policy";
+import { checkCapability, effectiveMeetingStatus, evaluateLessonAccess, lessonPhase, type LessonAccess, type LessonPhase } from "@/server/access/policy";
 import type { AppUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
 import { zoomLive } from "@/server/env";
@@ -167,10 +167,11 @@ export async function getClassroom(user: AppUser, rawLessonId: string, now = new
         ? ({ reason: "EXPIRED" } as const)
         : null;
 
+  const meeting = effectiveMeetingStatus(base, now);
   let stage: StageState;
-  if (base.meetingStatus === "LIVE") stage = "LIVE";
-  else if (base.meetingStatus === "ENDED") stage = "ENDED";
-  else if (base.meetingStatus === "NOT_PROVISIONED" || base.meetingStatus === "ERROR") stage = "NOT_READY";
+  if (meeting === "LIVE") stage = "LIVE";
+  else if (meeting === "ENDED") stage = "ENDED";
+  else if (meeting === "NOT_PROVISIONED" || meeting === "ERROR") stage = "NOT_READY";
   else stage = now.getTime() < base.joinOpensAt.getTime() ? "NOT_OPEN" : "WAITING";
 
   const [materials, recordings] = hasAccess && !history ? await Promise.all([listMaterials(user, lessonId), listRecordings(user, lessonId)]) : [[], []];

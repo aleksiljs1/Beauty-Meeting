@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
+import type { MeetingStatus } from "@/generated/prisma/enums";
 import type { AppUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
 import { env, zoomLive } from "@/server/env";
@@ -132,27 +133,48 @@ async function applyEvent(
   return outcome === "applied" ? { status: "PROCESSED", note: null } : { status: "IGNORED", note: "stale or duplicate state" };
 }
 
+type ZoomMeetingStatus = Awaited<ReturnType<typeof fetchZoomMeetingStatus>>;
+
 /**
- * Admin "sync" action: asks Zoom for the meeting's current status and applies it, recovering
- * from a missed webhook (e.g. the server was down when the class started).
+ * Asks Zoom for the meeting's current status and applies it, recovering from a missed webhook
+ * (e.g. the server was down when the class started). Throws Zoom's error to the caller.
  */
+async function refreshMeetingFromZoom(lessonId: string, meetingNumber: string, stored: MeetingStatus): Promise<ZoomMeetingStatus> {
+  const zoomStatus = await fetchZoomMeetingStatus(meetingNumber);
+  const now = new Date();
+  if (zoomStatus === "started" && stored !== "LIVE") await applyMeetingStarted(lessonId, now);
+  if (zoomStatus === "waiting" && stored === "LIVE") await applyMeetingEnded(lessonId, now);
+  return zoomStatus;
+}
+
+/** Admin "sync" action. */
 export async function syncLessonFromZoom(lessonId: string, admin: AppUser) {
   const lesson = await prisma.lesson.findUnique({ where: { id: lessonId }, select: { zoomMeetingNumber: true, meetingStatus: true } });
   if (!lesson) throw new ApiError("NOT_FOUND", "Mësimi nuk u gjet.");
   if (!lesson.zoomMeetingNumber) throw new ApiError("INTEGRATION_NOT_CONFIGURED", "Ky mësim nuk ka ende një takim Zoom.");
 
-  let zoomStatus: Awaited<ReturnType<typeof fetchZoomMeetingStatus>>;
+  let zoomStatus: ZoomMeetingStatus;
   try {
-    zoomStatus = await fetchZoomMeetingStatus(lesson.zoomMeetingNumber);
+    zoomStatus = await refreshMeetingFromZoom(lessonId, lesson.zoomMeetingNumber, lesson.meetingStatus);
   } catch (error) {
     toApiError(error, "Statusi nuk u lexua dot nga Zoom.");
   }
-
-  const now = new Date();
-  if (zoomStatus === "started" && lesson.meetingStatus !== "LIVE") await applyMeetingStarted(lessonId, now);
-  if (zoomStatus === "waiting" && lesson.meetingStatus === "LIVE") await applyMeetingEnded(lessonId, now);
   await audit(admin.id, "lesson.zoom_sync", "lesson", lessonId, { zoomStatus });
 
   const updated = await prisma.lesson.findUniqueOrThrow({ where: { id: lessonId }, select: { meetingStatus: true } });
   return { zoomStatus, meetingStatus: updated.meetingStatus };
+}
+
+/**
+ * A student asks to join before the site knows the class started: check with Zoom, so a lost
+ * "meeting.started" event can't keep the whole class on "waiting for the teacher" (the first
+ * join marks the lesson live and alerts everyone). Best effort: never blocks the join itself.
+ */
+export async function catchUpMeetingStart(lessonId: string, meetingNumber: string, stored: MeetingStatus) {
+  if (!zoomLive || stored === "LIVE") return;
+  try {
+    await refreshMeetingFromZoom(lessonId, meetingNumber, stored);
+  } catch (error) {
+    console.warn("[zoom] status check before join failed", lessonId, (error as Error).message);
+  }
 }

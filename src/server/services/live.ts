@@ -1,5 +1,5 @@
 import "server-only";
-import { checkCapability, evaluateLessonAccess, isExpired } from "@/server/access/policy";
+import { checkCapability, effectiveMeetingStatus, evaluateLessonAccess, isExpired } from "@/server/access/policy";
 import type { AppUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
 import { env } from "@/server/env";
@@ -12,14 +12,19 @@ import { audit } from "./audit";
 /**
  * Live lesson state and in-site notifications.
  *
- * LIVE is set only by a verified provider event (Zoom webhook, Phase 2) or by the explicitly
- * labelled demo simulation — never by the scheduled time. State never regresses: a delayed
- * "started" event can't reopen an ENDED lesson.
+ * LIVE is set only by a verified provider event (Zoom webhook or the host's sync) or by the
+ * explicitly labelled demo simulation — never by the scheduled time. State never regresses: a
+ * delayed "started" event can't reopen an ENDED lesson. When an "ended" event is lost, readers
+ * fall back to the schedule (policy.ts `effectiveMeetingStatus`) and the admin can end the class.
  */
 
 export const STARTING_SOON_MS = 10 * 60_000;
 
 type LiveSource = "demo" | "zoom";
+/** Who ended the class: the provider, the demo controls, or the admin (when Zoom never reported the end). */
+type EndSource = LiveSource | "admin";
+
+const END_AUDIT_ACTION: Record<EndSource, string> = { demo: "lesson.demo_end", zoom: "lesson.end", admin: "lesson.end_manual" };
 
 export async function markLessonLive(lessonId: string, source: LiveSource, actorId: string | null, startedAt = new Date()) {
   const lesson = await prisma.lesson.findUnique({ where: { id: lessonId }, select: { meetingStatus: true, isDemo: true, publication: true } });
@@ -34,7 +39,7 @@ export async function markLessonLive(lessonId: string, source: LiveSource, actor
   await audit(actorId, source === "demo" ? "lesson.demo_live" : "lesson.live", "lesson", lessonId);
 }
 
-export async function markLessonEnded(lessonId: string, source: LiveSource, actorId: string | null, endedAt = new Date()) {
+export async function markLessonEnded(lessonId: string, source: EndSource, actorId: string | null, endedAt = new Date()) {
   const result = await prisma.lesson.updateMany({
     where: { id: lessonId, meetingStatus: "LIVE", ...(source === "demo" ? { isDemo: true } : {}) },
     data: { meetingStatus: "ENDED", liveEndedAt: endedAt },
@@ -46,7 +51,7 @@ export async function markLessonEnded(lessonId: string, source: LiveSource, acto
     data: { validUntil: endedAt },
   });
   await publishLessonChanged(lessonId);
-  await audit(actorId, source === "demo" ? "lesson.demo_end" : "lesson.end", "lesson", lessonId);
+  await audit(actorId, END_AUDIT_ACTION[source], "lesson", lessonId);
 }
 
 // ---------------------------------------------------------------------------------------
@@ -199,6 +204,7 @@ export async function getLiveFeed(user: AppUser, now = new Date()): Promise<Live
           joinOpensAt: true,
           accessExpiresAt: true,
           scheduledStartAt: true,
+          scheduledEndAt: true,
           enrollments: { where: { userId: user.id }, select: { accessExpiresAt: true, revokedAt: true }, take: 1 },
         },
       },
@@ -212,11 +218,11 @@ export async function getLiveFeed(user: AppUser, now = new Date()): Promise<Live
     const visible = !!lesson && !!access && checkCapability(access, "VIEW_CONTENT", lesson, now).allowed;
     const canJoin = visible && checkCapability(access!, "JOIN_LIVE", lesson!, now).allowed;
     const stillValid = !row.validUntil || row.validUntil > now;
+    const meeting = lesson ? effectiveMeetingStatus(lesson, now) : null;
     const active =
       visible &&
       stillValid &&
-      ((row.type === "LESSON_LIVE" && lesson!.meetingStatus === "LIVE") ||
-        (row.type === "LESSON_STARTING_SOON" && lesson!.meetingStatus !== "LIVE" && lesson!.meetingStatus !== "ENDED"));
+      ((row.type === "LESSON_LIVE" && meeting === "LIVE") || (row.type === "LESSON_STARTING_SOON" && meeting !== "LIVE" && meeting !== "ENDED"));
     return {
       id: row.id,
       type: row.type,

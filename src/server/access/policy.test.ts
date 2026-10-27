@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   checkCapability,
+  effectiveMeetingStatus,
   evaluateLessonAccess,
   grantLifetimeSeconds,
+  LIVE_OVERRUN_MS,
   lessonPhase,
   type AccessEnrollment,
   type AccessLesson,
@@ -14,11 +16,13 @@ const admin: AccessViewer = { id: "a1", role: "admin" };
 
 const DEADLINE = new Date("2026-11-30T22:00:00.000Z");
 const JOIN_OPENS = new Date("2026-11-01T08:45:00.000Z");
+const END = new Date("2026-11-01T12:00:00.000Z");
 
 const lesson = (overrides: Partial<AccessLesson> = {}): AccessLesson => ({
   publication: "PUBLISHED",
   meetingStatus: "SCHEDULED",
   joinOpensAt: JOIN_OPENS,
+  scheduledEndAt: END,
   accessExpiresAt: DEADLINE,
   ...overrides,
 });
@@ -129,6 +133,34 @@ describe("checkCapability", () => {
   });
 });
 
+describe("effectiveMeetingStatus (a lost Zoom event never leaves a lesson stuck)", () => {
+  it("ends a lesson that never went live once its scheduled end passes", () => {
+    for (const meetingStatus of ["SCHEDULED", "NOT_PROVISIONED", "ERROR"] as const) {
+      expect(effectiveMeetingStatus(lesson({ meetingStatus }), ms(END, -1))).toBe(meetingStatus);
+      expect(effectiveMeetingStatus(lesson({ meetingStatus }), END)).toBe("ENDED");
+    }
+  });
+
+  it("keeps a LIVE lesson live through an overrun, then ends it if Zoom never reported the end", () => {
+    const live = lesson({ meetingStatus: "LIVE" });
+    expect(effectiveMeetingStatus(live, ms(END, LIVE_OVERRUN_MS - 1))).toBe("LIVE");
+    expect(effectiveMeetingStatus(live, ms(END, LIVE_OVERRUN_MS))).toBe("ENDED");
+  });
+
+  it("never makes a lesson live because of the time", () => {
+    expect(effectiveMeetingStatus(lesson({ meetingStatus: "SCHEDULED" }), JOIN_OPENS)).toBe("SCHEDULED");
+    expect(effectiveMeetingStatus(lesson({ meetingStatus: "ENDED" }), JOIN_OPENS)).toBe("ENDED");
+  });
+
+  it("stops offering Join for a stuck LIVE lesson after the overrun", () => {
+    const live = lesson({ meetingStatus: "LIVE" });
+    const late = ms(END, LIVE_OVERRUN_MS);
+    expect(checkCapability(evaluateLessonAccess(student, live, enrolled(), late), "JOIN_LIVE", live, late)).toMatchObject({
+      code: "LESSON_JOIN_NOT_OPEN",
+    });
+  });
+});
+
 describe("grantLifetimeSeconds", () => {
   it("never outlives the student's deadline", () => {
     const access = evaluateLessonAccess(student, lesson(), enrolled(), ms(DEADLINE, -20_000));
@@ -146,6 +178,13 @@ describe("lessonPhase", () => {
     expect(lessonPhase(l(), granted, false, ms(start, -5 * 60_000))).toBe("STARTING_SOON");
     expect(lessonPhase(l(), granted, false, ms(start, 60_000))).toBe("WAITING_FOR_HOST");
     expect(lessonPhase(l({ meetingStatus: "LIVE" }), granted, false, ms(start, 60_000))).toBe("LIVE");
+  });
+
+  it("moves a lesson Zoom never reported on to ended/replay after its scheduled end", () => {
+    expect(lessonPhase(l(), granted, false, ms(END, -1))).toBe("WAITING_FOR_HOST");
+    expect(lessonPhase(l(), granted, false, END)).toBe("ENDED");
+    expect(lessonPhase(l(), granted, true, END)).toBe("REPLAY");
+    expect(lessonPhase(l({ meetingStatus: "LIVE" }), granted, true, ms(END, LIVE_OVERRUN_MS))).toBe("REPLAY");
   });
 
   it("shows replay only when a recording is ready", () => {

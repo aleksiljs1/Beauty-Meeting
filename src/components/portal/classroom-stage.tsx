@@ -23,6 +23,7 @@ import { portalText } from "@/i18n/portal";
 import { ApiClientError, apiSend } from "@/lib/api/client";
 import { formatTime, timezoneAbbreviation } from "@/lib/datetime";
 import { formatCountdown } from "@/lib/polling";
+import { cn } from "@/lib/utils";
 import type { StageState } from "@/server/queries/portal";
 import { DemoStage } from "./demo-stage";
 import { ZoomAppLink } from "@/components/zoom/zoom-app-link";
@@ -129,6 +130,74 @@ function Countdown({
   );
 }
 
+/** The join button plus the "open in the Zoom app" fallback, shown wherever joining is open. */
+function JoinControls({
+  lessonId,
+  isJoining,
+  zoomAppFallback,
+  onJoin,
+  tone,
+}: {
+  lessonId: string;
+  isJoining: boolean;
+  zoomAppFallback: boolean;
+  onJoin: () => void;
+  tone: "live" | "default";
+}) {
+  return (
+    <>
+      <Button
+        size="lg"
+        className={cn("h-11 min-w-40 px-6 text-base", tone === "live" && "bg-live text-white hover:bg-live/90")}
+        disabled={isJoining}
+        onClick={onJoin}
+      >
+        {isJoining ? (
+          <>
+            <Loader2 className="animate-spin" aria-hidden="true" />
+            {t.joining}
+          </>
+        ) : (
+          t.join
+        )}
+      </Button>
+
+      {zoomAppFallback ? (
+        <div className="mt-4 grid max-w-md gap-2 border-t pt-4">
+          <p className="text-xs text-muted-foreground">{zoomText.student.appFallbackNote}</p>
+          <ZoomAppLink
+            endpoint={`/lessons/${lessonId}/zoom-app-link`}
+            field="joinUrl"
+            labels={{
+              request: zoomText.student.appFallback,
+              preparing: zoomText.student.appFallbackPreparing,
+              ready: zoomText.student.appFallbackReady,
+              open: zoomText.student.appFallbackOpen,
+              error: zoomText.student.appFallbackError,
+            }}
+          />
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function JoinError({ message }: { message: string | null }) {
+  if (!message) return null;
+  return (
+    <div
+      role="alert"
+      className="mt-2 flex max-w-md items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-left text-sm text-destructive"
+    >
+      <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+      <div>
+        <p className="font-medium">{t.errorTitle}</p>
+        <p>{message}</p>
+      </div>
+    </div>
+  );
+}
+
 function ClassroomStageImpl(props: StageProps) {
   const { lessonId, stage, canJoin, autoJoin } = props;
 
@@ -169,7 +238,7 @@ function ClassroomStageImpl(props: StageProps) {
         `${url.pathname}${url.search}${url.hash}`,
       );
 
-      if (stage === "LIVE" && canJoin) void requestJoin();
+      if ((stage === "LIVE" || stage === "WAITING") && canJoin) void requestJoin();
     }, 0);
 
     return () => clearTimeout(id);
@@ -177,6 +246,7 @@ function ClassroomStageImpl(props: StageProps) {
 
   const isJoining = join.kind === "joining";
   const joinError = join.kind === "error" ? join.message : zoom.status === "error" ? zoom.error : null;
+  const joinControls = { lessonId, isJoining, zoomAppFallback: props.zoomAppFallback, onJoin: () => void requestJoin() };
 
   let content: ReactNode;
 
@@ -215,67 +285,24 @@ function ClassroomStageImpl(props: StageProps) {
         {canJoin ? (
           <>
             <p className="max-w-md text-sm text-muted-foreground">{t.liveBody}</p>
-
-            <Button
-              size="lg"
-              className="h-11 min-w-40 bg-live px-6 text-base text-white hover:bg-live/90"
-              disabled={isJoining}
-              onClick={() => void requestJoin()}
-            >
-              {isJoining ? (
-                <>
-                  <Loader2 className="animate-spin" aria-hidden="true" />
-                  {t.joining}
-                </>
-              ) : (
-                t.join
-              )}
-            </Button>
-
-            {props.zoomAppFallback ? (
-              <div className="mt-4 grid max-w-md gap-2 border-t pt-4">
-                <p className="text-xs text-muted-foreground">{zoomText.student.appFallbackNote}</p>
-                <ZoomAppLink
-                  endpoint={`/lessons/${lessonId}/zoom-app-link`}
-                  field="joinUrl"
-                  labels={{
-                    request: zoomText.student.appFallback,
-                    preparing: zoomText.student.appFallbackPreparing,
-                    ready: zoomText.student.appFallbackReady,
-                    open: zoomText.student.appFallbackOpen,
-                    error: zoomText.student.appFallbackError,
-                  }}
-                />
-              </div>
-            ) : null}
+            <JoinControls {...joinControls} tone="live" />
           </>
         ) : (
           <p className="max-w-md text-sm text-muted-foreground">
             {props.joinBlockedMessage ?? t.joinBlocked}
           </p>
         )}
-
-        {joinError ? (
-          <div
-            role="alert"
-            className="mt-2 flex max-w-md items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-left text-sm text-destructive"
-          >
-            <CircleAlert
-              aria-hidden="true"
-              className="mt-0.5 size-4 shrink-0"
-            />
-            <div>
-              <p className="font-medium">{t.errorTitle}</p>
-              <p>{joinError}</p>
-            </div>
-          </div>
-        ) : null}
+        <JoinError message={joinError} />
       </StageMessage>
     );
   } else if (stage === "WAITING") {
+    // Joining is already allowed here: if Zoom's "started" event is late or lost, students
+    // can still get into a class the teacher has begun (the server re-checks every request).
     content = (
       <StageMessage icon={<Hourglass className="size-6" />} title={t.waitingTitle}>
-        <p className="max-w-md text-sm text-muted-foreground">{t.waitingBody}</p>
+        <p className="max-w-md text-sm text-muted-foreground">{canJoin ? t.waitingBody : t.waitingBodyNoJoin}</p>
+        {canJoin ? <JoinControls {...joinControls} tone="default" /> : null}
+        <JoinError message={joinError} />
       </StageMessage>
     );
   } else if (stage === "NOT_OPEN") {

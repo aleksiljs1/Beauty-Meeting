@@ -143,6 +143,23 @@ Original brief: `c:\Users\aleksiljs\Downloads\Beauty_Academy_Zoom_Claude_Megapro
   re-added automatically: in the roster they're listed unticked ("Aksesi u hoq më parë").
 - Deactivated accounts are never offered. Tests: `course-members.integration.test.ts`.
 
+## Lessons never get stuck in the wrong state (2026-10-27, from the business-logic review)
+
+Live state comes from Zoom events; if one is lost, the lesson used to stay "waiting for the teacher"
+or "live" for up to 30 days. Now:
+- **One rule, one place:** `effectiveMeetingStatus` in `src/server/access/policy.ts`. A lesson that never
+  went live is over once its scheduled end passes; a LIVE lesson whose end was never reported is over
+  `LIVE_OVERRUN_MS` (2 h) after the scheduled end. Time never makes a lesson LIVE. Every reader (join
+  permission, lesson phase, classroom stage, live pop-up) uses it, so a recording uploaded later shows as
+  a replay.
+- **Admin → lesson → "Shëno si të përfunduar"** (`DELETE /api/v1/admin/lessons/:id/live`) ends a class the
+  site still shows as live; alerts close at once. It doesn't close a meeting still open in Zoom.
+- **Students can join while "waiting for the teacher"** (the join window is open). Before handing out the
+  join details the server asks Zoom once whether the meeting started (`catchUpMeetingStart`); if so the
+  lesson goes LIVE and everyone gets the pop-up, so a lost `meeting.started` can't hold up the class. If
+  Zoom says the host hasn't started (SDK error 3008) the student sees "Mësuesja nuk e ka nisur ende
+  klasën" and can retry. The pop-up's "Bashkohu" now joins in this state too.
+
 ## Lesson materials: MP4 videos and multi-file upload (2026-10-23)
 
 - Materials may now include **MP4 videos** (`.mp4`/`.m4v`, declared `video/mp4`, verified by the `ftyp`
