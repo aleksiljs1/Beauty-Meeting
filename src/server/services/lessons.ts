@@ -10,6 +10,7 @@ import { publishLessonChanged } from "@/server/realtime/publish";
 import { deleteObject } from "@/server/storage/storage";
 import { deleteZoomMeeting, syncZoomMeetingSchedule } from "@/server/zoom/meetings";
 import { audit } from "./audit";
+import { assertActiveStudents, enrollStudents } from "./course-members";
 import { markLessonEnded, markLessonLive } from "./live";
 
 /**
@@ -51,10 +52,12 @@ function assertDemoAllowed(isDemo: boolean | undefined) {
   if (isDemo && env.ZOOM_MODE !== "demo") throw new ApiError("VALIDATION_FAILED", "Klasat demo lejohen vetëm në modalitetin demo.");
 }
 
-export async function createLesson(input: LessonInput, confirmEarlyDeadline: boolean, admin: AppUser) {
+/** `studentIds`: students to enrol right away (the course's students, pre-selected in the form). */
+export async function createLesson(input: LessonInput, confirmEarlyDeadline: boolean, admin: AppUser, studentIds: string[] = []) {
   throwScheduleIssues(validateLessonSchedule(input, confirmEarlyDeadline));
   await assertCourse(input.courseId);
   assertDemoAllowed(input.isDemo);
+  await assertActiveStudents([...new Set(studentIds)]); // before creating, so a bad list never leaves a half-made lesson
 
   const lesson = await prisma.lesson.create({
     data: {
@@ -75,7 +78,8 @@ export async function createLesson(input: LessonInput, confirmEarlyDeadline: boo
     select: { id: true },
   });
   await audit(admin.id, "lesson.create", "lesson", lesson.id, { isDemo: input.isDemo ?? false });
-  return lesson;
+  const { added } = await enrollStudents(lesson.id, studentIds, admin);
+  return { ...lesson, enrolled: added };
 }
 
 export async function updateLesson(lessonId: string, patch: LessonPatch, confirmEarlyDeadline: boolean, admin: AppUser) {

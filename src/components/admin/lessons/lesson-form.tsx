@@ -2,11 +2,12 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { Info } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
+import { CheckList } from "@/components/admin/check-list";
 import { FormField } from "@/components/admin/form-field";
 import { errorMessage } from "@/components/admin/use-api-action";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -25,7 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { ApiClientError, apiSend } from "@/lib/api/client";
+import { ApiClientError, apiGet, apiSend } from "@/lib/api/client";
 import {
   defaultSchedule,
   needsEarlyDeadlineConfirmation,
@@ -111,6 +112,8 @@ export function LessonForm({
   const scheduleDirty = SCHEDULE_FIELDS.some((field) => dirtyFields[field]);
   const startValue = useWatch({ control: form.control, name: "scheduledStartAt" });
   const zoneAt = fromZonedInputValue(startValue) ?? new Date();
+  const courseId = useWatch({ control: form.control, name: "courseId" });
+  const courseStudents = useCourseStudents(isEdit || courseId === NO_COURSE ? null : courseId);
 
   /** New lessons: keep join-open, end and deadline following the start until the admin edits them. */
   function onStartChange(value: string) {
@@ -154,6 +157,7 @@ export function LessonForm({
       joinOpensAt: schedule.joinOpensAt.toISOString(),
       accessExpiresAt: schedule.accessExpiresAt.toISOString(),
       confirmEarlyDeadline,
+      ...(isEdit ? {} : { studentIds: courseStudents.status === "done" ? [...courseStudents.selected] : [] }),
     };
     try {
       if (lesson) {
@@ -162,8 +166,8 @@ export function LessonForm({
         form.reset(values);
         router.refresh();
       } else {
-        const created = await apiSend<{ id: string }>("post", "/admin/lessons", body);
-        toast.success(t.created);
+        const created = await apiSend<{ id: string; enrolled: number }>("post", "/admin/lessons", body);
+        toast.success(created.enrolled ? t.createdWithStudents(created.enrolled) : t.created);
         router.push(`/admin/mesimet/${created.id}`);
       }
     } catch (error) {
@@ -208,6 +212,7 @@ export function LessonForm({
             )}
           />
         )}
+        {courseStudents.status !== "idle" && <CourseStudentsField state={courseStudents} />}
       </div>
 
       <fieldset className="space-y-4 rounded-md border p-4">
@@ -318,5 +323,55 @@ function SelectTriggerWrapper({
         ))}
       </SelectContent>
     </Select>
+  );
+}
+
+type CourseStudent = { id: string; name: string; email: string };
+type CourseStudentsState = {
+  status: "idle" | "loading" | "done" | "error";
+  students: CourseStudent[];
+  selected: ReadonlySet<string>;
+  setSelected: (next: Set<string>) => void;
+};
+
+/** New lessons: the chosen course's active students, all pre-selected. Changing the course reloads them. */
+function useCourseStudents(courseId: string | null): CourseStudentsState {
+  const [loaded, setLoaded] = useState<{ courseId: string; status: "done" | "error"; students: CourseStudent[] } | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!courseId) return;
+    let cancelled = false;
+    apiGet<CourseStudent[]>(`/admin/courses/${courseId}/students`)
+      .then((students) => {
+        if (cancelled) return;
+        setLoaded({ courseId, status: "done", students });
+        setSelected(new Set(students.map((s) => s.id)));
+      })
+      .catch(() => !cancelled && setLoaded({ courseId, status: "error", students: [] }));
+    return () => {
+      cancelled = true;
+    };
+  }, [courseId]);
+
+  if (!courseId) return { status: "idle", students: [], selected, setSelected };
+  if (loaded?.courseId !== courseId) return { status: "loading", students: [], selected, setSelected };
+  return { status: loaded.status, students: loaded.students, selected, setSelected };
+}
+
+function CourseStudentsField({ state }: { state: CourseStudentsState }) {
+  const c = t.courseStudents;
+  if (state.status === "loading") return <p className="text-sm text-muted-foreground">{c.loading}</p>;
+  if (state.status === "error") return <p className="text-sm text-destructive">{c.error}</p>;
+  if (!state.students.length) return <p className="text-sm text-muted-foreground">{c.empty}</p>;
+  return (
+    <CheckList
+      legend={`${c.legend} · ${c.selected(state.selected.size, state.students.length)}`}
+      items={state.students.map((s) => ({ id: s.id, label: s.name, description: s.email }))}
+      selected={state.selected}
+      onChange={state.setSelected}
+      shortcuts
+      footer={<p className="text-xs text-muted-foreground">{c.hint}</p>}
+    />
   );
 }

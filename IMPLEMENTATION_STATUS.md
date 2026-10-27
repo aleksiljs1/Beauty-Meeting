@@ -20,7 +20,7 @@ How to run: `README.md` · How to test: `docs/testing.md` · Decisions: `NOTES.m
 - ✅ Admin bootstrap command (`npm run admin:create`)
 - ✅ Design system: shadcn/ui (Radix), brand palette, Cormorant Garamond + Manrope
 - ✅ Timezone helpers (Europe/Tirane ⇄ UTC, DST-tested)
-- ✅ Services: accounts, shared invitations, live alerts, materials, recordings, audit (integration-tested)
+- ✅ Services: accounts, course students, shared invitations, live alerts, materials, recordings, audit (integration-tested)
 - ✅ Socket.IO realtime service (`npm run realtime`) with Postgres LISTEN/NOTIFY, token re-auth, expiry sweep
 - ✅ Clean clone from GitHub installs, passes checks and builds (verified after the `.gitignore` fix)
 

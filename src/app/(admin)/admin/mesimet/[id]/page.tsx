@@ -18,6 +18,7 @@ import { formatDateTime, formatTimeRange, formatWeekdayDate, ACADEMY_TIMEZONE_LA
 import { requirePageUser } from "@/server/auth/session";
 import { env } from "@/server/env";
 import { getAdminLesson, getLessonRoster, listCourses, listLessonInvitations } from "@/server/queries/admin";
+import { listCourseCandidates } from "@/server/services/course-members";
 import { listMaterials } from "@/server/services/materials";
 import { listRecordings } from "@/server/services/recordings";
 
@@ -41,9 +42,10 @@ export default async function LessonDetailPage({ params, searchParams }: PagePro
 
   const lesson = await getAdminLesson(id);
   if (!lesson) notFound();
-  const [courses, roster, invitations, materials, recordings] = await Promise.all([
+  const [courses, roster, courseCandidates, invitations, materials, recordings] = await Promise.all([
     listCourses(),
     getLessonRoster(id, rosterPage),
+    listCourseCandidates(id),
     listLessonInvitations(id),
     listMaterials(user, id),
     listRecordings(user, id),
@@ -89,7 +91,7 @@ export default async function LessonDetailPage({ params, searchParams }: PagePro
           ),
           studentet: (
             <SectionCard title={admin.roster.title}>
-              <RosterPanel lessonId={lesson.id} lessonDeadline={lesson.accessExpiresAt} rows={roster.items} />
+              <RosterPanel lessonId={lesson.id} lessonDeadline={lesson.accessExpiresAt} rows={roster.items} course={courseCandidates} />
               <Pagination page={roster.page} pageCount={roster.pageCount} href={(p) => `/admin/mesimet/${lesson.id}?tab=studentet&faqe=${p}`} />
             </SectionCard>
           ),

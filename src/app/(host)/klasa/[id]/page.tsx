@@ -9,6 +9,7 @@ import { zoomText } from "@/i18n/zoom";
 import { requirePageUser } from "@/server/auth/session";
 import { zoomLive } from "@/server/env";
 import { getAdminLesson, getLessonRoster, listLessonInvitations } from "@/server/queries/admin";
+import { listCourseCandidates } from "@/server/services/course-members";
 import { listMaterials } from "@/server/services/materials";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -27,7 +28,12 @@ export default async function HostRoomPage({ params }: PageProps<"/klasa/[id]">)
   if (!UUID.test(id)) notFound();
   const lesson = await getAdminLesson(id);
   if (!lesson || lesson.isDemo || !zoomLive) notFound();
-  const [materials, roster, invitations] = await Promise.all([listMaterials(user, id), getLessonRoster(id), listLessonInvitations(id)]);
+  const [materials, roster, courseCandidates, invitations] = await Promise.all([
+    listMaterials(user, id),
+    getLessonRoster(id),
+    listCourseCandidates(id),
+    listLessonInvitations(id),
+  ]);
 
   return (
     <>
@@ -37,7 +43,7 @@ export default async function HostRoomPage({ params }: PageProps<"/klasa/[id]">)
         meetingStatus={lesson.meetingStatus}
         panels={{
           materials: <MaterialsPanel lessonId={lesson.id} materials={materials} />,
-          students: <RosterPanel lessonId={lesson.id} lessonDeadline={lesson.accessExpiresAt} rows={roster.items} />,
+          students: <RosterPanel lessonId={lesson.id} lessonDeadline={lesson.accessExpiresAt} rows={roster.items} course={courseCandidates} />,
           invitations: <InvitationsPanel lesson={lesson} invitations={invitations} />,
         }}
       />

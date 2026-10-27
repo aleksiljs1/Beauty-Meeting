@@ -88,6 +88,18 @@ The seed printed a link for the upcoming lesson (or create one in the admin port
 - [ ] Historiku shows every action; Integrimet shows "Zoom: demo mode" honestly.
 - [ ] Përmbajtja → edit academy info / a service / upload a gallery photo → public site updates on the next visit.
 
+### Course students
+- [ ] Studentët → "Student i ri" → tick a course → the student is created and (option on) added to that
+      course's upcoming lessons; the toast says how many. The list shows the course; the course chips filter it.
+- [ ] Studentët → ⋯ → Kurset → add/remove a course. Removing does **not** remove any lesson access.
+- [ ] Mësim i ri → pick a course → its students appear ticked ("3 nga 3 të zgjedhur"); untick one, create →
+      the lesson's Studentët tab shows the others with source "Nga kursi".
+- [ ] Lesson → Studentët → "Studentët e kursit" lists members not yet in the lesson (seed: Sara on
+      "Stilimi për ceremoni") → "Shto studentin" adds her. Someone outside the course: use the search below.
+- [ ] Revoke a course student from a lesson → they reappear in "Studentët e kursit" **unticked**, marked
+      "Aksesi u hoq më parë"; they come back only if you tick them.
+- [ ] Deactivated students never appear in the course lists.
+
 ### Gallery display switches
 - [ ] In `/admin/permbajtja/galeria`, turn every display switch off before uploading an image (only "Në galeri" starts on); confirm it stays out of all public pages.
 - [ ] Enable only "Në galeri"; confirm it appears on `/galeria` and nowhere else.

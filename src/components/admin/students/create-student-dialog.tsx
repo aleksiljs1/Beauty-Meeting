@@ -7,9 +7,11 @@ import { useForm } from "react-hook-form";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
+import { CheckList } from "@/components/admin/check-list";
 import { FormField } from "@/components/admin/form-field";
 import { useApiAction } from "@/components/admin/use-api-action";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { apiSend } from "@/lib/api/client";
@@ -24,8 +26,10 @@ const schema = z.object({
 });
 type Values = z.infer<typeof schema>;
 
-export function CreateStudentDialog({ defaultOpen = false }: { defaultOpen?: boolean }) {
+export function CreateStudentDialog({ defaultOpen = false, courses }: { defaultOpen?: boolean; courses: { id: string; title: string }[] }) {
   const [open, setOpen] = useState(defaultOpen);
+  const [courseIds, setCourseIds] = useState<Set<string>>(new Set());
+  const [addToUpcoming, setAddToUpcoming] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -42,11 +46,15 @@ export function CreateStudentDialog({ defaultOpen = false }: { defaultOpen?: boo
   }
 
   const submit = form.handleSubmit(async (values) => {
-    const result = await run(() => apiSend<{ student: { email: string }; mailSent: boolean }>("post", "/admin/students", values));
+    const body = { ...values, courseIds: [...courseIds], addToUpcoming };
+    const result = await run(() => apiSend<{ student: { email: string }; mailSent: boolean; lessonsAdded: number }>("post", "/admin/students", body));
     if (!result) return;
-    if (result.mailSent) toast.success(t.create.success(result.student.email));
-    else toast.warning(t.create.mailFailed);
+    const lessons = result.lessonsAdded ? ` ${t.create.lessonsAdded(result.lessonsAdded)}` : "";
+    if (result.mailSent) toast.success(t.create.success(result.student.email) + lessons);
+    else toast.warning(t.create.mailFailed + lessons);
     form.reset();
+    setCourseIds(new Set());
+    setAddToUpcoming(true);
     changeOpen(false);
   });
 
@@ -69,6 +77,25 @@ export function CreateStudentDialog({ defaultOpen = false }: { defaultOpen?: boo
           <FormField label={t.create.email} error={form.formState.errors.email?.message}>
             <Input type="email" autoComplete="off" inputMode="email" {...form.register("email")} />
           </FormField>
+          {courses.length > 0 && (
+            <CheckList
+              legend={t.courses.field}
+              items={courses.map((c) => ({ id: c.id, label: c.title }))}
+              selected={courseIds}
+              onChange={setCourseIds}
+              footer={
+                <>
+                  <p className="text-xs text-muted-foreground">{t.courses.hint}</p>
+                  {courseIds.size > 0 && (
+                    <label className="flex items-start gap-2 pt-1 text-sm">
+                      <Checkbox className="mt-0.5" checked={addToUpcoming} onCheckedChange={(checked) => setAddToUpcoming(checked === true)} />
+                      <span>{t.courses.addToUpcoming}</span>
+                    </label>
+                  )}
+                </>
+              }
+            />
+          )}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => changeOpen(false)}>
               {common.actions.cancel}

@@ -19,7 +19,7 @@ export const GET = route(async (request) => {
 
 export const POST = route(async (request) => {
   const admin = await requireApiUser(request, "admin");
-  const { confirmEarlyDeadline, ...input } = createLessonSchema.parse(await readJson(request));
-  const lesson = await createLesson(input, confirmEarlyDeadline ?? false, admin);
+  const { confirmEarlyDeadline, studentIds, ...input } = createLessonSchema.parse(await readJson(request));
+  const lesson = await createLesson(input, confirmEarlyDeadline ?? false, admin, studentIds);
   return ok(lesson, { status: 201 });
 });

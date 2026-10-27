@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CalendarClock, MoreHorizontal, Plus, RotateCcw, UserMinus } from "lucide-react";
+import { CalendarClock, MoreHorizontal, Plus, RotateCcw, UserMinus, UserPlus } from "lucide-react";
+import { CheckList } from "@/components/admin/check-list";
 import { ConfirmAction } from "@/components/admin/confirm-action";
 import { FormField } from "@/components/admin/form-field";
 import { EmptyState } from "@/components/admin/page-parts";
@@ -20,7 +21,7 @@ const t = admin.roster;
 
 export type RosterRow = {
   id: string;
-  source: "ADMIN" | "INVITATION";
+  source: "ADMIN" | "INVITATION" | "COURSE";
   student: { id: string; name: string; email: string };
   ownDeadline: Date | null;
   effectiveDeadline: Date;
@@ -37,9 +38,19 @@ const STATUS_TONE: Record<RosterRow["status"], "outline" | "destructive" | "seco
 
 const zoneLabel = (date: Date) => `${ACADEMY_TIMEZONE_LABEL}, ${timezoneAbbreviation(date)}`;
 
-export function RosterPanel({ lessonId, lessonDeadline, rows }: { lessonId: string; lessonDeadline: Date; rows: RosterRow[] }) {
+export type RosterCourse = {
+  courseTitle: string | null;
+  memberCount: number;
+  candidates: { id: string; name: string; email: string; revoked: boolean }[];
+};
+
+export function RosterPanel({ lessonId, lessonDeadline, rows, course }: { lessonId: string; lessonDeadline: Date; rows: RosterRow[]; course: RosterCourse }) {
   return (
     <div className="space-y-6">
+      {course.courseTitle && (
+        // Re-keyed when the list changes, so the pre-selection follows the server state after adding.
+        <CourseStudents key={course.candidates.map((c) => `${c.id}:${c.revoked}`).join(",")} lessonId={lessonId} course={course} courseTitle={course.courseTitle} />
+      )}
       <AddStudent lessonId={lessonId} />
       {rows.length === 0 ? (
         <EmptyState>{t.empty}</EmptyState>
@@ -157,6 +168,47 @@ function DeadlineDialog({ row, lessonDeadline, onClose }: { row: RosterRow; less
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * The lesson course's students who aren't in the lesson yet, pre-selected. Students whose
+ * access to this lesson was revoked are listed but not pre-selected: that was a deliberate choice.
+ */
+function CourseStudents({ lessonId, course, courseTitle }: { lessonId: string; course: RosterCourse; courseTitle: string }) {
+  const c = t.course;
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(course.candidates.filter((s) => !s.revoked).map((s) => s.id)));
+  const { run, pending } = useApiAction();
+
+  async function add() {
+    const userIds = [...selected];
+    await run(() => apiSend("post", `/admin/lessons/${lessonId}/course-students`, { userIds, restoreRevoked: true }), { success: c.added(userIds.length) });
+  }
+
+  return (
+    <div className="space-y-3 rounded-md border p-4">
+      <h3 className="font-sans text-sm font-medium">{c.title(courseTitle)}</h3>
+      {course.memberCount === 0 ? (
+        <p className="text-sm text-muted-foreground">{c.noMembers}</p>
+      ) : course.candidates.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{c.allIn(course.memberCount)}</p>
+      ) : (
+        <>
+          <p className="text-sm text-muted-foreground">{c.intro}</p>
+          <CheckList
+            legend={`${selected.size} / ${course.candidates.length}`}
+            items={course.candidates.map((s) => ({ id: s.id, label: s.name, description: s.email, note: s.revoked ? c.revoked : undefined }))}
+            selected={selected}
+            onChange={setSelected}
+            shortcuts
+          />
+          <Button onClick={add} disabled={pending || selected.size === 0}>
+            <UserPlus aria-hidden /> {pending ? common.actions.loading : c.add(selected.size)}
+          </Button>
+        </>
+      )}
+      <p className="text-xs text-muted-foreground">{c.outsideHint}</p>
+    </div>
   );
 }
 

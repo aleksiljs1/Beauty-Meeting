@@ -115,6 +115,8 @@ for (const l of [demo, upcoming, replay, expired]) {
 }
 // Sara has a shorter personal deadline on the replay lesson (expires tomorrow).
 await enroll(replay.id, sara.id, new Date(now + DAY));
+// All three attend the course; Sara isn't in the upcoming lesson yet, so its roster offers her.
+await prisma.courseMember.createMany({ data: students.map((s) => ({ courseId: course.id, userId: s.id })) });
 
 // --- Sample material (original, generated here) ------------------------------------------
 function samplePdf(title: string): Uint8Array<ArrayBuffer> {
@@ -154,7 +156,7 @@ const invite = await createInvitation({ lessonId: upcoming.id, redeemUntil: new 
 console.log(`
 Seed complete (local development only).
   Admin:    admin@akademia.local
-  Students: ana@akademia.local, elira@akademia.local, sara@akademia.local (Sara is not enrolled in the upcoming lesson)
+  Students: ana@akademia.local, elira@akademia.local, sara@akademia.local (all in the course; Sara is not enrolled in the upcoming lesson)
   Password: ${PASSWORD}
   Shared invitation link for "${upcoming.title}":
     ${invite.url}

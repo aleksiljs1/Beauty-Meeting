@@ -26,10 +26,18 @@ export const pageQuery = (value: string | null) => {
   return Number.isInteger(page) && page > 0 && page < 10_000 ? page : 1;
 };
 
+const courseIds = z.array(z.uuid()).max(50);
+const studentIds = z.array(z.string().min(1).max(100)).max(500);
+
 export const createStudentSchema = z.object({
   name: z.string().trim().min(2, "Shkruani emrin.").max(100),
   email: z.email("Email i pavlefshëm.").max(200),
+  courseIds: courseIds.optional(),
+  /** Also enrol the student in the upcoming lessons of those courses. */
+  addToUpcoming: z.boolean().optional(),
 });
+
+export const studentCoursesSchema = z.object({ courseIds, addToUpcoming: z.boolean().optional() });
 
 export const updateStudentSchema = z
   .object({
@@ -50,7 +58,7 @@ const lessonFields = {
   accessExpiresAt: isoDate,
 };
 
-export const createLessonSchema = z.object({ ...lessonFields, confirmEarlyDeadline: z.boolean().optional() });
+export const createLessonSchema = z.object({ ...lessonFields, confirmEarlyDeadline: z.boolean().optional(), studentIds: studentIds.optional() });
 
 export const updateLessonSchema = z.object({
   title: lessonFields.title.optional(),
@@ -68,6 +76,7 @@ export const updateLessonSchema = z.object({
 export const publicationSchema = z.object({ publication: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED", "CANCELLED"]) });
 export const demoActionSchema = z.object({ action: z.enum(["live", "end", "reset"]) });
 
+export const enrollStudentsSchema = z.object({ userIds: studentIds.min(1), restoreRevoked: z.boolean().optional() });
 export const grantEnrollmentSchema = z.object({ userId: z.string().min(1).max(100), accessExpiresAt: isoDate.nullish() });
 export const updateEnrollmentSchema = z
   .object({ revoked: z.boolean().optional(), accessExpiresAt: isoDate.nullable().optional() })

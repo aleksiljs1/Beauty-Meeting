@@ -30,6 +30,7 @@ model User {
   accounts      Account[]
 
   enrollments        LessonEnrollment[]     @relation("EnrollmentStudent")
+  courseMemberships  CourseMember[]
   enrollmentsGranted LessonEnrollment[]     @relation("EnrollmentGrantor")
   lessonsCreated     Lesson[]
   invitationsCreated LessonInvitation[]
@@ -139,6 +140,8 @@ enum MeetingStatus {
 enum EnrollmentSource {
   ADMIN
   INVITATION
+  /// Added as a member of the lesson's course (pre-selected list), not one by one.
+  COURSE
 }
 
 /// Lifecycle of an uploaded object (material or recording file).
@@ -183,6 +186,7 @@ model Course {
   updatedAt    DateTime @updatedAt @db.Timestamptz(3)
 
   lessons Lesson[]
+  members CourseMember[]
 
   @@index([isPublic, position])
 }
@@ -239,6 +243,22 @@ model Lesson {
   @@index([publication, scheduledStartAt])
   @@index([meetingStatus])
   @@index([courseId])
+}
+
+/// A student's course. Membership grants no access by itself: it decides which students are
+/// offered (pre-selected) when the course's lessons are created or staffed. Access is always a
+/// LessonEnrollment, so per-lesson deadlines, revocations and invitations keep working as before.
+model CourseMember {
+  id       String @id @default(uuid(7)) @db.Uuid
+  courseId String @db.Uuid
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([courseId, userId])
+  @@index([userId])
 }
 
 model LessonEnrollment {

@@ -3,12 +3,15 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Mail, MoreHorizontal, Pencil, UserCheck, UserX } from "lucide-react";
+import { GraduationCap, Mail, MoreHorizontal, Pencil, UserCheck, UserX } from "lucide-react";
+import { toast } from "sonner";
 import { z } from "zod";
+import { CheckList } from "@/components/admin/check-list";
 import { ConfirmAction } from "@/components/admin/confirm-action";
 import { FormField } from "@/components/admin/form-field";
 import { useApiAction } from "@/components/admin/use-api-action";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -19,10 +22,11 @@ import { common } from "@/i18n/common";
 const t = admin.students;
 const nameSchema = z.object({ name: z.string().trim().min(2, t.validation.name).max(100, t.validation.name) });
 
-type Student = { id: string; name: string; email: string; active: boolean };
+type Student = { id: string; name: string; email: string; active: boolean; courses: { id: string }[] };
+type Course = { id: string; title: string };
 
-export function StudentActions({ student }: { student: Student }) {
-  const [dialog, setDialog] = useState<null | "rename" | "deactivate" | "reactivate">(null);
+export function StudentActions({ student, courses }: { student: Student; courses: Course[] }) {
+  const [dialog, setDialog] = useState<null | "rename" | "courses" | "deactivate" | "reactivate">(null);
   const { run, pending } = useApiAction();
   const form = useForm<{ name: string }>({ resolver: zodResolver(nameSchema), values: { name: student.name } });
   const url = `/admin/students/${encodeURIComponent(student.id)}`;
@@ -43,6 +47,9 @@ export function StudentActions({ student }: { student: Student }) {
         <DropdownMenuContent align="end" className="min-w-64">
           <DropdownMenuItem onSelect={() => setDialog("rename")}>
             <Pencil aria-hidden /> {t.edit.open}
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setDialog("courses")}>
+            <GraduationCap aria-hidden /> {t.courses.open}
           </DropdownMenuItem>
           {student.active && (
             <DropdownMenuItem
@@ -86,6 +93,8 @@ export function StudentActions({ student }: { student: Student }) {
         </DialogContent>
       </Dialog>
 
+      {dialog === "courses" && <CoursesDialog student={student} courses={courses} onClose={() => setDialog(null)} />}
+
       <ConfirmAction
         open={dialog === "deactivate"}
         onOpenChange={(open) => setDialog(open ? "deactivate" : null)}
@@ -104,5 +113,69 @@ export function StudentActions({ student }: { student: Student }) {
         onConfirm={() => run(() => apiSend("patch", url, { active: true }), { success: t.reactivate.success })}
       />
     </>
+  );
+}
+
+function CoursesDialog({ student, courses, onClose }: { student: Student; courses: Course[]; onClose: () => void }) {
+  const initial = new Set(student.courses.map((c) => c.id));
+  const [selected, setSelected] = useState<Set<string>>(initial);
+  const [addToUpcoming, setAddToUpcoming] = useState(true);
+  const { run, pending } = useApiAction();
+  const adding = [...selected].some((id) => !initial.has(id));
+  const changed = adding || [...initial].some((id) => !selected.has(id));
+
+  async function save() {
+    const result = await run(() =>
+      apiSend<{ lessonsAdded: number }>("put", `/admin/students/${encodeURIComponent(student.id)}/courses`, {
+        courseIds: [...selected],
+        addToUpcoming: adding && addToUpcoming,
+      }),
+    );
+    if (!result) return;
+    toast.success(result.lessonsAdded ? t.courses.savedWithLessons(result.lessonsAdded) : t.courses.saved);
+    onClose();
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t.courses.title}</DialogTitle>
+          <DialogDescription>{t.courses.description(student.name)}</DialogDescription>
+        </DialogHeader>
+        {courses.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{t.courses.none}</p>
+        ) : (
+          <CheckList
+            legend={t.courses.field}
+            items={courses.map((c) => ({ id: c.id, label: c.title }))}
+            selected={selected}
+            onChange={setSelected}
+            footer={
+              <div className="space-y-2 pt-1">
+                {adding && student.active && (
+                  <label className="flex items-start gap-2 text-sm">
+                    <Checkbox className="mt-0.5" checked={addToUpcoming} onCheckedChange={(checked) => setAddToUpcoming(checked === true)} />
+                    <span>
+                      {t.courses.addToUpcoming}
+                      <span className="block text-xs text-muted-foreground">{t.courses.addToUpcomingHint}</span>
+                    </span>
+                  </label>
+                )}
+                <p className="text-xs text-muted-foreground">{t.courses.removeNote}</p>
+              </div>
+            }
+          />
+        )}
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose}>
+            {common.actions.cancel}
+          </Button>
+          <Button onClick={save} disabled={pending || !changed}>
+            {pending ? common.actions.loading : common.actions.save}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

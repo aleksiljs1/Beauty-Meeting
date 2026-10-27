@@ -119,12 +119,16 @@ export type AdminStudentRow = {
   active: boolean;
   hasPassword: boolean;
   enrollments: number;
+  courses: { id: string; title: string }[];
   createdAt: Date;
 };
 
-export async function listStudents(params: { q?: string; page?: number }): Promise<Paged<AdminStudentRow>> {
+export async function listStudents(params: { q?: string; page?: number; courseId?: string }): Promise<Paged<AdminStudentRow>> {
   const page = params.page ?? 1;
-  const where = studentSearch(params.q);
+  const where: Prisma.UserWhereInput = {
+    ...studentSearch(params.q),
+    ...(params.courseId ? { courseMemberships: { some: { courseId: params.courseId } } } : {}),
+  };
   const [rows, total] = await Promise.all([
     prisma.user.findMany({
       where,
@@ -138,6 +142,7 @@ export async function listStudents(params: { q?: string; page?: number }): Promi
         createdAt: true,
         accounts: { where: { providerId: "credential", password: { not: null } }, select: { id: true }, take: 1 },
         _count: { select: { enrollments: { where: { revokedAt: null } } } },
+        courseMemberships: { orderBy: { course: { position: "asc" } }, select: { course: { select: { id: true, title: true } } } },
       },
     }),
     prisma.user.count({ where }),
@@ -150,6 +155,7 @@ export async function listStudents(params: { q?: string; page?: number }): Promi
       active: !u.banned,
       hasPassword: u.accounts.length > 0,
       enrollments: u._count.enrollments,
+      courses: u.courseMemberships.map((m) => m.course),
       createdAt: u.createdAt,
     })),
     total,

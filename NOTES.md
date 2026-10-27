@@ -124,6 +124,25 @@ Original brief: `c:\Users\aleksiljs\Downloads\Beauty_Academy_Zoom_Claude_Megapro
   `npm run test:integration` passed (69 tests), including independent-flag, single-slot replacement,
   and all four public-query filters. `npx prisma migrate status` reported the database up to date.
 
+## Course students (user request, 2026-10-27)
+
+- Lessons belong to a course; now **students belong to courses too** (`CourseMember`, many-to-many: a
+  student can attend several courses). Set when creating the student or later via Studentët → ⋯ → Kurset.
+  The students list shows each student's courses and filters by course.
+- **Membership never grants access by itself.** Access is still only a `LessonEnrollment`, checked by the
+  central policy, so per-lesson deadlines, revocation, invitations, live alerts and emails work as before.
+  Membership decides who is *offered*:
+  - **New lesson in a course** → the course's active students appear pre-selected; untick anyone who
+    shouldn't attend. They are enrolled when the lesson is created (source `COURSE`).
+  - **Lesson → Studentët** → "Studentët e kursit" lists members not yet in the lesson, pre-selected, one
+    button to add them. Anyone from outside the course is still added with the search below it.
+  - **Student added to a course** → option (on by default) to also enrol them in that course's upcoming
+    lessons (draft or published, not finished, not cancelled/archived).
+- Nothing changes behind the admin's back: removing a student from a course, changing a lesson's course
+  or deleting a course never removes lesson access. A student whose access to a lesson was revoked is never
+  re-added automatically: in the roster they're listed unticked ("Aksesi u hoq më parë").
+- Deactivated accounts are never offered. Tests: `course-members.integration.test.ts`.
+
 ## Lesson materials: MP4 videos and multi-file upload (2026-10-23)
 
 - Materials may now include **MP4 videos** (`.mp4`/`.m4v`, declared `video/mp4`, verified by the `ftyp`
