@@ -1,7 +1,7 @@
 "use client";
 
 import { Download, Eye, FileText, Film, Image as ImageIcon, Loader2, Presentation, X } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { portalText } from "@/i18n/portal";
@@ -55,8 +55,14 @@ export function MaterialsPanel({
   /** False while the panel is hidden (another tab): a playing video is paused. */
   visible?: boolean;
 }) {
-  const [viewer, setViewer] = useState<Viewer | null>(null);
+  const [opened, setViewer] = useState<Viewer | null>(null);
   const [pending, setPending] = useState<string | null>(null);
+  // A material the admin removed (the list refreshes live) closes for the student too.
+  const viewer = opened && materials.some((m) => m.id === opened.id) ? opened : null;
+  const lostViewer = !!opened && !viewer;
+  useEffect(() => {
+    if (lostViewer) onViewerChange?.(false);
+  }, [lostViewer, onViewerChange]);
 
   const grant = async (material: MaterialItem, mode: "view" | "download") => {
     setPending(`${material.id}:${mode}`);

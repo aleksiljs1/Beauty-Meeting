@@ -76,7 +76,8 @@ export const adminContent = {
     priceText: "Çmimi (opsional)",
     isPublic: "Shfaqe në faqen publike",
     billingHeading: "Pagesat",
-    billingHint: "Plotësoni datën e fillimit dhe kohëzgjatjen për të regjistruar pagesat e studentëve te “Pagesat”.",
+    billingHint:
+      "Plotësoni datën e fillimit dhe kohëzgjatjen për të regjistruar pagesat e studentëve te “Pagesat”. Çdo student paguan nga muaji i kursit kur u shtua (studentët që ishin në kurs para se të plotësohej kjo, nga muaji 1); muaji i fillimit i secilit ndryshohet te “Pagesat”. Kur ka pagesa, ndryshimi i datës së fillimit zhvendos edhe muajt e paguar.",
     startsOn: "Data e fillimit",
     durationYears: "Vite",
     durationMonths: "Muaj",

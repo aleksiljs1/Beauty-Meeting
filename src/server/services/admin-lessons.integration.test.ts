@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { beforeEach, describe, expect, it } from "vitest";
 import { ZodError } from "zod";
+import { academyDay } from "@/lib/datetime";
 import { createLesson as createFixtureLesson, createUser, resetDatabase } from "@/test/fixtures";
 
 const { createLesson, createRepeatingLesson, updateLesson, setLessonPublication, runDemoAction, deleteDraftLesson } = await import("./lessons");
@@ -94,6 +95,12 @@ describe("repeating lessons", () => {
     await expect(createRepeatingLesson({ title: "Grim", ...schedule() }, { weekdays: [0, 1, 2, 3, 4, 5, 6], until: "2099-01-01" }, false, admin)).rejects.toMatchObject({
       code: "VALIDATION_FAILED",
     });
+    expect(await prisma.lesson.count()).toBe(0);
+  });
+
+  it("creates nothing when a chosen student can't be enrolled", async () => {
+    const banned = await createUser("student", { banned: true });
+    await expect(createRepeatingLesson({ title: "Grim", ...schedule() }, { weekdays: [0, 2], until: academyDay(new Date(Date.now() + 15 * DAY)) }, false, admin, [banned.id])).rejects.toMatchObject({ code: "CONFLICT" });
     expect(await prisma.lesson.count()).toBe(0);
   });
 });

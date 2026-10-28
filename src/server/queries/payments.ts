@@ -31,24 +31,28 @@ export async function listPaymentAccounts(filter: { courseId?: string } = {}, no
     select: { id: true, title: true, startsOn: true, durationMonths: true, monthlyPriceCents: true, _count: { select: { members: true } } },
   });
   const billed = courses.filter((c) => c.startsOn && c.durationMonths);
-  const [members, sums] = await Promise.all([
+  const courseIds = billed.map((c) => c.id);
+  const [members, starts, sums] = await Promise.all([
     prisma.courseMember.findMany({
-      where: { courseId: { in: billed.map((c) => c.id) }, user: { role: "student" } },
+      where: { courseId: { in: courseIds }, user: { role: "student" } },
       orderBy: { user: { name: "asc" } },
       take: MAX_ACCOUNTS,
-      select: { courseId: true, firstMonth: true, user: { select: { id: true, name: true, email: true, banned: true } } },
+      select: { courseId: true, user: { select: { id: true, name: true, email: true, banned: true } } },
     }),
+    prisma.billingStart.findMany({ where: { courseId: { in: courseIds } }, select: { courseId: true, userId: true, firstMonth: true } }),
     prisma.payment.groupBy({
       by: ["courseId", "userId"],
-      where: { courseId: { in: billed.map((c) => c.id) }, cancelledAt: null },
+      where: { courseId: { in: courseIds }, cancelledAt: null },
       _sum: { months: true, amountCents: true },
     }),
   ]);
 
   const courseById = new Map(billed.map((c) => [c.id, c]));
   const paid = new Map(sums.map((s) => [`${s.courseId}:${s.userId}`, s._sum]));
-  const accounts: PaymentAccount[] = members.map(({ courseId, firstMonth, user }) => {
+  const firstMonths = new Map(starts.map((s) => [`${s.courseId}:${s.userId}`, s.firstMonth]));
+  const accounts: PaymentAccount[] = members.map(({ courseId, user }) => {
     const course = courseById.get(courseId)!;
+    const firstMonth = firstMonths.get(`${courseId}:${user.id}`) ?? 1;
     const billing = { startsOn: fromDbDate(course.startsOn!), durationMonths: course.durationMonths!, monthlyPriceCents: course.monthlyPriceCents };
     const sum = paid.get(`${courseId}:${user.id}`);
     const monthsPaid = sum?.months ?? 0;
@@ -104,8 +108,8 @@ export type PaymentHistoryEntry = {
 
 /** One student's payments for a course, oldest first, with the months each one covers. */
 export async function getPaymentHistory(courseId: string, userId: string): Promise<PaymentHistoryEntry[]> {
-  const [member, payments] = await Promise.all([
-    prisma.courseMember.findUnique({ where: { courseId_userId: { courseId, userId } }, select: { firstMonth: true } }),
+  const [start, payments] = await Promise.all([
+    prisma.billingStart.findUnique({ where: { courseId_userId: { courseId, userId } }, select: { firstMonth: true } }),
     prisma.payment.findMany({
       where: { courseId, userId },
       orderBy: [{ paidOn: "asc" }, { createdAt: "asc" }],
@@ -113,7 +117,7 @@ export async function getPaymentHistory(courseId: string, userId: string): Promi
       select: { id: true, months: true, amountCents: true, paidOn: true, method: true, note: true, cancelledAt: true, cancelReason: true, recordedBy: { select: { name: true } } },
     }),
   ]);
-  let next = member?.firstMonth ?? 1;
+  let next = start?.firstMonth ?? 1;
   return payments.map(({ recordedBy, paidOn, ...p }) => {
     const covers = p.cancelledAt ? null : { fromMonth: next, toMonth: (next += p.months) - 1 };
     return { ...p, paidOn: fromDbDate(paidOn), recordedBy: recordedBy?.name ?? null, fromMonth: covers?.fromMonth ?? null, toMonth: covers?.toMonth ?? null };

@@ -16,6 +16,7 @@ import { bytesMatch, MAX_UPLOAD_BYTES, ruleForDeclaredFile, SNIFF_BYTES } from "
 import { GALLERY_IMAGE_TYPES, isGalleryKey } from "@/server/storage/public-media";
 import { deleteObject, headObject, newObjectKey, presignPut, readObjectHead } from "@/server/storage/storage";
 import { audit } from "./audit";
+import { assertBillingChangeKeepsPayments } from "./payments";
 
 /**
  * Public website content (settings, services, courses, gallery), edited by the admin.
@@ -203,14 +204,22 @@ export async function createCourse(admin: AppUser, input: CourseInput) {
 }
 
 export async function updateCourse(admin: AppUser, id: string, input: Partial<CourseInput>) {
-  const course = await withSlugCheck(prisma.course.update({ where: { id }, data: courseData(input), select: courseSelect }));
+  const data = courseData(input);
+  await assertBillingChangeKeepsPayments(id, data);
+  const course = await withSlugCheck(prisma.course.update({ where: { id }, data, select: courseSelect }));
   await audit(admin.id, "content.course.update", "course", id);
   return toAdminCourse(course);
 }
 
 export async function deleteCourse(admin: AppUser, id: string) {
   if (await prisma.payment.count({ where: { courseId: id } })) throw new ApiError("CONFLICT", e.courseHasPayments);
-  await rethrowMissing(prisma.course.delete({ where: { id } }));
+  try {
+    await rethrowMissing(prisma.course.delete({ where: { id } }));
+  } catch (error) {
+    // A payment recorded between the check and the delete: the foreign key refuses it.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") throw new ApiError("CONFLICT", e.courseHasPayments);
+    throw error;
+  }
   await audit(admin.id, "content.course.delete", "course", id);
 }
 

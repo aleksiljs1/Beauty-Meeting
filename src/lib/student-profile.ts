@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { admin } from "@/i18n/admin";
-import { fromDbDate } from "./datetime";
+import { fromDbDate, isCalendarDay, todayInAcademy } from "./datetime";
 
 /**
  * Optional student details, shared by the admin forms and the API. Every field is a plain
@@ -16,7 +16,7 @@ const text = (max: number) => z.string().trim().max(max, v.tooLong);
 export const studentProfileSchema = z.object({
   phone: text(40).refine((value) => value === "" || /^\+?[\d\s()-]{6,}$/.test(value), v.phone),
   /** "YYYY-MM-DD"; age is worked out from it, so it never goes stale. */
-  birthDate: text(10).refine((value) => value === "" || (/^\d{4}-\d{2}-\d{2}$/.test(value) && value >= "1900-01-01"), v.birthDate),
+  birthDate: text(10).refine((value) => value === "" || (isCalendarDay(value) && value >= "1900-01-01" && value <= todayInAcademy()), v.birthDate),
   gender: z.union([z.literal(""), z.enum(GENDERS)]),
   city: text(100),
   /** Only admins see this. */

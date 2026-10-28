@@ -1,12 +1,14 @@
 import "server-only";
 import { z } from "zod";
+import { MAX_COURSE_MONTHS } from "@/lib/billing";
+import { isCalendarDay } from "@/lib/datetime";
 import { studentProfileSchema } from "@/lib/student-profile";
 import { ApiError } from "@/server/http";
 
 /** Zod schemas and param helpers shared by the /api/v1/admin route handlers. */
 
 const isoDate = z.iso.datetime({ offset: true, message: "Data nuk është e vlefshme." }).transform((value) => new Date(value));
-const calendarDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data nuk është e vlefshme.");
+const calendarDay = z.string().refine(isCalendarDay, "Data nuk është e vlefshme.");
 const optionalText = (max: number) => z.string().max(max, "Teksti është shumë i gjatë.").nullish();
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -125,7 +127,7 @@ const studentId = z.string().min(1).max(100);
 export const paymentAccountQuery = z.object({ courseId: z.uuid(), userId: studentId });
 
 export const recordPaymentSchema = paymentAccountQuery.extend({
-  months: z.number().int().min(1, "Të paktën 1 muaj.").max(120),
+  months: z.number().int().min(1, "Të paktën 1 muaj.").max(MAX_COURSE_MONTHS),
   /** Euro cents: what was actually paid (a yearly payment may be discounted). */
   amountCents: z.number().int().min(0).max(100_000_000),
   paidOn: calendarDay,
@@ -135,4 +137,4 @@ export const recordPaymentSchema = paymentAccountQuery.extend({
 
 export const cancelPaymentSchema = z.object({ reason: z.string().trim().min(3, "Shkruani arsyen.").max(300) });
 
-export const firstMonthSchema = z.object({ firstMonth: z.number().int().min(1).max(120) });
+export const firstMonthSchema = z.object({ firstMonth: z.number().int().min(1).max(MAX_COURSE_MONTHS) });

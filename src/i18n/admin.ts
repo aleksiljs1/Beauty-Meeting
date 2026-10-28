@@ -151,7 +151,7 @@ export const admin = {
     delete: {
       action: "Fshi",
       title: "Të fshihet llogaria e studentit?",
-      description: (name: string) => `${name} dhe llogaria e tij/saj do të fshihen përgjithmonë. Regjistrimet në mësime, kurset dhe sesionet e hyrjes të këtij studenti do të hiqen. Ky veprim nuk mund të zhbëhet.`,
+      description: (name: string) => `${name} dhe llogaria e tij/saj do të fshihen përgjithmonë. Regjistrimet në mësime, kurset dhe sesionet e hyrjes të këtij studenti do të hiqen. Një student me pagesa nuk mund të fshihet; çaktivizojeni. Ky veprim nuk mund të zhbëhet.`,
       confirm: "Fshi llogarinë",
       success: "Llogaria e studentit u fshi.",
     },
@@ -190,6 +190,7 @@ export const admin = {
     columns: { student: "Studenti", course: "Kursi", paid: "Paguar", until: "Paguar deri", owed: "Borxh", status: "Gjendja", actions: "Veprime" },
     status: { OVERDUE: "Me vonesë", DUE_SOON: "Afati së shpejti", PAID: "Në rregull", COMPLETE: "Paguar plotësisht" },
     inactive: "Joaktiv",
+    inactiveNotCounted: "Studentët e çaktivizuar shfaqen te «Të gjitha», por nuk llogariten te borxhi.",
     month: (year: number, month: number) => `Viti ${year} · Muaji ${month}`,
     months: (n: number) => (n === 1 ? "1 muaj" : `${n} muaj`),
     paidOf: (paid: number, total: number) => `${paid} nga ${total} muaj`,
@@ -303,7 +304,9 @@ export const admin = {
       hint: "Krijon të njëjtin mësim, me të njëjtët studentë, në ditët e zgjedhura deri në datën e fundit. Çdo mësim mund të ndryshohet më pas veçmas.",
       weekdays: "Ditët e javës",
       until: "Data e fundit",
-      preview: (count: number, last: string) => `Do të krijohen ${count} mësime (i fundit: ${last}).`,
+      preview: (count: number, dates: string[], last: string | null) =>
+        `Do të krijohen ${count} mësime: ${dates.join(", ")}${last ? ` … deri më ${last}` : ""}.`,
+      startDay: "Dita e mësimit të parë përfshihet gjithmonë.",
       tooMany: (max: number) => `Shumë mësime: deri në ${max} njëherësh. Zgjidhni një datë të fundit më të afërt.`,
       noWeekday: "Zgjidhni të paktën një ditë.",
       created: (count: number) => `U krijuan ${count} mësime si draft.`,
@@ -336,7 +339,7 @@ export const admin = {
     restoreDraft: "Rikthe si draft",
     deleteDraft: "Fshi draftin",
     deleteTitle: "Të fshihet drafti?",
-    deleteBody: "Mësimi, materialet dhe regjistrimet e tij fshihen përgjithmonë. Kjo nuk mund të zhbëhet.",
+    deleteBody: "Mësimi dhe regjistrimet e tij fshihen përgjithmonë; materialet mbeten te Materialet. Kjo nuk mund të zhbëhet.",
     deleted: "Mësimi u fshi.",
     done: {
       PUBLISHED: "Mësimi u publikua.",

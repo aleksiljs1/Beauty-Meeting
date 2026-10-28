@@ -7,11 +7,11 @@ import type { AppUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
 import { env } from "@/server/env";
 import { ApiError } from "@/server/http";
-import { publishLessonChanged } from "@/server/realtime/publish";
+import { publishFeedChanged, publishLessonChanged } from "@/server/realtime/publish";
 import { deleteObject } from "@/server/storage/storage";
 import { deleteZoomMeeting, syncZoomMeetingSchedule } from "@/server/zoom/meetings";
 import { audit } from "./audit";
-import { assertActiveStudents, enrollStudents } from "./course-members";
+import { assertActiveStudents } from "./course-members";
 import { markLessonEnded, markLessonLive, notifyLessonCancelled, notifyLessonRescheduled } from "./live";
 
 /**
@@ -55,46 +55,68 @@ function assertDemoAllowed(isDemo: boolean | undefined) {
 
 /** `studentIds`: students to enrol right away (the course's students, pre-selected in the form). */
 export async function createLesson(input: LessonInput, confirmEarlyDeadline: boolean, admin: AppUser, studentIds: string[] = []) {
-  throwScheduleIssues(validateLessonSchedule(input, confirmEarlyDeadline));
-  await assertCourse(input.courseId);
-  assertDemoAllowed(input.isDemo);
-  await assertActiveStudents([...new Set(studentIds)]); // checked first, so a bad list is refused before anything is created
-
-  const lesson = await prisma.lesson.create({
-    data: {
-      title: input.title.trim(),
-      summary: clean(input.summary),
-      details: clean(input.details),
-      courseId: input.courseId || null,
-      scheduledStartAt: input.scheduledStartAt,
-      scheduledEndAt: input.scheduledEndAt,
-      joinOpensAt: input.joinOpensAt,
-      accessExpiresAt: input.accessExpiresAt,
-      isDemo: input.isDemo ?? false,
-      // The demo classroom is always "provisioned"; real Zoom meetings are created in Phase 2.
-      meetingStatus: input.isDemo ? "SCHEDULED" : "NOT_PROVISIONED",
-      publication: "DRAFT",
-      createdById: admin.id,
-    },
-    select: { id: true },
-  });
-  await audit(admin.id, "lesson.create", "lesson", lesson.id, { isDemo: input.isDemo ?? false });
-  const { added } = await enrollStudents(lesson.id, studentIds, admin);
-  return { ...lesson, enrolled: added };
+  const { id, enrolled } = await createLessons(input, [input], confirmEarlyDeadline, admin, studentIds);
+  return { id, enrolled };
 }
 
-/**
- * Creates a lesson and its repeats (same details and students, one lesson per date). Every
- * date is checked before anything is created; each lesson then gets its own Zoom meeting as usual.
- */
+/** Creates a lesson and its repeats: one lesson per date, all with the same details and students. */
 export async function createRepeatingLesson(input: LessonInput, repeat: RepeatRule, confirmEarlyDeadline: boolean, admin: AppUser, studentIds: string[] = []) {
   const schedules = repeatSchedules(input, repeat);
   if (schedules.length > MAX_REPEATED_LESSONS) throw new ApiError("VALIDATION_FAILED", `Mund të krijohen deri në ${MAX_REPEATED_LESSONS} mësime njëherësh. Zgjidhni një datë mbarimi më të afërt.`);
-  for (const schedule of schedules) throwScheduleIssues(validateLessonSchedule(schedule, confirmEarlyDeadline));
+  return createLessons(input, schedules, confirmEarlyDeadline, admin, studentIds);
+}
 
-  const created = [];
-  for (const schedule of schedules) created.push(await createLesson({ ...input, ...schedule }, confirmEarlyDeadline, admin, studentIds));
-  return { id: created[0].id, enrolled: created[0].enrolled, count: created.length };
+/**
+ * All or nothing: every date and student is checked first, then the lessons, their enrolments and
+ * audit entries are written in one transaction, so a failure (or a retry after one) never leaves
+ * half a series behind.
+ */
+async function createLessons(input: LessonInput, schedules: LessonSchedule[], confirmEarlyDeadline: boolean, admin: AppUser, studentIds: string[]) {
+  for (const schedule of schedules) throwScheduleIssues(validateLessonSchedule(schedule, confirmEarlyDeadline));
+  await assertCourse(input.courseId);
+  assertDemoAllowed(input.isDemo);
+  const ids = [...new Set(studentIds)];
+  await assertActiveStudents(ids);
+  const members = new Set(
+    input.courseId && ids.length
+      ? (await prisma.courseMember.findMany({ where: { courseId: input.courseId, userId: { in: ids } }, select: { userId: true } })).map((m) => m.userId)
+      : [],
+  );
+  const isDemo = input.isDemo ?? false;
+
+  const lessons = await prisma.$transaction(async (tx) => {
+    const created = await tx.lesson.createManyAndReturn({
+      data: schedules.map(({ scheduledStartAt, scheduledEndAt, joinOpensAt, accessExpiresAt }) => ({
+        title: input.title.trim(),
+        summary: clean(input.summary),
+        details: clean(input.details),
+        courseId: input.courseId || null,
+        scheduledStartAt,
+        scheduledEndAt,
+        joinOpensAt,
+        accessExpiresAt,
+        isDemo,
+        // The demo classroom is always "provisioned"; real Zoom meetings are created in Phase 2.
+        meetingStatus: isDemo ? "SCHEDULED" : "NOT_PROVISIONED",
+        publication: "DRAFT",
+        createdById: admin.id,
+      })),
+      select: { id: true, scheduledStartAt: true },
+    });
+    const enrollments = created.flatMap((lesson) =>
+      ids.map((userId) => ({ lessonId: lesson.id, userId, source: members.has(userId) ? ("COURSE" as const) : ("ADMIN" as const), grantedById: admin.id })),
+    );
+    await tx.lessonEnrollment.createMany({ data: enrollments });
+    await tx.auditLog.createMany({
+      data: [
+        ...created.map((lesson) => ({ actorId: admin.id, action: "lesson.create", targetType: "lesson", targetId: lesson.id, details: { isDemo } })),
+        ...enrollments.map((e) => ({ actorId: admin.id, action: "enrollment.grant", targetType: "lesson", targetId: e.lessonId, details: { userId: e.userId, via: e.source === "COURSE" ? "course" : "admin" } })),
+      ],
+    });
+    return created.sort((a, b) => a.scheduledStartAt.getTime() - b.scheduledStartAt.getTime());
+  });
+  await publishFeedChanged(ids);
+  return { id: lessons[0].id, enrolled: ids.length, count: lessons.length };
 }
 
 export async function updateLesson(lessonId: string, patch: LessonPatch, confirmEarlyDeadline: boolean, admin: AppUser) {

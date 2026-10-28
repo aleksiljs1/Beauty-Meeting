@@ -4,7 +4,8 @@ import { createUser, resetDatabase } from "@/test/fixtures";
 
 const { cancelPayment, recordPayment, setFirstMonth } = await import("./payments");
 const { setStudentCourses } = await import("./course-members");
-const { deleteCourse } = await import("./content");
+const { deleteCourse, updateCourse } = await import("./content");
+const { deleteStudent } = await import("./students");
 const { getPaymentAlerts, getPaymentHistory, listPaymentAccounts } = await import("@/server/queries/payments");
 const { prisma } = await import("@/server/db");
 
@@ -99,5 +100,44 @@ describe("course payments", () => {
     await setStudentCourses(student.id, [courseId], admin);
     await pay(courseId, student.id, 1);
     await expect(deleteCourse(admin, courseId)).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+  it("keeps a returning student's paid months where they were", async () => {
+    const { id: courseId } = await course();
+    const student = await createUser("student");
+    await setStudentCourses(student.id, [courseId], admin, { now: new Date("2026-12-05T10:00:00Z") }); // pays from month 2
+    await pay(courseId, student.id, 2, "2026-12-05");
+    await setStudentCourses(student.id, [], admin);
+    // Back in month 5: the two paid months are still months 2–3, so months 4 and 5 are owed.
+    const march = new Date("2027-03-10T10:00:00Z");
+    await setStudentCourses(student.id, [courseId], admin, { now: march });
+    expect(await account(student.id, march)).toMatchObject({ firstMonth: 2, paidThroughMonth: 3, monthsOwed: 2 });
+
+    // Without payments, coming back starts from the month they return in.
+    const other = await createUser("student");
+    await setStudentCourses(other.id, [courseId], admin, { now: new Date("2026-11-05T10:00:00Z") });
+    await setStudentCourses(other.id, [], admin);
+    await setStudentCourses(other.id, [courseId], admin, { now: march });
+    expect(await account(other.id, march)).toMatchObject({ firstMonth: 5 });
+  });
+
+  it("won't delete a student who has payments", async () => {
+    const { id: courseId } = await course();
+    const student = await createUser("student");
+    await setStudentCourses(student.id, [courseId], admin);
+    await pay(courseId, student.id, 1);
+    await expect(deleteStudent(student.id, admin)).rejects.toMatchObject({ code: "CONFLICT" });
+    expect(await prisma.payment.count({ where: { userId: student.id } })).toBe(1);
+  });
+
+  it("won't shorten a course below what someone paid, or drop its billing", async () => {
+    const { id: courseId } = await course();
+    const student = await createUser("student");
+    await setStudentCourses(student.id, [courseId], admin, { now: new Date("2026-10-20T10:00:00Z") });
+    await pay(courseId, student.id, 14);
+    await expect(updateCourse(admin, courseId, { duration: { years: "1", months: "0" } })).rejects.toMatchObject({ code: "CONFLICT" });
+    await expect(updateCourse(admin, courseId, { startsOn: "" })).rejects.toMatchObject({ code: "CONFLICT" });
+    await updateCourse(admin, courseId, { duration: { years: "1", months: "2" } });
+    expect((await prisma.course.findUniqueOrThrow({ where: { id: courseId } })).durationMonths).toBe(14);
   });
 });

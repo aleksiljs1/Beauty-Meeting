@@ -16,6 +16,9 @@ export const DUE_SOON_DAYS = 7;
 
 export type BillingStatus = "OVERDUE" | "DUE_SOON" | "PAID" | "COMPLETE";
 
+/** Longest course the course form allows (10 years 11 months). */
+export const MAX_COURSE_MONTHS = 10 * 12 + 11;
+
 export type CourseBilling = { startsOn: string; durationMonths: number; monthlyPriceCents: number | null };
 const parse = (date: string) => date.split("-").map(Number) as [number, number, number];
 

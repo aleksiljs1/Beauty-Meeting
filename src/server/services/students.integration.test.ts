@@ -34,6 +34,7 @@ describe("optional student details", () => {
   it("validates the fields and works out the age from the birth date", () => {
     const bad = updateStudentSchema.safeParse({ profile: { ...emptyStudentProfile, phone: "call me", birthDate: "1850-01-01" } });
     expect(bad.success ? [] : bad.error.issues.map((i) => i.path.join("."))).toEqual(["profile.phone", "profile.birthDate"]);
+    for (const birthDate of ["2001-02-30", "2999-01-01"]) expect(updateStudentSchema.safeParse({ profile: { ...emptyStudentProfile, birthDate } }).success).toBe(false);
     expect(ageOn("2001-05-20", "2026-05-19")).toBe(24);
     expect(ageOn("2001-05-20", "2026-05-20")).toBe(25);
   });

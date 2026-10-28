@@ -77,9 +77,13 @@ export async function updateStudentEmail(userId: string, email: string, admin: A
 }
 
 /** Permanently removes a student and their dependent access records. */
+const HAS_PAYMENTS = "Ky student ka pagesa të regjistruara, ndaj nuk fshihet. Çaktivizojeni në vend të fshirjes, që historiku i pagesave të ruhet.";
+
 export async function deleteStudent(userId: string, admin: AppUser) {
   if (userId === admin.id) throw new ApiError("FORBIDDEN", "Nuk mund të fshini llogarinë tuaj.");
   const student = await findStudent(userId);
+  // Payments are kept for the books (the FK restricts too, in case one is recorded meanwhile).
+  if (await prisma.payment.count({ where: { userId } })) throw new ApiError("CONFLICT", HAS_PAYMENTS);
   try {
     await prisma.$transaction(async (tx) => {
       await tx.user.delete({ where: { id: userId } });

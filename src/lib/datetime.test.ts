@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { academyDay, addDays, formatDate, formatMonthYear, formatTimeRange, fromZonedInputValue, timezoneAbbreviation, toZonedInputValue, weekdayIndex } from "./datetime";
+import { academyDay, addDays, formatDate, formatMonthYear, formatTimeRange, fromZonedInputValue, isCalendarDay, timezoneAbbreviation, toZonedInputValue, weekdayIndex } from "./datetime";
 
 describe("academy timezone (Europe/Tirane)", () => {
   it("converts admin-entered local time to UTC in winter (CET, UTC+1) and summer (CEST, UTC+2)", () => {
@@ -42,5 +42,10 @@ describe("academy timezone (Europe/Tirane)", () => {
     expect(weekdayIndex("2026-11-01")).toBe(6); // Sunday
     expect(addDays("2026-03-28", 2)).toBe("2026-03-30"); // across the DST change
     expect(formatMonthYear("2026-11-01")).toBe("nëntor 2026");
+  });
+
+  it("rejects days that don't exist instead of rolling them over", () => {
+    expect(isCalendarDay("2028-02-29")).toBe(true);
+    for (const day of ["2026-02-29", "2026-02-31", "2026-04-31", "2026-13-01", "2026-00-10", "2026-1-5", ""]) expect(isCalendarDay(day)).toBe(false);
   });
 });

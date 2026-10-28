@@ -101,6 +101,9 @@ const DAY_MS = 86_400_000;
 const pad = (n: number) => String(n).padStart(2, "0");
 const parseDay = (day: string) => day.split("-").map(Number) as [number, number, number];
 
+/** A real "YYYY-MM-DD" day (rejects 2026-02-31 and 2026-13-01, which Date would quietly roll over). */
+export const isCalendarDay = (day: string) => /^\d{4}-\d{2}-\d{2}$/.test(day) && addDays(day, 0) === day;
+
 export function addDays(day: string, days: number): string {
   const [y, m, d] = parseDay(day);
   return new Date(Date.UTC(y, m - 1, d) + days * DAY_MS).toISOString().slice(0, 10);

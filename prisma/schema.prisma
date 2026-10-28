@@ -31,6 +31,7 @@ model User {
 
   enrollments        LessonEnrollment[]     @relation("EnrollmentStudent")
   courseMemberships  CourseMember[]
+  billingStarts      BillingStart[]
   enrollmentsGranted LessonEnrollment[]     @relation("EnrollmentGrantor")
   lessonsCreated     Lesson[]
   invitationsCreated LessonInvitation[]
@@ -199,8 +200,9 @@ model Course {
   monthlyPriceCents Int?
 
   lessons  Lesson[]
-  members  CourseMember[]
-  payments Payment[]
+  members       CourseMember[]
+  billingStarts BillingStart[]
+  payments      Payment[]
 
   @@index([isPublic, position])
 }
@@ -268,8 +270,6 @@ model CourseMember {
   course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
   userId   String
   user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  /// First course month this student pays for (later than 1 when they joined late).
-  firstMonth Int @default(1)
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 
@@ -545,6 +545,20 @@ enum PaymentMethod {
   OTHER
 }
 
+/// The course month a student pays from (later than 1 when they joined late). Kept apart from
+/// CourseMember so it survives the student being taken off the course and added back: their
+/// earlier payments then still cover the same months.
+model BillingStart {
+  courseId   String @db.Uuid
+  course     Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstMonth Int    @default(1)
+
+  @@id([courseId, userId])
+  @@index([userId])
+}
+
 /// A payment made outside the site and recorded by the admin. It covers `months` whole course
 /// months, following the student's earlier payments. Mistakes are cancelled, never deleted.
 model Payment {
@@ -553,7 +567,8 @@ model Payment {
   /// A course with payments can't be deleted, so the money history isn't lost silently.
   course       Course        @relation(fields: [courseId], references: [id], onDelete: Restrict)
   userId       String
-  user         User          @relation("PaymentStudent", fields: [userId], references: [id], onDelete: Cascade)
+  /// A student with payments can't be deleted either (deactivate them instead).
+  user         User          @relation("PaymentStudent", fields: [userId], references: [id], onDelete: Restrict)
   months       Int
   amountCents  Int
   paidOn       DateTime      @db.Date

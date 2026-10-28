@@ -43,8 +43,11 @@ export default async function PaymentsPage({ searchParams }: PageProps<"/admin/p
   const courseId = courses.find((c) => c.id === one(params.kursi))?.id;
   const status = STATUSES.find((s) => s === one(params.gjendja));
   const { accounts, unbilledCourses } = await listPaymentAccounts({ courseId });
-  const shown = status ? accounts.filter((a) => a.status === status) : accounts;
-  const sum = (pick: (a: (typeof accounts)[number]) => number | null) => accounts.reduce((total, a) => total + (pick(a) ?? 0), 0);
+  // Deactivated students (usually dropouts) aren't chased for money: they stay listed under "all",
+  // with what they paid, but count toward neither the debt nor the status filters.
+  const active = accounts.filter((a) => a.active);
+  const shown = status ? active.filter((a) => a.status === status) : accounts;
+  const sum = (list: typeof accounts, pick: (a: (typeof accounts)[number]) => number | null) => list.reduce((total, a) => total + (pick(a) ?? 0), 0);
 
   const href = ({ kursi = courseId, gjendja = status }: { kursi?: string; gjendja?: string }) => {
     const search = new URLSearchParams();
@@ -58,10 +61,11 @@ export default async function PaymentsPage({ searchParams }: PageProps<"/admin/p
       <PageHeader title={t.title} intro={t.intro} />
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <Total label={t.totals.owed} cents={sum((a) => a.amountOwedCents)} />
-        <Total label={t.totals.paid} cents={sum((a) => a.amountPaidCents)} />
-        <Total label={t.totals.left} cents={sum((a) => a.amountLeftCents)} />
+        <Total label={t.totals.owed} cents={sum(active, (a) => a.amountOwedCents)} />
+        <Total label={t.totals.paid} cents={sum(accounts, (a) => a.amountPaidCents)} />
+        <Total label={t.totals.left} cents={sum(active, (a) => a.amountLeftCents)} />
       </div>
+      {active.length < accounts.length && <p className="-mt-3 text-xs text-muted-foreground">{t.inactiveNotCounted}</p>}
 
       {unbilledCourses.length > 0 && (
         <div className="flex flex-col gap-2 rounded-md border border-dashed p-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
@@ -93,7 +97,7 @@ export default async function PaymentsPage({ searchParams }: PageProps<"/admin/p
           </FilterChip>
           {STATUSES.map((s) => (
             <FilterChip key={s} href={href({ gjendja: s })} active={status === s}>
-              {`${t.status[s]} (${accounts.filter((a) => a.status === s).length})`}
+              {`${t.status[s]} (${active.filter((a) => a.status === s).length})`}
             </FilterChip>
           ))}
         </div>

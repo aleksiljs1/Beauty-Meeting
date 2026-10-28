@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { adminContent } from "@/i18n/admin-content";
-import { parseEuroCents } from "./billing";
+import { MAX_COURSE_MONTHS, parseEuroCents } from "./billing";
+import { isCalendarDay } from "./datetime";
 import { SLUG_PATTERN } from "./public-content";
 
 /**
@@ -13,7 +14,7 @@ const v = adminContent.validation;
 const text = (max: number) => z.string().trim().max(max, v.tooLong);
 const requiredText = (max: number) => text(max).min(1, v.required);
 const wholeNumber = (max: number) => text(3).refine((value) => value === "" || (/^\d+$/.test(value) && Number(value) <= max), v.number(max));
-const calendarDate = text(10).refine((value) => value === "" || /^\d{4}-\d{2}-\d{2}$/.test(value), v.date);
+const calendarDate = text(10).refine((value) => value === "" || isCalendarDay(value), v.date);
 const euroAmount = text(12).refine((value) => value === "" || parseEuroCents(value) !== null, v.price);
 const httpUrl = text(500).refine((value) => value === "" || /^https?:\/\/[^\s]+$/i.test(value), v.url);
 
@@ -52,7 +53,7 @@ export const courseSchema = z.object({
   isPublic: z.boolean(),
   /** Billing: empty fields mean "not set"; payments need a start date and a length. */
   startsOn: calendarDate,
-  duration: z.object({ years: wholeNumber(10), months: wholeNumber(11) }),
+  duration: z.object({ years: wholeNumber(Math.floor(MAX_COURSE_MONTHS / 12)), months: wholeNumber(11) }),
   monthlyPrice: euroAmount,
 });
 export type CourseInput = z.infer<typeof courseSchema>;

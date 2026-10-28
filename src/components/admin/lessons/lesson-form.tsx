@@ -134,6 +134,7 @@ export function LessonForm({
     const previousStart = fromZonedInputValue(lastStart);
     if (start) setLastStart(value);
     if (isEdit || !start || !previousStart) return;
+    if (repeat) setRepeat(followStartDay(repeat, weekdayIndex(academyDay(previousStart)), weekdayIndex(academyDay(start))));
     const currentEnd = fromZonedInputValue(form.getValues("scheduledEndAt"));
     if (!currentEnd) return;
     const durationMs = Math.max(30 * 60_000, currentEnd.getTime() - previousStart.getTime());
@@ -256,7 +257,7 @@ export function LessonForm({
             <Input type="datetime-local" {...form.register("accessExpiresAt")} />
           </FormField>
         </div>
-        {!isEdit && <RepeatField rule={repeat} onToggle={toggleRepeat} onChange={setRepeat} count={repeated?.length ?? 0} last={repeated?.at(-1)} problem={repeatProblem} />}
+        {!isEdit && <RepeatField rule={repeat} onToggle={toggleRepeat} onChange={setRepeat} startDay={firstStart && weekdayIndex(academyDay(firstStart))} schedules={repeated ?? []} problem={repeatProblem} />}
         <div aria-live="polite">
           {isEdit && lesson.publication === "PUBLISHED" && scheduleDirty && (
             <Alert>
@@ -321,24 +322,39 @@ export function LessonForm({
   );
 }
 
+/**
+ * The first lesson always happens on its own start day, so that weekday stays selected; when the
+ * start moves to another weekday, a rule that only had the old one follows it.
+ */
+function followStartDay(rule: RepeatRule, from: number, to: number): RepeatRule {
+  if (from === to) return rule;
+  const weekdays = rule.weekdays.length === 1 && rule.weekdays[0] === from ? [to] : [...new Set([...rule.weekdays, to])];
+  return { ...rule, weekdays };
+}
+
+const PREVIEW_DATES = 4;
+
 function RepeatField({
   rule,
   onToggle,
   onChange,
-  count,
-  last,
+  startDay,
+  schedules,
   problem,
 }: {
   rule: RepeatRule | null;
   onToggle: (on: boolean) => void;
   onChange: (rule: RepeatRule) => void;
-  count: number;
-  last?: LessonSchedule;
+  /** Weekday of the first lesson (always included), when the start is set. */
+  startDay: number | null;
+  schedules: LessonSchedule[];
   problem: string | null;
 }) {
   const r = t.repeat;
   const toggleDay = (day: number) =>
     rule && onChange({ ...rule, weekdays: rule.weekdays.includes(day) ? rule.weekdays.filter((d) => d !== day) : [...rule.weekdays, day] });
+  const dates = schedules.slice(0, PREVIEW_DATES).map((s) => formatDate(s.scheduledStartAt));
+  const last = schedules.length > PREVIEW_DATES ? formatDate(schedules.at(-1)!.scheduledStartAt) : null;
 
   return (
     <div className="space-y-3 border-t pt-4">
@@ -360,11 +376,13 @@ function RepeatField({
                 <button
                   key={name}
                   type="button"
-                  aria-pressed={rule.weekdays.includes(day)}
+                  aria-pressed={rule.weekdays.includes(day) || day === startDay}
+                  disabled={day === startDay}
+                  title={day === startDay ? r.startDay : undefined}
                   onClick={() => toggleDay(day)}
                   className={cn(
                     "rounded-full border px-3 py-1 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-                    rule.weekdays.includes(day) ? "border-foreground bg-foreground text-background" : "bg-card text-muted-foreground hover:text-foreground",
+                    rule.weekdays.includes(day) || day === startDay ? "border-foreground bg-foreground text-background" : "bg-card text-muted-foreground hover:text-foreground",
                   )}
                 >
                   {name}
@@ -376,7 +394,7 @@ function RepeatField({
             <Input type="date" value={rule.until} onChange={(e) => e.target.value && onChange({ ...rule, until: e.target.value })} />
           </FormField>
           <p className={cn("text-sm sm:col-span-2", problem ? "text-destructive" : "text-muted-foreground")} aria-live="polite">
-            {problem ?? (last && r.preview(count, formatDate(last.scheduledStartAt)))}
+            {problem ?? (dates.length > 0 && r.preview(schedules.length, dates, last))}
           </p>
         </div>
       )}
