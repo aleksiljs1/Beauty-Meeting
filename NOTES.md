@@ -143,6 +143,27 @@ Original brief: `c:\Users\aleksiljs\Downloads\Beauty_Academy_Zoom_Claude_Megapro
   re-added automatically: in the roster they're listed unticked ("Aksesi u hoq më parë").
 - Deactivated accounts are never offered. Tests: `course-members.integration.test.ts`.
 
+## Excel student onboarding (2026-10-28)
+
+- Admin opens `/admin/studentet` → **Student i ri** → **Importo nga Excel**. The existing single-student
+  creation form remains available in the same dialog.
+- The `.xlsx` workbook must have `Emrat`, `Email`, and `Abonimet` headers in its first worksheet's first row.
+  `Emri` is accepted as an alias for `Emrat`; other non-empty headers are rejected. Multiple subscription
+  names in a cell can be separated by commas or semicolons. An empty `Abonimet` cell is allowed.
+- Preview and import are separate admin-authenticated API requests. Preview checks the file (5 MB maximum),
+  rows (100 students maximum), required values, and email format. It returns only the three fields needed for
+  onboarding; the workbook is read in memory and is never written to disk or retained by the API.
+- On confirmation, subscription names are normalized and matched case-insensitively to existing course titles.
+  Unmatched names block the import. The admin may also choose to add each student to upcoming lessons for
+  their matched courses. Each account receives the same password-setup email as manual student creation.
+- Implementation: `src/components/admin/students/import-students-panel.tsx`, the integration in
+  `src/components/admin/students/create-student-dialog.tsx`, parser `src/app/api/v1/admin/students/csvparse.ts`,
+  and API routes under `src/app/api/v1/admin/students/import/`. Existing account and course services are reused.
+- Browser acceptance: user confirmed the Excel import and review workflow works. The batch is prevalidated
+  before writes, but account creation/course assignment is sequential rather than a single transaction; an
+  unexpected server/database failure mid-batch can leave earlier rows imported. Check the students list before
+  retrying after such a failure.
+
 ## Lessons never get stuck in the wrong state (2026-10-27, from the business-logic review)
 
 Live state comes from Zoom events; if one is lost, the lesson used to stay "waiting for the teacher"

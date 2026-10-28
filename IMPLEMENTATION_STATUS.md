@@ -1,7 +1,7 @@
 # Implementation status
 
 Single source of truth for progress. Update at the end of every work session / stage.
-Last updated: 2026-10-23
+Last updated: 2026-10-28
 Legend: ✅ done & verified · 🟡 in progress · ⬜ not started · ⛔ blocked (reason)
 
 How to run: `README.md` · How to test: `docs/testing.md` · Decisions: `NOTES.md`
@@ -35,7 +35,8 @@ How to run: `README.md` · How to test: `docs/testing.md` · Decisions: `NOTES.m
 - ✅ Invitation page `/ftese/[token]`: read-only preview + explicit "Bashkohu" (verified GET never enrolls)
 - ✅ Live-class pop-up + notification bell via Socket.IO (+120 s safety poll), cross-tab dismissal — verified end to end
 - ✅ Live-class pop-up on public pages for signed-in students (lazy-loaded; anonymous visitors don't download it)
-- ✅ Admin portal: dashboard, students (create + setup email, deactivate/reactivate, resend), lessons CRUD/publish/cancel/archive/restore, roster & per-student deadlines, shared invitation links, material & multipart recording uploads, demo go-live/end/reset, integrations status, audit history (56 live API checks)
+- ✅ Admin portal: dashboard, students (create + setup email, Excel bulk import, deactivate/reactivate, resend), lessons CRUD/publish/cancel/archive/restore, roster & per-student deadlines, shared invitation links, material & multipart recording uploads, demo go-live/end/reset, integrations status, audit history (56 live API checks)
+- ✅ Excel student onboarding from the **Student i ri** dialog: in-memory `.xlsx` preview, required/unknown-column and row validation, duplicate-email checks, course-title matching, course membership/upcoming lesson assignment, and password setup emails; browser-tested by the user
 - ✅ Phase 1 merged: 67 unit + 50 integration tests, production build green
 - ✅ Independent security review: no critical/high issues. Fixed all findings — rate limits no longer bypassable by
   spoofed X-Forwarded-For (TRUSTED_IP_HEADER required in production + per-account throttle), access tokens bound to
