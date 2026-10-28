@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 import { createLesson as createFixtureLesson, createUser, resetDatabase } from "@/test/fixtures";
 
-const { createLesson, updateLesson, setLessonPublication, runDemoAction, deleteDraftLesson } = await import("./lessons");
+const { createLesson, createRepeatingLesson, updateLesson, setLessonPublication, runDemoAction, deleteDraftLesson } = await import("./lessons");
 const { grantEnrollment, revokeEnrollment, restoreEnrollment, setEnrollmentDeadline } = await import("./enrollments");
 const { setStudentActive } = await import("./students");
 const { requireLessonCapability } = await import("@/server/access/lesson-access");
@@ -74,6 +74,27 @@ describe("lesson administration", () => {
     await runDemoAction(demo.id, "end", admin);
     await runDemoAction(demo.id, "reset", admin);
     expect((await prisma.lesson.findUniqueOrThrow({ where: { id: demo.id } })).meetingStatus).toBe("SCHEDULED");
+  });
+});
+
+describe("repeating lessons", () => {
+  it("creates one draft per date, each with the chosen students", async () => {
+    const student = await createUser("student");
+    const first = new Date("2030-01-07T16:00:00Z"); // Monday 17:00 Tirana
+    const s = { ...schedule(), scheduledStartAt: first, scheduledEndAt: new Date(first.getTime() + 2 * HOUR), joinOpensAt: new Date(first.getTime() - 15 * 60_000), accessExpiresAt: new Date(first.getTime() + 30 * DAY) };
+    const result = await createRepeatingLesson({ title: "Grim", ...s }, { weekdays: [0, 2], until: "2030-01-16" }, false, admin, [student.id]);
+
+    expect(result.count).toBe(4); // Mon 7, Wed 9, Mon 14, Wed 16
+    const lessons = await prisma.lesson.findMany({ orderBy: { scheduledStartAt: "asc" }, include: { enrollments: true } });
+    expect(lessons.map((l) => l.scheduledStartAt.toISOString().slice(0, 10))).toEqual(["2030-01-07", "2030-01-09", "2030-01-14", "2030-01-16"]);
+    expect(lessons.every((l) => l.publication === "DRAFT" && l.title === "Grim" && l.enrollments[0]?.userId === student.id)).toBe(true);
+  });
+
+  it("refuses too many lessons before creating any", async () => {
+    await expect(createRepeatingLesson({ title: "Grim", ...schedule() }, { weekdays: [0, 1, 2, 3, 4, 5, 6], until: "2099-01-01" }, false, admin)).rejects.toMatchObject({
+      code: "VALIDATION_FAILED",
+    });
+    expect(await prisma.lesson.count()).toBe(0);
   });
 });
 

@@ -1,3 +1,5 @@
+import { academyDay, addDays, fromZonedInputValue, toZonedInputValue, weekdayIndex } from "@/lib/datetime";
+
 /**
  * Pure lesson schedule rules shared by the admin form (instant feedback) and the server
  * (authoritative check). No I/O, no framework imports — unit-tested.
@@ -77,4 +79,40 @@ export function scheduleChanged(before: LessonSchedule, after: Partial<LessonSch
   return (Object.keys(after) as (keyof LessonSchedule)[]).some(
     (key) => after[key] !== undefined && after[key]!.getTime() !== before[key].getTime(),
   );
+}
+
+// --- Repeating lessons ------------------------------------------------------------------------
+
+/** At most this many lessons are created from one form. */
+export const MAX_REPEATED_LESSONS = 100;
+
+/** `weekdays`: 0 = Monday … 6 = Sunday. `until`: last day ("YYYY-MM-DD"), inclusive. */
+export type RepeatRule = { weekdays: number[]; until: string };
+
+/**
+ * The schedules of a repeating lesson: the first one, then one on every chosen weekday up to
+ * `until`. Every time (start, end, join opens, deadline) keeps its Tirana clock time, so a
+ * 17:00 class stays at 17:00 across the summer-time change.
+ */
+export function repeatSchedules(first: LessonSchedule, rule: RepeatRule): LessonSchedule[] {
+  const firstDay = academyDay(first.scheduledStartAt);
+  const weekdays = new Set(rule.weekdays);
+  const shift = (date: Date, days: number) => {
+    const local = toZonedInputValue(date);
+    return fromZonedInputValue(`${addDays(local.slice(0, 10), days)}${local.slice(10)}`)!;
+  };
+
+  const schedules = [first];
+  for (let offset = 1; schedules.length < MAX_REPEATED_LESSONS + 1; offset++) {
+    const day = addDays(firstDay, offset);
+    if (day > rule.until) break;
+    if (!weekdays.has(weekdayIndex(day))) continue;
+    schedules.push({
+      scheduledStartAt: shift(first.scheduledStartAt, offset),
+      scheduledEndAt: shift(first.scheduledEndAt, offset),
+      joinOpensAt: shift(first.joinOpensAt, offset),
+      accessExpiresAt: shift(first.accessExpiresAt, offset),
+    });
+  }
+  return schedules;
 }

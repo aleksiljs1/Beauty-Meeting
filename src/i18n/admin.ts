@@ -295,6 +295,16 @@ export const admin = {
     saved: "Ndryshimet u ruajtën.",
     publishedNote:
       "Ky mësim është i publikuar. Ndryshimi i orarit ose i afatit nuk ndryshon automatikisht afatet personale të studentëve dhe as lidhjet ekzistuese të ftesave.",
+    repeat: {
+      toggle: "Përsërite mësimin",
+      hint: "Krijon të njëjtin mësim, me të njëjtët studentë, në ditët e zgjedhura deri në datën e fundit. Çdo mësim mund të ndryshohet më pas veçmas.",
+      weekdays: "Ditët e javës",
+      until: "Data e fundit",
+      preview: (count: number, last: string) => `Do të krijohen ${count} mësime (i fundit: ${last}).`,
+      tooMany: (max: number) => `Shumë mësime: deri në ${max} njëherësh. Zgjidhni një datë të fundit më të afërt.`,
+      noWeekday: "Zgjidhni të paktën një ditë.",
+      created: (count: number) => `U krijuan ${count} mësime si draft.`,
+    },
     earlyDeadlineTitle: "Afati i aksesit para përfundimit",
     earlyDeadlineConfirm: "Po, ruaje me këtë afat",
     validation: {

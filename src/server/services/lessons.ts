@@ -2,7 +2,7 @@ import "server-only";
 import { z } from "zod";
 import type { PublicationStatus } from "@/generated/prisma/enums";
 import { effectiveMeetingStatus } from "@/server/access/policy";
-import { validateLessonSchedule, type LessonSchedule, type ScheduleIssue } from "@/lib/admin/lesson-rules";
+import { MAX_REPEATED_LESSONS, repeatSchedules, validateLessonSchedule, type LessonSchedule, type RepeatRule, type ScheduleIssue } from "@/lib/admin/lesson-rules";
 import type { AppUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
 import { env } from "@/server/env";
@@ -81,6 +81,20 @@ export async function createLesson(input: LessonInput, confirmEarlyDeadline: boo
   await audit(admin.id, "lesson.create", "lesson", lesson.id, { isDemo: input.isDemo ?? false });
   const { added } = await enrollStudents(lesson.id, studentIds, admin);
   return { ...lesson, enrolled: added };
+}
+
+/**
+ * Creates a lesson and its repeats (same details and students, one lesson per date). Every
+ * date is checked before anything is created; each lesson then gets its own Zoom meeting as usual.
+ */
+export async function createRepeatingLesson(input: LessonInput, repeat: RepeatRule, confirmEarlyDeadline: boolean, admin: AppUser, studentIds: string[] = []) {
+  const schedules = repeatSchedules(input, repeat);
+  if (schedules.length > MAX_REPEATED_LESSONS) throw new ApiError("VALIDATION_FAILED", `Mund të krijohen deri në ${MAX_REPEATED_LESSONS} mësime njëherësh. Zgjidhni një datë mbarimi më të afërt.`);
+  for (const schedule of schedules) throwScheduleIssues(validateLessonSchedule(schedule, confirmEarlyDeadline));
+
+  const created = [];
+  for (const schedule of schedules) created.push(await createLesson({ ...input, ...schedule }, confirmEarlyDeadline, admin, studentIds));
+  return { id: created[0].id, enrolled: created[0].enrolled, count: created.length };
 }
 
 export async function updateLesson(lessonId: string, patch: LessonPatch, confirmEarlyDeadline: boolean, admin: AppUser) {

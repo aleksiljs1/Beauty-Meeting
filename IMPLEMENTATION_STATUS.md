@@ -38,6 +38,7 @@ How to run: `README.md` · How to test: `docs/testing.md` · Decisions: `NOTES.m
 - ✅ Admin portal: dashboard, students (create + setup email, Excel bulk import, deactivate/reactivate, resend), lessons CRUD/publish/cancel/archive/restore, roster & per-student deadlines, shared invitation links, material & multipart recording uploads, demo go-live/end/reset, integrations status, audit history (56 live API checks)
 - ✅ Excel student onboarding from the **Student i ri** dialog: in-memory `.xlsx` preview, required/unknown-column and row validation, duplicate-email checks, course-title matching, course membership/upcoming lesson assignment, and password setup emails; browser-tested by the user
 - ✅ Optional student details (phone, birth date → age, gender, city, private admin notes) on create and edit; shown in the list; search by phone
+- ✅ Repeating lessons: one form creates the same lesson (and students) on chosen weekdays until a date, keeping the Tirana clock time across DST; max 100
 - ✅ Admin calendar (/admin/kalendari): month grid (agenda list on phones) of lessons with times and course names, colour per course, course filter, drafts/cancelled marked
 - ✅ Course payments (`/admin/pagesat`): course start/length/monthly price, per-student first month, record/cancel payments (cash/bank), paid-until/owed/left per student, overdue and due-soon alerts on the dashboard — unit + integration-tested; see NOTES.md "Course payments"
 - ✅ Phase 1 merged: 67 unit + 50 integration tests, production build green

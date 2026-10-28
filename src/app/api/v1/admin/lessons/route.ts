@@ -2,7 +2,7 @@ import { z } from "zod";
 import { requireApiUser } from "@/server/auth/session";
 import { ok, readJson, route } from "@/server/http";
 import { listLessons } from "@/server/queries/admin";
-import { createLesson } from "@/server/services/lessons";
+import { createLesson, createRepeatingLesson } from "@/server/services/lessons";
 import { createLessonSchema, pageQuery } from "@/server/validation/admin";
 
 const filterSchema = z.object({
@@ -19,7 +19,9 @@ export const GET = route(async (request) => {
 
 export const POST = route(async (request) => {
   const admin = await requireApiUser(request, "admin");
-  const { confirmEarlyDeadline, studentIds, ...input } = createLessonSchema.parse(await readJson(request));
-  const lesson = await createLesson(input, confirmEarlyDeadline ?? false, admin, studentIds);
+  const { confirmEarlyDeadline, studentIds, repeat, ...input } = createLessonSchema.parse(await readJson(request));
+  const lesson = repeat
+    ? await createRepeatingLesson(input, repeat, confirmEarlyDeadline ?? false, admin, studentIds)
+    : { ...(await createLesson(input, confirmEarlyDeadline ?? false, admin, studentIds)), count: 1 };
   return ok(lesson, { status: 201 });
 });

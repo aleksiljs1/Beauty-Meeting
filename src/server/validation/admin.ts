@@ -6,6 +6,7 @@ import { ApiError } from "@/server/http";
 /** Zod schemas and param helpers shared by the /api/v1/admin route handlers. */
 
 const isoDate = z.iso.datetime({ offset: true, message: "Data nuk është e vlefshme." }).transform((value) => new Date(value));
+const calendarDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data nuk është e vlefshme.");
 const optionalText = (max: number) => z.string().max(max, "Teksti është shumë i gjatë.").nullish();
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -62,7 +63,13 @@ const lessonFields = {
   accessExpiresAt: isoDate,
 };
 
-export const createLessonSchema = z.object({ ...lessonFields, confirmEarlyDeadline: z.boolean().optional(), studentIds: studentIds.optional() });
+export const createLessonSchema = z.object({
+  ...lessonFields,
+  confirmEarlyDeadline: z.boolean().optional(),
+  studentIds: studentIds.optional(),
+  /** Also create the same lesson on these weekdays (0 = Monday) until `until`. */
+  repeat: z.object({ weekdays: z.array(z.number().int().min(0).max(6)).min(1).max(7), until: calendarDay }).optional(),
+});
 
 export const updateLessonSchema = z.object({
   title: lessonFields.title.optional(),
@@ -109,7 +116,6 @@ export const completeRecordingSchema = z.object({
 /** Single-PUT materials finish with an empty body; multipart (video) materials send their parts. */
 export const finishMaterialSchema = z.object({ parts: completeRecordingSchema.shape.parts.optional() });
 
-const calendarDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data nuk është e vlefshme.");
 const studentId = z.string().min(1).max(100);
 
 export const paymentAccountQuery = z.object({ courseId: z.uuid(), userId: studentId });

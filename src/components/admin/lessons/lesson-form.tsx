@@ -29,13 +29,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { ApiClientError, apiGet, apiSend } from "@/lib/api/client";
 import {
   defaultSchedule,
+  MAX_REPEATED_LESSONS,
   needsEarlyDeadlineConfirmation,
+  repeatSchedules,
   scheduleMessages,
   suggestedStart,
   validateLessonSchedule,
   type LessonSchedule,
+  type RepeatRule,
 } from "@/lib/admin/lesson-rules";
-import { ACADEMY_TIMEZONE_LABEL, fromZonedInputValue, timezoneAbbreviation, toZonedInputValue } from "@/lib/datetime";
+import { academyDay, ACADEMY_TIMEZONE_LABEL, addMonths, formatDate, fromZonedInputValue, timezoneAbbreviation, toZonedInputValue, weekdayIndex } from "@/lib/datetime";
+import { cn } from "@/lib/utils";
 import { admin } from "@/i18n/admin";
 import { common } from "@/i18n/common";
 
@@ -114,6 +118,15 @@ export function LessonForm({
   const zoneAt = fromZonedInputValue(startValue) ?? new Date();
   const courseId = useWatch({ control: form.control, name: "courseId" });
   const courseStudents = useCourseStudents(isEdit || courseId === NO_COURSE ? null : courseId);
+  const [repeat, setRepeat] = useState<RepeatRule | null>(null);
+  const firstStart = fromZonedInputValue(startValue);
+  const repeated = repeat && firstStart ? repeatSchedules(defaultSchedule(firstStart), repeat) : null;
+  const repeatProblem = !repeat ? null : !repeat.weekdays.length ? t.repeat.noWeekday : repeated && repeated.length > MAX_REPEATED_LESSONS ? t.repeat.tooMany(MAX_REPEATED_LESSONS) : null;
+
+  function toggleRepeat(on: boolean) {
+    const day = academyDay(firstStart ?? new Date());
+    setRepeat(on ? { weekdays: [weekdayIndex(day)], until: addMonths(day, 1) } : null);
+  }
 
   /** New lessons: keep join-open, end and deadline following the start until the admin edits them. */
   function onStartChange(value: string) {
@@ -158,6 +171,7 @@ export function LessonForm({
       accessExpiresAt: schedule.accessExpiresAt.toISOString(),
       confirmEarlyDeadline,
       ...(isEdit ? {} : { studentIds: courseStudents.status === "done" ? [...courseStudents.selected] : [] }),
+      ...(repeat && !isEdit ? { repeat } : {}),
     };
     try {
       if (lesson) {
@@ -168,9 +182,14 @@ export function LessonForm({
         form.reset(values);
         router.refresh();
       } else {
-        const created = await apiSend<{ id: string; enrolled: number }>("post", "/admin/lessons", body);
-        toast.success(created.enrolled ? t.createdWithStudents(created.enrolled) : t.created);
-        router.push(`/admin/mesimet/${created.id}`);
+        const created = await apiSend<{ id: string; enrolled: number; count: number }>("post", "/admin/lessons", body);
+        if (created.count > 1) {
+          toast.success(t.repeat.created(created.count));
+          router.push(`/admin/kalendari?muaji=${values.scheduledStartAt.slice(0, 7)}`);
+        } else {
+          toast.success(created.enrolled ? t.createdWithStudents(created.enrolled) : t.created);
+          router.push(`/admin/mesimet/${created.id}`);
+        }
       }
     } catch (error) {
       if (error instanceof ApiClientError && error.code === "VALIDATION_FAILED" && error.issues.length) {
@@ -182,6 +201,7 @@ export function LessonForm({
   }
 
   const submit = form.handleSubmit(async (values) => {
+    if (repeatProblem) return;
     // Instant feedback with the same rules the server enforces.
     const issues = validateLessonSchedule(toSchedule(values));
     if (needsEarlyDeadlineConfirmation(issues)) return setConfirming(values);
@@ -236,6 +256,7 @@ export function LessonForm({
             <Input type="datetime-local" {...form.register("accessExpiresAt")} />
           </FormField>
         </div>
+        {!isEdit && <RepeatField rule={repeat} onToggle={toggleRepeat} onChange={setRepeat} count={repeated?.length ?? 0} last={repeated?.at(-1)} problem={repeatProblem} />}
         <div aria-live="polite">
           {isEdit && lesson.publication === "PUBLISHED" && scheduleDirty && (
             <Alert>
@@ -297,6 +318,69 @@ export function LessonForm({
         </AlertDialogContent>
       </AlertDialog>
     </form>
+  );
+}
+
+function RepeatField({
+  rule,
+  onToggle,
+  onChange,
+  count,
+  last,
+  problem,
+}: {
+  rule: RepeatRule | null;
+  onToggle: (on: boolean) => void;
+  onChange: (rule: RepeatRule) => void;
+  count: number;
+  last?: LessonSchedule;
+  problem: string | null;
+}) {
+  const r = t.repeat;
+  const toggleDay = (day: number) =>
+    rule && onChange({ ...rule, weekdays: rule.weekdays.includes(day) ? rule.weekdays.filter((d) => d !== day) : [...rule.weekdays, day] });
+
+  return (
+    <div className="space-y-3 border-t pt-4">
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          <label htmlFor="lesson-repeat" className="text-sm font-medium">
+            {r.toggle}
+          </label>
+          <p className="text-xs text-muted-foreground">{r.hint}</p>
+        </div>
+        <Switch id="lesson-repeat" checked={!!rule} onCheckedChange={onToggle} />
+      </div>
+      {rule && (
+        <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
+          <fieldset className="space-y-1.5">
+            <legend className="text-sm font-medium">{r.weekdays}</legend>
+            <div className="flex flex-wrap gap-1.5">
+              {admin.calendar.weekdays.map((name, day) => (
+                <button
+                  key={name}
+                  type="button"
+                  aria-pressed={rule.weekdays.includes(day)}
+                  onClick={() => toggleDay(day)}
+                  className={cn(
+                    "rounded-full border px-3 py-1 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                    rule.weekdays.includes(day) ? "border-foreground bg-foreground text-background" : "bg-card text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+          <FormField label={r.until}>
+            <Input type="date" value={rule.until} onChange={(e) => e.target.value && onChange({ ...rule, until: e.target.value })} />
+          </FormField>
+          <p className={cn("text-sm sm:col-span-2", problem ? "text-destructive" : "text-muted-foreground")} aria-live="polite">
+            {problem ?? (last && r.preview(count, formatDate(last.scheduledStartAt)))}
+          </p>
+        </div>
+      )}
+    </div>
   );
 }
 
