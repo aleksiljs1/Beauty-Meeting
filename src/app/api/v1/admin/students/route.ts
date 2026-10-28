@@ -4,6 +4,7 @@ import { listStudents } from "@/server/queries/admin";
 import { createAccount, sendAccountSetupEmail } from "@/server/services/accounts";
 import { audit } from "@/server/services/audit";
 import { assertCoursesExist, setStudentCourses } from "@/server/services/course-members";
+import { saveStudentProfile } from "@/server/services/students";
 import { createStudentSchema, pageQuery } from "@/server/validation/admin";
 
 export const GET = route(async (request) => {
@@ -16,9 +17,10 @@ export const GET = route(async (request) => {
 export const POST = route(async (request) => {
   const admin = await requireApiUser(request, "admin");
   const input = createStudentSchema.parse(await readJson(request));
-  const { courseIds = [], addToUpcoming = false, ...account } = input;
+  const { courseIds = [], addToUpcoming = false, profile, ...account } = input;
   await assertCoursesExist([...new Set(courseIds)]); // before the account exists, so a bad id leaves nothing behind
   const student = await createAccount({ ...account, role: "student" }, admin.id);
+  if (profile) await saveStudentProfile(student.id, profile, admin);
   const courses = courseIds.length ? await setStudentCourses(student.id, courseIds, admin, { addToUpcoming }) : null;
   let mailSent = true;
   try {

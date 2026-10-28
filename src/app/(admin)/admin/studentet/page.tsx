@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { admin } from "@/i18n/admin";
+import { todayInAcademy } from "@/lib/datetime";
+import { ageOn } from "@/lib/student-profile";
 import { requirePageUser } from "@/server/auth/session";
 import { listCourses, listStudents } from "@/server/queries/admin";
 
@@ -25,6 +27,7 @@ export default async function StudentsPage({ searchParams }: PageProps<"/admin/s
   const courses = await listCourses();
   const courseId = courses.find((c) => c.id === one(params.kursi))?.id;
   const result = await listStudents({ q, page, courseId });
+  const today = todayInAcademy();
 
   const buildHref = ({ p = 1, kursi = courseId }: { p?: number; kursi?: string }) => {
     const search = new URLSearchParams();
@@ -80,7 +83,14 @@ export default async function StudentsPage({ searchParams }: PageProps<"/admin/s
             {result.items.map((student) => (
               <li key={student.id} className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-4 py-3 md:grid-cols-[2fr_2fr_1.5fr_1fr_6rem_3rem]">
                 <span className="font-medium">{student.name}</span>
-                <span className="col-start-1 truncate text-sm text-muted-foreground md:col-start-auto">{student.email}</span>
+                <span className="col-start-1 min-w-0 text-sm text-muted-foreground md:col-start-auto">
+                  <span className="block truncate">{student.email}</span>
+                  {(student.profile.phone || student.profile.birthDate) && (
+                    <span className="block truncate text-xs">
+                      {[student.profile.phone, student.profile.birthDate && admin.students.profile.age(ageOn(student.profile.birthDate, today))].filter(Boolean).join(" · ")}
+                    </span>
+                  )}
+                </span>
                 <span className="col-start-1 text-sm md:col-start-auto">
                   <span className="text-muted-foreground md:sr-only">{t.columns.courses}: </span>
                   {student.courses.length ? student.courses.map((c) => c.title).join(", ") : <span className="text-muted-foreground">{t.noCourse}</span>}

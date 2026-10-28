@@ -38,6 +38,7 @@ model User {
   materialsUploaded  LessonMaterial[]
   notifications      Notification[]
   auditEntries       AuditLog[]
+  profile            StudentProfile?
   payments           Payment[]              @relation("PaymentStudent")
   paymentsRecorded   Payment[]              @relation("PaymentRecorder")
 
@@ -549,4 +550,23 @@ model Payment {
 
   @@index([courseId, userId])
   @@index([userId])
+}
+
+enum Gender {
+  FEMALE
+  MALE
+  OTHER
+}
+
+/// Optional details the admin keeps about a student (kept out of Better Auth's user table).
+model StudentProfile {
+  userId    String    @id
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phone     String?
+  birthDate DateTime? @db.Date
+  gender    Gender?
+  city      String?
+  /// Private admin notes; never shown to the student.
+  notes     String?
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
 }

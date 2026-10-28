@@ -2,6 +2,7 @@ import "server-only";
 import { HeadBucketCommand } from "@aws-sdk/client-s3";
 import type { Prisma } from "@/generated/prisma/client";
 import type { PublicationStatus } from "@/generated/prisma/enums";
+import { toProfileInput, type StudentProfileInput } from "@/lib/student-profile";
 import { END_GRACE_MS, effectiveMeetingStatus } from "@/server/access/policy";
 import { prisma } from "@/server/db";
 import { env, ZOOM_LIVE_VARIABLES, zoomLive } from "@/server/env";
@@ -125,7 +126,15 @@ function studentSearch(q?: string): Prisma.UserWhereInput {
   const term = q?.trim().slice(0, 100);
   return {
     role: "student",
-    ...(term ? { OR: [{ name: { contains: term, mode: "insensitive" } }, { email: { contains: term, mode: "insensitive" } }] } : {}),
+    ...(term
+      ? {
+          OR: [
+            { name: { contains: term, mode: "insensitive" } },
+            { email: { contains: term, mode: "insensitive" } },
+            { profile: { phone: { contains: term } } },
+          ],
+        }
+      : {}),
   };
 }
 
@@ -137,6 +146,7 @@ export type AdminStudentRow = {
   hasPassword: boolean;
   enrollments: number;
   courses: { id: string; title: string }[];
+  profile: StudentProfileInput;
   createdAt: Date;
 };
 
@@ -160,6 +170,7 @@ export async function listStudents(params: { q?: string; page?: number; courseId
         accounts: { where: { providerId: "credential", password: { not: null } }, select: { id: true }, take: 1 },
         _count: { select: { enrollments: { where: { revokedAt: null } } } },
         courseMemberships: { orderBy: { course: { position: "asc" } }, select: { course: { select: { id: true, title: true } } } },
+        profile: { select: { phone: true, birthDate: true, gender: true, city: true, notes: true } },
       },
     }),
     prisma.user.count({ where }),
@@ -173,6 +184,7 @@ export async function listStudents(params: { q?: string; page?: number; courseId
       hasPassword: u.accounts.length > 0,
       enrollments: u._count.enrollments,
       courses: u.courseMemberships.map((m) => m.course),
+      profile: toProfileInput(u.profile),
       createdAt: u.createdAt,
     })),
     total,

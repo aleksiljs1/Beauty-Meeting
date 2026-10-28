@@ -93,6 +93,10 @@ export function fromZonedInputValue(value: string): Date | null {
 export const academyDay = (value: DateInput) => toZonedInputValue(value).slice(0, 10);
 export const todayInAcademy = (now: Date = new Date()) => academyDay(now);
 
+/** "YYYY-MM-DD" ⇄ a Postgres DATE column (read and written as UTC midnight). */
+export const fromDbDate = (date: Date) => date.toISOString().slice(0, 10);
+export const toDbDate = (day: string) => new Date(`${day}T00:00:00Z`);
+
 const DAY_MS = 86_400_000;
 const pad = (n: number) => String(n).padStart(2, "0");
 const parseDay = (day: string) => day.split("-").map(Number) as [number, number, number];

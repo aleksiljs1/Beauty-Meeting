@@ -2,6 +2,8 @@ import "server-only";
 import { auth } from "@/server/auth/auth";
 import type { AppUser } from "@/server/auth/session";
 import { Prisma } from "@/generated/prisma/client";
+import { toDbDate } from "@/lib/datetime";
+import type { StudentProfileInput } from "@/lib/student-profile";
 import { prisma } from "@/server/db";
 import { ApiError } from "@/server/http";
 import { publishFeedChanged } from "@/server/realtime/publish";
@@ -20,6 +22,20 @@ export async function renameStudent(userId: string, name: string, admin: AppUser
   await findStudent(userId);
   await prisma.user.update({ where: { id: userId }, data: { name: name.trim() } });
   await audit(admin.id, "account.rename", "user", userId);
+}
+
+/** Saves the optional details; empty fields are stored as "not given". */
+export async function saveStudentProfile(userId: string, input: StudentProfileInput, admin: AppUser) {
+  await findStudent(userId);
+  const data = {
+    phone: input.phone || null,
+    birthDate: input.birthDate ? toDbDate(input.birthDate) : null,
+    gender: input.gender || null,
+    city: input.city || null,
+    notes: input.notes || null,
+  };
+  await prisma.studentProfile.upsert({ where: { userId }, create: { userId, ...data }, update: data });
+  await audit(admin.id, "account.profile", "user", userId);
 }
 
 /** Corrects a student's email, invalidates old credentials/setup links, and sends a fresh setup link. */

@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { studentProfileSchema } from "@/lib/student-profile";
 import { ApiError } from "@/server/http";
 
 /** Zod schemas and param helpers shared by the /api/v1/admin route handlers. */
@@ -35,6 +36,7 @@ export const createStudentSchema = z.object({
   courseIds: courseIds.optional(),
   /** Also enrol the student in the upcoming lessons of those courses. */
   addToUpcoming: z.boolean().optional(),
+  profile: studentProfileSchema.optional(),
 });
 
 export const studentCoursesSchema = z.object({ courseIds, addToUpcoming: z.boolean().optional() });
@@ -44,8 +46,9 @@ export const updateStudentSchema = z
     name: z.string().trim().min(2).max(100).optional(),
     email: z.email("Email i pavlefshëm.").max(200).transform((value) => value.trim().toLowerCase()).optional(),
     active: z.boolean().optional(),
+    profile: studentProfileSchema.optional(),
   })
-  .refine((v) => v.name !== undefined || v.email !== undefined || v.active !== undefined, "Asgjë për të ndryshuar.");
+  .refine((v) => v.name !== undefined || v.email !== undefined || v.active !== undefined || v.profile !== undefined, "Asgjë për të ndryshuar.");
 
 const lessonFields = {
   title: z.string().trim().min(2, "Shkruani titullin.").max(200),

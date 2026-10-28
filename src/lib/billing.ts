@@ -17,10 +17,6 @@ export const DUE_SOON_DAYS = 7;
 export type BillingStatus = "OVERDUE" | "DUE_SOON" | "PAID" | "COMPLETE";
 
 export type CourseBilling = { startsOn: string; durationMonths: number; monthlyPriceCents: number | null };
-
-/** "YYYY-MM-DD" ⇄ a Postgres DATE column (read and written as UTC midnight). */
-export const fromDbDate = (date: Date) => date.toISOString().slice(0, 10);
-export const toDbDate = (day: string) => new Date(`${day}T00:00:00Z`);
 const parse = (date: string) => date.split("-").map(Number) as [number, number, number];
 
 export const courseMonthStart = (startsOn: string, month: number) => addMonths(startsOn, month - 1);

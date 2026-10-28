@@ -10,12 +10,14 @@ import { z } from "zod";
 import { CheckList } from "@/components/admin/check-list";
 import { FormField } from "@/components/admin/form-field";
 import { ImportStudentsPanel } from "@/components/admin/students/import-students-panel";
+import { StudentProfileFields } from "@/components/admin/students/student-profile-fields";
 import { useApiAction } from "@/components/admin/use-api-action";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { apiSend } from "@/lib/api/client";
+import { emptyStudentProfile, studentProfileSchema } from "@/lib/student-profile";
 import { admin } from "@/i18n/admin";
 import { common } from "@/i18n/common";
 
@@ -24,6 +26,7 @@ const t = admin.students;
 const schema = z.object({
   name: z.string().trim().min(2, t.validation.name).max(100, t.validation.name),
   email: z.email(t.validation.email).max(200, t.validation.email),
+  profile: studentProfileSchema,
 });
 type Values = z.infer<typeof schema>;
 
@@ -36,7 +39,7 @@ export function CreateStudentDialog({ defaultOpen = false, courses }: { defaultO
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { run } = useApiAction();
-  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { name: "", email: "" } });
+  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { name: "", email: "", profile: emptyStudentProfile } });
 
   function changeOpen(next: boolean) {
     setOpen(next);
@@ -68,7 +71,7 @@ export function CreateStudentDialog({ defaultOpen = false, courses }: { defaultO
           <Plus aria-hidden /> {t.create.open}
         </Button>
       </DialogTrigger>
-      <DialogContent className={mode === "import" ? "sm:max-w-2xl" : "sm:max-w-md"}>
+      <DialogContent className={mode === "import" ? "sm:max-w-2xl" : "max-h-[90vh] overflow-y-auto sm:max-w-lg"}>
         <DialogHeader>
           <DialogTitle>{t.create.title}</DialogTitle>
           <DialogDescription>{t.create.description}</DialogDescription>
@@ -98,6 +101,7 @@ export function CreateStudentDialog({ defaultOpen = false, courses }: { defaultO
           <FormField label={t.create.email} error={form.formState.errors.email?.message}>
             <Input type="email" autoComplete="off" inputMode="email" {...form.register("email")} />
           </FormField>
+          <StudentProfileFields form={form} />
           {courses.length > 0 && (
             <CheckList
               legend={t.courses.field}

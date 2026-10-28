@@ -10,6 +10,7 @@ import { z } from "zod";
 import { CheckList } from "@/components/admin/check-list";
 import { ConfirmAction } from "@/components/admin/confirm-action";
 import { FormField } from "@/components/admin/form-field";
+import { StudentProfileFields } from "@/components/admin/students/student-profile-fields";
 import { useApiAction } from "@/components/admin/use-api-action";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -17,24 +18,25 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { apiSend } from "@/lib/api/client";
+import { studentProfileSchema, type StudentProfileInput } from "@/lib/student-profile";
 import { admin } from "@/i18n/admin";
 import { common } from "@/i18n/common";
 
 const t = admin.students;
-const nameSchema = z.object({ name: z.string().trim().min(2, t.validation.name).max(100, t.validation.name) });
+const detailsSchema = z.object({ name: z.string().trim().min(2, t.validation.name).max(100, t.validation.name), profile: studentProfileSchema });
 
-type Student = { id: string; name: string; email: string; active: boolean; courses: { id: string }[] };
+type Student = { id: string; name: string; email: string; active: boolean; courses: { id: string }[]; profile: StudentProfileInput };
 type Course = { id: string; title: string };
 
 export function StudentActions({ student, courses }: { student: Student; courses: Course[] }) {
   const [dialog, setDialog] = useState<null | "rename" | "email" | "courses" | "deactivate" | "reactivate" | "delete">(null);
   const { run, pending } = useApiAction();
   const router = useRouter();
-  const form = useForm<{ name: string }>({ resolver: zodResolver(nameSchema), values: { name: student.name } });
+  const form = useForm<z.infer<typeof detailsSchema>>({ resolver: zodResolver(detailsSchema), values: { name: student.name, profile: student.profile } });
   const url = `/admin/students/${encodeURIComponent(student.id)}`;
 
-  const rename = form.handleSubmit(async ({ name }) => {
-    const done = await run(() => apiSend("patch", url, { name }), { success: t.edit.success });
+  const saveDetails = form.handleSubmit(async (values) => {
+    const done = await run(() => apiSend("patch", url, values), { success: t.edit.success });
     if (done) setDialog(null);
   });
 
@@ -81,15 +83,16 @@ export function StudentActions({ student, courses }: { student: Student; courses
       </DropdownMenu>
 
       <Dialog open={dialog === "rename"} onOpenChange={(open) => setDialog(open ? "rename" : null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{t.edit.title}</DialogTitle>
             <DialogDescription>{student.email}</DialogDescription>
           </DialogHeader>
-          <form onSubmit={rename} className="space-y-4" noValidate>
+          <form onSubmit={saveDetails} className="space-y-4" noValidate>
             <FormField label={t.edit.name} error={form.formState.errors.name?.message}>
               <Input autoComplete="off" {...form.register("name")} />
             </FormField>
+            <StudentProfileFields form={form} />
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialog(null)}>
                 {common.actions.cancel}
