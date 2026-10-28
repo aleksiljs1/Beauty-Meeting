@@ -127,10 +127,10 @@ The seed printed a link for the upcoming lesson (or create one in the admin port
 - [ ] Disable "Publikuar" for an image with display switches enabled; confirm it disappears from public pages but remains in the admin gallery.
 
 ### Lesson materials: several files at once and MP4 videos
-Prepare: two PDFs/images, one short `.mp4` (a phone clip works), one file over 50 MB that is not a
+Prepare: two PDFs/images, one short `.mp4` (a phone clip works), one file over 100 MB that is not a
 video (e.g. a large PDF), and a disallowed file (e.g. `.exe`, `.mov` or `.zip`).
 - [ ] Admin → lesson → Materialet → "Ngarko materiale" → select all files at once. Each file gets its
-      own row: invalid ones fail immediately with a reason ("nuk lejohet" / "shumë i madh (maksimumi 50 MB)")
+      own row: invalid ones fail immediately with a reason ("nuk lejohet" / "shumë i madh (maksimumi 100 MB)")
       while the others upload, at most two at a time, each with its own progress bar.
 - [ ] When the batch ends the header shows a summary ("3 skedarë u ngarkuan · 2 dështuan"); the uploaded
       files appear in the list in the selected order, the video with a film icon. "Mbyll listën" clears it.

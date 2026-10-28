@@ -108,16 +108,20 @@ describe("video materials (MP4, multipart)", () => {
     return { materialId: started.materialId, etag: put.headers.get("etag") ?? "" };
   }
 
-  it("applies per-type size limits: 1 GB for video, 50 MB for everything else", async () => {
+  it("applies per-type size limits: 4 GB for video, 100 MB for documents, and 50 MB for images", async () => {
     const video = await materials.startMaterialUpload(admin, lesson.id, { filename: "demo.mp4", mimeType: "video/mp4", sizeBytes: 200 * MB });
     expect(video).toMatchObject({ method: "multipart", partCount: 4 });
     await materials.deleteMaterial(admin, video.materialId);
 
-    await expect(materials.startMaterialUpload(admin, lesson.id, { filename: "demo.mp4", mimeType: "video/mp4", sizeBytes: 1024 * MB + 1 })).rejects.toMatchObject({
+    await expect(materials.startMaterialUpload(admin, lesson.id, { filename: "demo.mp4", mimeType: "video/mp4", sizeBytes: 4 * 1024 * MB + 1 })).rejects.toMatchObject({
       code: "VALIDATION_FAILED",
-      message: expect.stringContaining("1 GB"),
+      message: expect.stringContaining("4 GB"),
     });
-    await expect(materials.startMaterialUpload(admin, lesson.id, { filename: "a.pdf", mimeType: "application/pdf", sizeBytes: 50 * MB + 1 })).rejects.toMatchObject({
+    await expect(materials.startMaterialUpload(admin, lesson.id, { filename: "a.pdf", mimeType: "application/pdf", sizeBytes: 100 * MB + 1 })).rejects.toMatchObject({
+      code: "VALIDATION_FAILED",
+      message: expect.stringContaining("100 MB"),
+    });
+    await expect(materials.startMaterialUpload(admin, lesson.id, { filename: "a.png", mimeType: "image/png", sizeBytes: 50 * MB + 1 })).rejects.toMatchObject({
       code: "VALIDATION_FAILED",
       message: expect.stringContaining("50 MB"),
     });

@@ -34,23 +34,27 @@ const isWebp = (h: Uint8Array) => startsWith(h, ascii("RIFF")) && startsWith(h, 
 const MB = 1024 * 1024;
 const GB = 1024 * MB;
 
+/** PDF and Office lesson documents use a single presigned upload up to 100 MB. */
+export const MATERIAL_DOCUMENT_MAX_BYTES = 100 * MB;
 /** Short technique demos next to the lesson; full lesson recordings belong in Recordings (8 GB). */
-export const MATERIAL_VIDEO_MAX_BYTES = 1 * GB;
+export const MATERIAL_VIDEO_MAX_BYTES = 4 * GB;
 
 const RULES: Record<UploadKind, FileRule[]> = {
   material: [
-    { mime: "application/pdf", extensions: ["pdf"], inline: true, matches: isPdf },
+    { mime: "application/pdf", extensions: ["pdf"], inline: true, matches: isPdf, maxBytes: MATERIAL_DOCUMENT_MAX_BYTES },
     {
       mime: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
       extensions: ["pptx"],
       inline: false,
       matches: isZip,
+      maxBytes: MATERIAL_DOCUMENT_MAX_BYTES,
     },
     {
       mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       extensions: ["docx"],
       inline: false,
       matches: isZip,
+      maxBytes: MATERIAL_DOCUMENT_MAX_BYTES,
     },
     { mime: "image/png", extensions: ["png"], inline: true, matches: isPng },
     { mime: "image/jpeg", extensions: ["jpg", "jpeg"], inline: true, matches: isJpeg },
@@ -133,7 +137,7 @@ export function declaredMimeFor(kind: UploadKind, filename: string, browserType:
   return browserType;
 }
 
-/** Human-readable limit for messages ("50 MB", "1 GB"). */
+/** Human-readable limit for messages ("50 MB", "100 MB", "4 GB"). */
 export function formatLimit(bytes: number): string {
   return bytes >= GB ? `${Math.round(bytes / GB)} GB` : `${Math.round(bytes / MB)} MB`;
 }

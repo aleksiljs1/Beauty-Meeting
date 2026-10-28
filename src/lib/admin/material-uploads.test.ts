@@ -10,15 +10,16 @@ describe("prepareMaterialFile", () => {
     expect(prepareMaterialFile({ name: "Prezantimi.pptx", type: "", size: MB })).toMatchObject({ ok: true, multipart: false });
   });
 
-  it("accepts MP4 videos up to 1 GB with a multipart upload", () => {
+  it("accepts MP4 videos up to 4 GB with a multipart upload", () => {
     expect(prepareMaterialFile({ name: "Teknika.mp4", type: "video/mp4", size: 300 * MB })).toEqual({ ok: true, mimeType: "video/mp4", multipart: true });
     expect(prepareMaterialFile({ name: "Teknika.m4v", type: "video/x-m4v", size: MB })).toEqual({ ok: true, mimeType: "video/mp4", multipart: true });
-    expect(prepareMaterialFile({ name: "Teknika.mp4", type: "video/mp4", size: 1024 * MB + 1 })).toEqual({ ok: false, reason: "size", limit: "1 GB" });
+    expect(prepareMaterialFile({ name: "Teknika.mp4", type: "video/mp4", size: 4 * 1024 * MB + 1 })).toEqual({ ok: false, reason: "size", limit: "4 GB" });
   });
 
-  it("keeps the 50 MB limit for everything else", () => {
-    expect(prepareMaterialFile({ name: "a.pdf", type: "application/pdf", size: 50 * MB })).toMatchObject({ ok: true });
-    expect(prepareMaterialFile({ name: "a.pdf", type: "application/pdf", size: 50 * MB + 1 })).toEqual({ ok: false, reason: "size", limit: "50 MB" });
+  it("allows documents up to 100 MB while keeping images at 50 MB", () => {
+    expect(prepareMaterialFile({ name: "a.pdf", type: "application/pdf", size: 100 * MB })).toMatchObject({ ok: true });
+    expect(prepareMaterialFile({ name: "a.pdf", type: "application/pdf", size: 100 * MB + 1 })).toEqual({ ok: false, reason: "size", limit: "100 MB" });
+    expect(prepareMaterialFile({ name: "a.png", type: "image/png", size: 50 * MB + 1 })).toEqual({ ok: false, reason: "size", limit: "50 MB" });
   });
 
   it("rejects disallowed or mismatched types and empty files", () => {

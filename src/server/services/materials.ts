@@ -28,7 +28,7 @@ import { PLAYBACK_URL_TTL_SECONDS } from "./recordings";
  * record, uploads directly to storage, then finalizes — only then are size and real file type
  * verified and the material becomes READY (visible to students).
  *
- * Documents and images (≤ 50 MB) use one presigned PUT. MP4 videos (≤ 1 GB) use the same
+ * Documents (≤ 100 MB) and images (≤ 50 MB) use one presigned PUT. MP4 videos (≤ 4 GB) use the same
  * multipart flow as recordings: each part is retried on its own, so a dropped connection doesn't
  * restart a large upload, and no single URL has to outlive the whole transfer.
  */

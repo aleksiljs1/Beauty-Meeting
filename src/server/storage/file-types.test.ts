@@ -29,25 +29,28 @@ describe("upload allowlist", () => {
 describe("video materials", () => {
   const MB = 1024 * 1024;
 
-  it("allows MP4 materials, verified by their bytes, with a 1 GB limit and multipart upload", () => {
+  it("allows MP4 materials, verified by their bytes, with a 4 GB limit and multipart upload", () => {
     expect(ruleForDeclaredFile("material", "Teknika.mp4", "video/mp4")).not.toBeNull();
     expect(ruleForDeclaredFile("material", "Teknika.m4v", "video/mp4")).not.toBeNull();
     expect(ruleForDeclaredFile("material", "Teknika.mov", "video/quicktime")).toBeNull();
     expect(bytesMatch("material", "video/mp4", bytes(0, 0, 0, 0x18, "ftypmp42"))).toBe(true);
     expect(bytesMatch("material", "video/mp4", bytes("%PDF-1.7"))).toBe(false);
     expect(isInlineSafe("material", "video/mp4")).toBe(true);
-    expect(maxBytesFor("material", "video/mp4")).toBe(1024 * MB);
-    expect(maxBytesFor("material", "application/pdf")).toBe(50 * MB);
+    expect(maxBytesFor("material", "video/mp4")).toBe(4 * 1024 * MB);
+    expect(maxBytesFor("material", "application/pdf")).toBe(100 * MB);
+    expect(maxBytesFor("material", "image/png")).toBe(50 * MB);
     expect(usesMultipart("material", "video/mp4")).toBe(true);
     expect(usesMultipart("material", "application/pdf")).toBe(false);
   });
 
   it("checks type and per-type size together", () => {
     expect(checkDeclaredFile("material", { filename: "a.mp4", mimeType: "video/mp4", sizeBytes: 60 * MB })).toMatchObject({ ok: true, multipart: true });
-    expect(checkDeclaredFile("material", { filename: "a.pdf", mimeType: "application/pdf", sizeBytes: 60 * MB })).toEqual({ ok: false, reason: "size", maxBytes: 50 * MB });
+    expect(checkDeclaredFile("material", { filename: "a.pdf", mimeType: "application/pdf", sizeBytes: 100 * MB })).toMatchObject({ ok: true });
+    expect(checkDeclaredFile("material", { filename: "a.pdf", mimeType: "application/pdf", sizeBytes: 100 * MB + 1 })).toEqual({ ok: false, reason: "size", maxBytes: 100 * MB });
+    expect(checkDeclaredFile("material", { filename: "a.png", mimeType: "image/png", sizeBytes: 50 * MB + 1 })).toEqual({ ok: false, reason: "size", maxBytes: 50 * MB });
     expect(checkDeclaredFile("material", { filename: "a.exe", mimeType: "video/mp4", sizeBytes: 1 })).toEqual({ ok: false, reason: "type" });
-    expect(formatLimit(50 * MB)).toBe("50 MB");
-    expect(formatLimit(1024 * MB)).toBe("1 GB");
+    expect(formatLimit(100 * MB)).toBe("100 MB");
+    expect(formatLimit(4 * 1024 * MB)).toBe("4 GB");
   });
 
   it("normalizes missing or alias browser types by extension only", () => {

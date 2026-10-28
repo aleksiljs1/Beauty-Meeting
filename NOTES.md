@@ -200,7 +200,8 @@ or "live" for up to 30 days. Now:
 - Materials may now include **MP4 videos** (`.mp4`/`.m4v`, declared `video/mp4`, verified by the `ftyp`
   box like recordings) for short technique demos next to the lesson. `.mov`/WebM and other containers
   stay out: MP4 (H.264/AAC) is the one format every target browser, including iPhone Safari, plays inline.
-- **Size limits per type**: videos up to **1 GB**, every other material keeps **50 MB**. Full lesson
+- **Size limits per type**: videos up to **4 GB**, PDF/Word/PowerPoint documents up to **100 MB**, and
+  images up to **50 MB**. Full lesson
   recordings (up to 8 GB) still belong in Regjistrimet. Limits live on the allowlist rules
   (`file-types.ts`, `maxBytes`); `checkDeclaredFile()` is the single check used by the server and,
   for early feedback, by the admin UI (the server stays the authority and still verifies the bytes).

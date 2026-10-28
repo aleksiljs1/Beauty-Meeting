@@ -345,7 +345,7 @@ export const admin = {
   materials: {
     title: "Materialet",
     intro:
-      "PDF, PowerPoint, Word ose imazhe (deri në 50 MB) dhe video MP4 (deri në 1 GB). Mund të zgjidhni ose të tërhiqni këtu disa skedarë njëherësh. Studentët shohin vetëm materialet e verifikuara.",
+      "PDF, PowerPoint dhe Word (deri në 100 MB), imazhe (deri në 50 MB) dhe video MP4 (deri në 4 GB). Mund të zgjidhni ose të tërhiqni këtu disa skedarë njëherësh. Studentët shohin vetëm materialet e verifikuara.",
     choose: "Ngarko materiale",
     dropHere: "Lëshojini skedarët këtu për t'i ngarkuar",
     queueLabel: "Ngarkimet e materialeve",
