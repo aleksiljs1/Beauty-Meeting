@@ -195,6 +195,25 @@ or "live" for up to 30 days. Now:
   removed after a cancel, the change is saved and a warning toast says so.
 - **Dashboard → "Kërkon vëmendje"** lists published, upcoming lessons without a Zoom meeting (live mode).
 
+## Course payments (user request, 2026-10-28)
+
+- Payments happen **outside the site** (cash / bank transfer); the admin only records them. No online payments.
+- A course gets a **start date**, a **length** (years + months, stored as `durationMonths`) and a **monthly price**
+  (Përmbajtja → Kurset → "Pagesat"). Course month *k* starts on start + (k − 1) months and shows as
+  "Viti ⌈k/12⌉ · Muaji …". Rules live in `src/lib/billing.ts` (unit-tested).
+- Each course student has a **first month** (`CourseMember.firstMonth`): a student added after the course started
+  pays from the current month; the admin can change it ("Muaji i fillimit").
+- A payment covers N whole months **in order**, after the student's earlier payments, never past the course end.
+  The amount is pre-filled (months × price) and editable (e.g. a discounted year). Mistakes are **cancelled with a
+  reason, never deleted**; a course with payments can't be deleted.
+- Status is calculated, never stored: **Me vonesë** (a started month is unpaid), **Afati së shpejti** (next month
+  starts within 7 days), **Në rregull**, **Paguar plotësisht**. Owed = unpaid started months × price.
+- Admin sees everything on **/admin/pagesat** (filters by course and status, totals: owed now / paid / left);
+  **Paneli → "Kërkon vëmendje"** shows overdue and due-this-week counts (active students only).
+- Payment status **never blocks access** — the admin decides (e.g. deactivates). Not done yet: a daily email to the
+  admin, "paid until" in the student portal, partial months, pauses, course groups (the same course run again
+  with a new start date would need a "group" level).
+
 ## Lesson materials: MP4 videos and multi-file upload (2026-10-23)
 
 - Materials may now include **MP4 videos** (`.mp4`/`.m4v`, declared `video/mp4`, verified by the `ftyp`

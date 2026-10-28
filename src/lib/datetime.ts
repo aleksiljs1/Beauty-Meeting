@@ -86,3 +86,13 @@ export function fromZonedInputValue(value: string): Date | null {
   if (earlier !== guess && toZonedInputValue(earlier) === value) guess = earlier;
   return new Date(guess);
 }
+
+// --- Calendar dates ("YYYY-MM-DD", no time of day) --------------------------------------------
+
+/** Today's date in academy time, e.g. "2026-10-28". */
+export function todayInAcademy(now: Date = new Date()): string {
+  return toZonedInputValue(now).slice(0, 10);
+}
+
+/** "2026-10-28" → "28 tetor 2026". Noon UTC is the same calendar day in Tirana all year. */
+export const formatCalendarDate = (value: string) => formatDate(`${value}T12:00:00Z`);

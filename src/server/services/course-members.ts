@@ -1,4 +1,6 @@
 import "server-only";
+import { fromDbDate, joiningMonth } from "@/lib/billing";
+import { todayInAcademy } from "@/lib/datetime";
 import type { AppUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
 import { ApiError } from "@/server/http";
@@ -95,9 +97,19 @@ export async function setStudentCourses(userId: string, courseIds: string[], adm
   const added = wanted.filter((id) => !currentIds.has(id));
   const removed = [...currentIds].filter((id) => !wanted.includes(id));
 
+  // Someone joining a course that already started pays from the current course month.
+  const billing = await prisma.course.findMany({ where: { id: { in: added } }, select: { id: true, startsOn: true, durationMonths: true } });
+  const today = todayInAcademy(now);
+  const firstMonth = (courseId: string) => {
+    const course = billing.find((c) => c.id === courseId);
+    return course?.startsOn && course.durationMonths
+      ? joiningMonth({ startsOn: fromDbDate(course.startsOn), durationMonths: course.durationMonths }, today)
+      : 1;
+  };
+
   await prisma.$transaction([
     prisma.courseMember.deleteMany({ where: { userId, courseId: { in: removed } } }),
-    prisma.courseMember.createMany({ data: added.map((courseId) => ({ courseId, userId })), skipDuplicates: true }),
+    prisma.courseMember.createMany({ data: added.map((courseId) => ({ courseId, userId, firstMonth: firstMonth(courseId) })), skipDuplicates: true }),
   ]);
   for (const courseId of added) await audit(admin.id, "course.member_add", "course", courseId, { userId });
   for (const courseId of removed) await audit(admin.id, "course.member_remove", "course", courseId, { userId });

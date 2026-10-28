@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { BookOpen, CircleHelp, History, LayoutDashboard, LogOut, Menu, PanelsTopLeft, Plug, UserRound, Users } from "lucide-react";
+import { BookOpen, CircleHelp, History, LayoutDashboard, LogOut, Menu, PanelsTopLeft, Plug, UserRound, Users, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { href: "/admin", label: admin.shell.nav.dashboard, icon: LayoutDashboard, exact: true },
   { href: "/admin/studentet", label: admin.shell.nav.students, icon: Users },
+  { href: "/admin/pagesat", label: admin.shell.nav.payments, icon: Wallet },
   { href: "/admin/mesimet", label: admin.shell.nav.lessons, icon: BookOpen },
   { href: "/admin/permbajtja", label: admin.shell.nav.content, icon: PanelsTopLeft },
   { href: "/admin/integrimet", label: admin.shell.nav.integrations, icon: Plug },

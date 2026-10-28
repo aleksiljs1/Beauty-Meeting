@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Form from "next/form";
-import Link from "next/link";
 import { Search } from "lucide-react";
-import { EmptyState, PageHeader, Pagination } from "@/components/admin/page-parts";
+import { EmptyState, FilterChip, PageHeader, Pagination } from "@/components/admin/page-parts";
 import { CreateStudentDialog } from "@/components/admin/students/create-student-dialog";
 import { StudentActions } from "@/components/admin/students/student-actions";
 import { Badge } from "@/components/ui/badge";
@@ -11,28 +10,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { admin } from "@/i18n/admin";
 import { requirePageUser } from "@/server/auth/session";
-import { cn } from "@/lib/utils";
 import { listCourses, listStudents } from "@/server/queries/admin";
 
 export const metadata: Metadata = { title: admin.students.title };
 
 const t = admin.students;
 const one = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
-
-function Chip({ href, active, children }: { href: string; active: boolean; children: string }) {
-  return (
-    <Link
-      href={href}
-      aria-current={active ? "true" : undefined}
-      className={cn(
-        "rounded-full border px-3 py-1 text-sm transition-colors duration-200 outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-        active ? "border-foreground bg-foreground text-background" : "bg-card text-muted-foreground hover:border-rose/50 hover:text-foreground",
-      )}
-    >
-      {children}
-    </Link>
-  );
-}
 
 export default async function StudentsPage({ searchParams }: PageProps<"/admin/studentet">) {
   await requirePageUser("admin");
@@ -70,13 +53,13 @@ export default async function StudentsPage({ searchParams }: PageProps<"/admin/s
       {courses.length > 0 && (
         <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t.courseFilter}>
           <span className="text-xs text-muted-foreground">{t.courseFilter}</span>
-          <Chip href={buildHref({ kursi: "" })} active={!courseId}>
+          <FilterChip href={buildHref({ kursi: "" })} active={!courseId}>
             {t.allCourses}
-          </Chip>
+          </FilterChip>
           {courses.map((course) => (
-            <Chip key={course.id} href={buildHref({ kursi: course.id })} active={courseId === course.id}>
+            <FilterChip key={course.id} href={buildHref({ kursi: course.id })} active={courseId === course.id}>
               {course.title}
-            </Chip>
+            </FilterChip>
           ))}
         </div>
       )}

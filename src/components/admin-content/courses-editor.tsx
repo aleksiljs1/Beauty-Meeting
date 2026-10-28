@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { adminContent } from "@/i18n/admin-content";
 import { common } from "@/i18n/common";
 import { ApiClientError, apiSend } from "@/lib/api/client";
+import { centsToEuroInput } from "@/lib/billing";
 import { courseSchema, type CourseInput } from "@/lib/content-schemas";
 import { slugify } from "@/lib/public-content";
 import { applyFieldIssues, errorMessage, Field, StatusMessage, type Status } from "./form-bits";
@@ -32,6 +33,12 @@ function CourseForm({ item, onSaved, onCancel }: ItemFormProps<AdminCourse>) {
       durationText: item?.durationText ?? "",
       priceText: item?.priceText ?? "",
       isPublic: item?.isPublic ?? false,
+      startsOn: item?.startsOn ?? "",
+      duration: {
+        years: item?.durationMonths ? String(Math.floor(item.durationMonths / 12)) : "",
+        months: item?.durationMonths ? String(item.durationMonths % 12) : "",
+      },
+      monthlyPrice: item?.monthlyPriceCents != null ? centsToEuroInput(item.monthlyPriceCents) : "",
     },
   });
   const err = formState.errors;
@@ -81,6 +88,24 @@ function CourseForm({ item, onSaved, onCancel }: ItemFormProps<AdminCourse>) {
           {(aria) => <Input {...aria} {...register("priceText")} />}
         </Field>
       </div>
+      <fieldset className="grid gap-4 rounded-md border p-4">
+        <legend className="px-1 text-sm font-medium">{t.billingHeading}</legend>
+        <p className="text-sm text-muted-foreground">{t.billingHint}</p>
+        <div className="grid gap-4 sm:grid-cols-4">
+          <Field id="course-starts-on" label={t.startsOn} error={err.startsOn?.message}>
+            {(aria) => <Input type="date" {...aria} {...register("startsOn")} />}
+          </Field>
+          <Field id="course-years" label={t.durationYears} error={err.duration?.years?.message}>
+            {(aria) => <Input inputMode="numeric" {...aria} {...register("duration.years")} />}
+          </Field>
+          <Field id="course-months" label={t.durationMonths} error={err.duration?.months?.message}>
+            {(aria) => <Input inputMode="numeric" {...aria} {...register("duration.months")} />}
+          </Field>
+          <Field id="course-monthly-price" label={t.monthlyPrice} error={err.monthlyPrice?.message}>
+            {(aria) => <Input inputMode="decimal" {...aria} {...register("monthlyPrice")} />}
+          </Field>
+        </div>
+      </fieldset>
       <Controller
         control={control}
         name="isPublic"

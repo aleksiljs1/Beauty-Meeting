@@ -19,6 +19,10 @@ export type AdminCourse = {
   priceText: string | null;
   isPublic: boolean;
   position: number;
+  /** "YYYY-MM-DD" */
+  startsOn: string | null;
+  durationMonths: number | null;
+  monthlyPriceCents: number | null;
 };
 
 export type AdminGalleryItem = {

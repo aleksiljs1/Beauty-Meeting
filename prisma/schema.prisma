@@ -38,6 +38,8 @@ model User {
   materialsUploaded  LessonMaterial[]
   notifications      Notification[]
   auditEntries       AuditLog[]
+  payments           Payment[]              @relation("PaymentStudent")
+  paymentsRecorded   Payment[]              @relation("PaymentRecorder")
 
   @@unique([email])
   @@map("user")
@@ -189,8 +191,15 @@ model Course {
   createdAt    DateTime @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime @updatedAt @db.Timestamptz(3)
 
-  lessons Lesson[]
-  members CourseMember[]
+  /// Billing (src/lib/billing.ts): `durationMonths` course months from `startsOn`, each costing
+  /// `monthlyPriceCents`. Payments can be recorded once start and duration are set.
+  startsOn          DateTime? @db.Date
+  durationMonths    Int?
+  monthlyPriceCents Int?
+
+  lessons  Lesson[]
+  members  CourseMember[]
+  payments Payment[]
 
   @@index([isPublic, position])
 }
@@ -258,6 +267,8 @@ model CourseMember {
   course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
   userId   String
   user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// First course month this student pays for (later than 1 when they joined late).
+  firstMonth Int @default(1)
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 
@@ -508,4 +519,34 @@ model GalleryItem {
   @@index([isPublished, showOnHomeHero, position])
   @@index([isPublished, showOnHomeGallery, position])
   @@index([isPublished, showOnAbout, position])
+}
+
+enum PaymentMethod {
+  CASH
+  BANK
+  OTHER
+}
+
+/// A payment made outside the site and recorded by the admin. It covers `months` whole course
+/// months, following the student's earlier payments. Mistakes are cancelled, never deleted.
+model Payment {
+  id           String        @id @default(uuid(7)) @db.Uuid
+  courseId     String        @db.Uuid
+  /// A course with payments can't be deleted, so the money history isn't lost silently.
+  course       Course        @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  userId       String
+  user         User          @relation("PaymentStudent", fields: [userId], references: [id], onDelete: Cascade)
+  months       Int
+  amountCents  Int
+  paidOn       DateTime      @db.Date
+  method       PaymentMethod @default(CASH)
+  note         String?
+  recordedById String?
+  recordedBy   User?         @relation("PaymentRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
+  cancelledAt  DateTime?     @db.Timestamptz(3)
+  cancelReason String?
+  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
+
+  @@index([courseId, userId])
+  @@index([userId])
 }

@@ -105,3 +105,21 @@ export const completeRecordingSchema = z.object({
 });
 /** Single-PUT materials finish with an empty body; multipart (video) materials send their parts. */
 export const finishMaterialSchema = z.object({ parts: completeRecordingSchema.shape.parts.optional() });
+
+const calendarDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data nuk është e vlefshme.");
+const studentId = z.string().min(1).max(100);
+
+export const paymentAccountQuery = z.object({ courseId: z.uuid(), userId: studentId });
+
+export const recordPaymentSchema = paymentAccountQuery.extend({
+  months: z.number().int().min(1, "Të paktën 1 muaj.").max(120),
+  /** Euro cents: what was actually paid (a yearly payment may be discounted). */
+  amountCents: z.number().int().min(0).max(100_000_000),
+  paidOn: calendarDay,
+  method: z.enum(["CASH", "BANK", "OTHER"]),
+  note: optionalText(500),
+});
+
+export const cancelPaymentSchema = z.object({ reason: z.string().trim().min(3, "Shkruani arsyen.").max(300) });
+
+export const firstMonthSchema = z.object({ firstMonth: z.number().int().min(1).max(120) });

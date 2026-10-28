@@ -4,6 +4,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { Prisma } from "@/generated/prisma/client";
 import { adminContent } from "@/i18n/admin-content";
 import type { CourseInput, GalleryItemInput, ServiceInput, SettingsInput } from "@/lib/content-schemas";
+import { fromDbDate, parseEuroCents, toDbDate } from "@/lib/billing";
 import { readImageDimensions } from "@/lib/image-dimensions";
 import { parseOpeningHours } from "@/lib/public-content";
 import type { AppUser } from "@/server/auth/session";
@@ -151,10 +152,20 @@ const courseSelect = {
   priceText: true,
   isPublic: true,
   position: true,
+  startsOn: true,
+  durationMonths: true,
+  monthlyPriceCents: true,
 } as const;
 
+/** The start date goes out as "YYYY-MM-DD". */
+const toAdminCourse = ({ startsOn, ...course }: Prisma.CourseGetPayload<{ select: typeof courseSelect }>) => ({
+  ...course,
+  startsOn: startsOn ? fromDbDate(startsOn) : null,
+});
+
 export async function listCoursesForAdmin() {
-  return prisma.course.findMany({ orderBy: [{ position: "asc" }, { createdAt: "asc" }], select: courseSelect, take: LIST_LIMIT });
+  const courses = await prisma.course.findMany({ orderBy: [{ position: "asc" }, { createdAt: "asc" }], select: courseSelect, take: LIST_LIMIT });
+  return courses.map(toAdminCourse);
 }
 
 const courseData = (input: Partial<CourseInput>) => ({
@@ -165,6 +176,9 @@ const courseData = (input: Partial<CourseInput>) => ({
   ...(input.durationText !== undefined && { durationText: orNull(input.durationText) }),
   ...(input.priceText !== undefined && { priceText: orNull(input.priceText) }),
   ...(input.isPublic !== undefined && { isPublic: input.isPublic }),
+  ...(input.startsOn !== undefined && { startsOn: input.startsOn ? toDbDate(input.startsOn) : null }),
+  ...(input.duration !== undefined && { durationMonths: Number(input.duration.years || 0) * 12 + Number(input.duration.months || 0) || null }),
+  ...(input.monthlyPrice !== undefined && { monthlyPriceCents: input.monthlyPrice ? parseEuroCents(input.monthlyPrice) : null }),
 });
 
 async function withSlugCheck<T>(promise: Promise<T>): Promise<T> {
@@ -184,16 +198,17 @@ export async function createCourse(admin: AppUser, input: CourseInput) {
     }),
   );
   await audit(admin.id, "content.course.create", "course", course.id);
-  return course;
+  return toAdminCourse(course);
 }
 
 export async function updateCourse(admin: AppUser, id: string, input: Partial<CourseInput>) {
   const course = await withSlugCheck(prisma.course.update({ where: { id }, data: courseData(input), select: courseSelect }));
   await audit(admin.id, "content.course.update", "course", id);
-  return course;
+  return toAdminCourse(course);
 }
 
 export async function deleteCourse(admin: AppUser, id: string) {
+  if (await prisma.payment.count({ where: { courseId: id } })) throw new ApiError("CONFLICT", e.courseHasPayments);
   await rethrowMissing(prisma.course.delete({ where: { id } }));
   await audit(admin.id, "content.course.delete", "course", id);
 }

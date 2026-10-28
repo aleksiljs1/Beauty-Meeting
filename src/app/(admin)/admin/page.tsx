@@ -1,12 +1,14 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { AlertTriangle, Plus } from "lucide-react";
+import { AlertTriangle, Plus, Wallet } from "lucide-react";
 import { DemoBadge, EmptyState, MeetingBadge, PageHeader, PublicationBadge, SectionCard } from "@/components/admin/page-parts";
 import { Button } from "@/components/ui/button";
 import { admin } from "@/i18n/admin";
+import { formatEuro } from "@/lib/billing";
 import { formatDateTime, formatTimeRange, formatWeekdayDate } from "@/lib/datetime";
 import { requirePageUser } from "@/server/auth/session";
 import { getAdminDashboard, type DashboardIssue } from "@/server/queries/admin";
+import { getPaymentAlerts } from "@/server/queries/payments";
 
 export const metadata: Metadata = { title: admin.dashboard.title };
 
@@ -38,7 +40,11 @@ function Stat({ label, value }: { label: string; value: number }) {
 
 export default async function AdminDashboardPage() {
   await requirePageUser("admin");
-  const data = await getAdminDashboard();
+  const [data, payments] = await Promise.all([getAdminDashboard(), getPaymentAlerts()]);
+  const paymentAlerts = [
+    payments.overdue && { text: t.paymentsOverdue(payments.overdue, payments.amountOwedCents ? formatEuro(payments.amountOwedCents) : ""), href: "/admin/pagesat?gjendja=OVERDUE", urgent: true },
+    payments.dueSoon && { text: t.paymentsDueSoon(payments.dueSoon), href: "/admin/pagesat?gjendja=DUE_SOON", urgent: false },
+  ].filter((alert) => !!alert);
 
   return (
     <div className="space-y-8">
@@ -68,10 +74,21 @@ export default async function AdminDashboardPage() {
       </div>
 
       <SectionCard title={t.issuesTitle}>
-        {data.issues.length === 0 ? (
+        {data.issues.length === 0 && paymentAlerts.length === 0 ? (
           <EmptyState>{t.issuesEmpty}</EmptyState>
         ) : (
           <ul className="divide-y">
+            {paymentAlerts.map((alert) => (
+              <li key={alert.href} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="flex gap-3 text-sm font-medium">
+                  <Wallet className={`mt-0.5 size-4 shrink-0 ${alert.urgent ? "text-destructive" : "text-muted-foreground"}`} aria-hidden />
+                  {alert.text}
+                </p>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={alert.href}>{t.openPayments}</Link>
+                </Button>
+              </li>
+            ))}
             {data.issues.map((issue) => (
               <li key={`${issue.kind}-${issue.id}`} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex gap-3">

@@ -75,8 +75,14 @@ export const adminContent = {
     durationHint: "p.sh. “3 muaj”",
     priceText: "Çmimi (opsional)",
     isPublic: "Shfaqe në faqen publike",
+    billingHeading: "Pagesat",
+    billingHint: "Plotësoni datën e fillimit dhe kohëzgjatjen për të regjistruar pagesat e studentëve te “Pagesat”.",
+    startsOn: "Data e fillimit",
+    durationYears: "Vite",
+    durationMonths: "Muaj",
+    monthlyPrice: "Çmimi mujor (€)",
     deleteTitle: "Të fshihet kursi?",
-    deleteBody: "Kursi hiqet nga faqja. Mësimet e lidhura me të nuk fshihen, por nuk do të jenë më pjesë e këtij kursi.",
+    deleteBody: "Kursi hiqet nga faqja dhe studentët hiqen nga kursi. Mësimet e lidhura me të nuk fshihen, por nuk do të jenë më pjesë e këtij kursi. Një kurs me pagesa të regjistruara nuk mund të fshihet.",
   },
 
   gallery: {
@@ -119,11 +125,15 @@ export const adminContent = {
     url: "Shkruani një lidhje të plotë që fillon me https://.",
     slug: "Përdorni vetëm shkronja të vogla pa theks, numra dhe viza (p.sh. kursi-i-grimit).",
     tooManyRows: "Shumë rreshta.",
+    number: (max: number) => `Shkruani një numër nga 0 deri në ${max}.`,
+    date: "Zgjidhni një datë të vlefshme.",
+    price: "Shkruani një shumë, p.sh. 40 ose 40,50.",
   },
 
   errors: {
     notFound: "Elementi nuk u gjet. Rifreskoni faqen.",
     slugTaken: "Kjo adresë përdoret nga një kurs tjetër. Zgjidhni një tjetër.",
+    courseHasPayments: "Ky kurs ka pagesa të regjistruara dhe nuk mund të fshihet. Hiqeni nga faqja publike në vend të kësaj.",
     staleOrder: "Lista ka ndryshuar ndërkohë. Rifreskoni faqen dhe provoni përsëri.",
     badImage: "Skedari nuk është një foto e vlefshme ose ngarkimi nuk përfundoi.",
     uploadExists: "Kjo foto është ruajtur tashmë.",
