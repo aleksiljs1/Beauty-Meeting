@@ -48,12 +48,19 @@ const dashboardLessonSelect = {
 export type DashboardIssue = {
   kind: "RECORDING_FAILED" | "RECORDING_STALLED" | "MATERIAL_FAILED" | "MATERIAL_STALLED" | "ZOOM_MEETING_MISSING";
   id: string;
-  lessonId: string;
-  lessonTitle: string;
+  /** Null for a library file no lesson uses yet (the issue links to the library instead). */
+  lessonId: string | null;
+  lessonTitle: string | null;
   name: string | null;
   message: string | null;
   at: Date;
 };
+
+const issueFileSelect = { id: true, displayName: true, lessons: { take: 1, select: { lesson: { select: { id: true, title: true } } } } } as const;
+const fileIssuePlace = (file: { lessons: { lesson: { id: string; title: string } }[] }) => ({
+  lessonId: file.lessons[0]?.lesson.id ?? null,
+  lessonTitle: file.lessons[0]?.lesson.title ?? null,
+});
 
 export async function getAdminDashboard(now = new Date()) {
   const stale = new Date(now.getTime() - HOUR);
@@ -85,17 +92,17 @@ export async function getAdminDashboard(now = new Date()) {
       take: 20,
       select: { id: true, lessonId: true, displayName: true, updatedAt: true, lesson: { select: { title: true } } },
     }),
-    prisma.lessonMaterial.findMany({
+    prisma.materialFile.findMany({
       where: { status: "FAILED" },
       orderBy: { updatedAt: "desc" },
       take: 20,
-      select: { id: true, lessonId: true, displayName: true, updatedAt: true, lesson: { select: { title: true } } },
+      select: { ...issueFileSelect, updatedAt: true },
     }),
-    prisma.lessonMaterial.findMany({
+    prisma.materialFile.findMany({
       where: { status: "PENDING", createdAt: { lt: stale } },
       orderBy: { createdAt: "desc" },
       take: 20,
-      select: { id: true, lessonId: true, displayName: true, createdAt: true, lesson: { select: { title: true } } },
+      select: { ...issueFileSelect, createdAt: true },
     }),
     // Published, still ahead, and students can't join: no Zoom meeting yet (live mode only).
     zoomLive
@@ -111,8 +118,8 @@ export async function getAdminDashboard(now = new Date()) {
   const issues: DashboardIssue[] = [
     ...failedRecordings.map((r) => ({ kind: "RECORDING_FAILED" as const, id: r.id, lessonId: r.lessonId, lessonTitle: r.lesson.title, name: r.displayName, message: r.errorMessage, at: r.updatedAt })),
     ...stalledRecordings.map((r) => ({ kind: "RECORDING_STALLED" as const, id: r.id, lessonId: r.lessonId, lessonTitle: r.lesson.title, name: r.displayName, message: null, at: r.updatedAt })),
-    ...failedMaterials.map((m) => ({ kind: "MATERIAL_FAILED" as const, id: m.id, lessonId: m.lessonId, lessonTitle: m.lesson.title, name: m.displayName, message: null, at: m.updatedAt })),
-    ...stalledMaterials.map((m) => ({ kind: "MATERIAL_STALLED" as const, id: m.id, lessonId: m.lessonId, lessonTitle: m.lesson.title, name: m.displayName, message: null, at: m.createdAt })),
+    ...failedMaterials.map((m) => ({ kind: "MATERIAL_FAILED" as const, id: m.id, ...fileIssuePlace(m), name: m.displayName, message: null, at: m.updatedAt })),
+    ...stalledMaterials.map((m) => ({ kind: "MATERIAL_STALLED" as const, id: m.id, ...fileIssuePlace(m), name: m.displayName, message: null, at: m.createdAt })),
     ...withoutMeeting.map((l) => ({ kind: "ZOOM_MEETING_MISSING" as const, id: l.id, lessonId: l.id, lessonTitle: l.title, name: null, message: null, at: l.scheduledStartAt })),
   ].sort((a, b) => b.at.getTime() - a.at.getTime());
 
@@ -233,7 +240,7 @@ export async function listLessons(filter: LessonListFilter, now = new Date()) {
         meetingStatus: true,
         isDemo: true,
         course: { select: { title: true } },
-        _count: { select: { enrollments: { where: { revokedAt: null } }, materials: { where: { status: "READY" } } } },
+        _count: { select: { enrollments: { where: { revokedAt: null } }, materials: { where: { file: { status: "READY" } } } } },
       },
     }),
     prisma.lesson.count({ where }),
@@ -249,6 +256,38 @@ export async function listLessons(filter: LessonListFilter, now = new Date()) {
     total,
     page,
   );
+}
+
+// --- Materials library -----------------------------------------------------------------------
+
+export type LibraryFile = {
+  id: string;
+  displayName: string;
+  mimeType: string;
+  sizeBytes: number;
+  status: "PENDING" | "READY" | "FAILED";
+  createdAt: Date;
+  lessons: { id: string; title: string }[];
+};
+
+/** Library files, newest first, with the lessons that use them. */
+export async function listMaterialLibrary({ q, readyOnly = false }: { q?: string; readyOnly?: boolean } = {}): Promise<LibraryFile[]> {
+  const term = q?.trim().slice(0, 100);
+  const rows = await prisma.materialFile.findMany({
+    where: { ...(term ? { displayName: { contains: term, mode: "insensitive" } } : {}), ...(readyOnly ? { status: "READY" } : {}) },
+    orderBy: { createdAt: "desc" },
+    take: 500,
+    select: {
+      id: true,
+      displayName: true,
+      mimeType: true,
+      sizeBytes: true,
+      status: true,
+      createdAt: true,
+      lessons: { orderBy: { lesson: { scheduledStartAt: "desc" } }, select: { lesson: { select: { id: true, title: true } } } },
+    },
+  });
+  return rows.map(({ lessons, sizeBytes, ...file }) => ({ ...file, sizeBytes: Number(sizeBytes), lessons: lessons.map((l) => l.lesson) }));
 }
 
 /** Lessons starting in [from, to) for the teachers' calendar; archived lessons are left out. */
@@ -377,13 +416,18 @@ export async function listAuditLog(page = 1) {
     prisma.auditLog.count(),
   ]);
 
-  // Resolve readable target names in two batched queries (no N+1).
+  // Resolve readable target names in batched queries (no N+1).
   const ids = (type: string) => [...new Set(rows.filter((r) => r.targetType === type && r.targetId).map((r) => r.targetId!))];
-  const [lessons, users] = await Promise.all([
+  const [lessons, users, files] = await Promise.all([
     prisma.lesson.findMany({ where: { id: { in: ids("lesson").filter(isUuid) } }, select: { id: true, title: true } }),
     prisma.user.findMany({ where: { id: { in: ids("user") } }, select: { id: true, name: true } }),
+    prisma.materialFile.findMany({ where: { id: { in: ids("material").filter(isUuid) } }, select: { id: true, displayName: true } }),
   ]);
-  const names = new Map<string, string>([...lessons.map((l) => [l.id, l.title] as const), ...users.map((u) => [u.id, u.name] as const)]);
+  const names = new Map<string, string>([
+    ...lessons.map((l) => [l.id, l.title] as const),
+    ...users.map((u) => [u.id, u.name] as const),
+    ...files.map((f) => [f.id, f.displayName] as const),
+  ]);
 
   return paged(
     rows.map((r) => ({

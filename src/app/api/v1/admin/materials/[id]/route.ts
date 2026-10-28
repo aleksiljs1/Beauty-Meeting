@@ -1,7 +1,7 @@
 import { requireApiUser } from "@/server/auth/session";
 import { ok, readJson, route } from "@/server/http";
 import { moveMaterial, renameMaterial } from "@/server/services/material-admin";
-import { deleteMaterial } from "@/server/services/materials";
+import { removeMaterial } from "@/server/services/materials";
 import { updateMaterialSchema, uuidParam } from "@/server/validation/admin";
 
 type Ctx = RouteContext<"/api/v1/admin/materials/[id]">;
@@ -15,8 +15,9 @@ export const PATCH = route<Ctx>(async (request, { params }) => {
   return ok({ id });
 });
 
+/** Removes the material from its lesson; the file stays in the library. */
 export const DELETE = route<Ctx>(async (request, { params }) => {
   const admin = await requireApiUser(request, "admin");
-  await deleteMaterial(admin, uuidParam((await params).id, "Materiali nuk u gjet."));
-  return ok({ deleted: true });
+  await removeMaterial(admin, uuidParam((await params).id, "Materiali nuk u gjet."));
+  return ok({ removed: true });
 });

@@ -3,17 +3,16 @@ import type { AppUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
 import { ApiError } from "@/server/http";
 import { publishLessonChanged } from "@/server/realtime/publish";
-import { sanitizeDisplayName } from "@/server/storage/file-types";
 import { audit } from "./audit";
+import { renameFile } from "./material-files";
 
-/** Rename and reorder lesson materials (upload/delete live in materials.ts). */
+/** Rename and reorder lesson materials (files live in material-files.ts, links in materials.ts). */
 
+/** Renames the library file, so the new name shows in every lesson that uses it. */
 export async function renameMaterial(materialId: string, displayName: string, admin: AppUser) {
-  const material = await prisma.lessonMaterial.findUnique({ where: { id: materialId }, select: { lessonId: true } });
+  const material = await prisma.lessonMaterial.findUnique({ where: { id: materialId }, select: { fileId: true } });
   if (!material) throw new ApiError("NOT_FOUND", "Materiali nuk u gjet.");
-  await prisma.lessonMaterial.update({ where: { id: materialId }, data: { displayName: sanitizeDisplayName(displayName) } });
-  await audit(admin.id, "material.rename", "lesson", material.lessonId, { materialId });
-  await publishLessonChanged(material.lessonId);
+  await renameFile(material.fileId, displayName, admin);
 }
 
 /** Swaps a material with its neighbour. Positions are renumbered 0..n-1 so gaps/duplicates heal. */

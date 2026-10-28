@@ -105,6 +105,10 @@ export const startUploadSchema = z.object({
   sizeBytes: z.number().int().positive(),
 });
 
+export const startFileUploadSchema = startUploadSchema.extend({ lessonId: z.uuid().optional() });
+export const renameFileSchema = z.object({ displayName: z.string().trim().min(1).max(150) });
+export const attachFilesSchema = z.object({ fileIds: z.array(z.uuid()).min(1).max(100) });
+
 export const updateMaterialSchema = z
   .object({ displayName: z.string().trim().min(1).max(150).optional(), move: z.enum(["up", "down"]).optional() })
   .refine((v) => v.displayName !== undefined || v.move !== undefined, "Asgjë për të ndryshuar.");

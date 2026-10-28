@@ -8,7 +8,7 @@ import type { AppUser } from "@/server/auth/session";
 export async function resetDatabase() {
   if (!process.env.DATABASE_URL?.includes("academy_test")) throw new Error("Refusing to reset a non-test database");
   await prisma.$executeRawUnsafe(
-    `TRUNCATE "WebhookEvent", "Notification", "InvitationRedemption", "LessonInvitation", "LessonEnrollment", "LessonMaterial",
+    `TRUNCATE "WebhookEvent", "Notification", "InvitationRedemption", "LessonInvitation", "LessonEnrollment", "LessonMaterial", "MaterialFile",
       "Recording", "Lesson", "Course", "AuditLog", "session", "account", "verification", "user" CASCADE`,
   );
 }

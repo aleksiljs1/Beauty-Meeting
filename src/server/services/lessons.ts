@@ -220,7 +220,6 @@ export async function deleteDraftLesson(lessonId: string, admin: AppUser) {
       title: true,
       zoomMeetingNumber: true,
       _count: { select: { enrollments: true } },
-      materials: { select: { objectKey: true } },
       recordings: { select: { objectKey: true } },
     },
   });
@@ -233,7 +232,8 @@ export async function deleteDraftLesson(lessonId: string, admin: AppUser) {
 
   await deleteZoomMeeting(lessonId, lesson.zoomMeetingNumber, admin.id);
   await prisma.lesson.delete({ where: { id: lessonId } });
-  const keys = [...lesson.materials.map((m) => m.objectKey), ...lesson.recordings.map((r) => r.objectKey)].filter((k): k is string => !!k);
+  // Materials stay in the library; only the lesson's own recordings are removed from storage.
+  const keys = lesson.recordings.map((r) => r.objectKey).filter((k): k is string => !!k);
   await Promise.all(keys.map((key) => deleteObject(key).catch((error) => console.error("[storage] orphan lesson object", key, error))));
   await audit(admin.id, "lesson.delete", "lesson", lessonId, { title: lesson.title });
 }

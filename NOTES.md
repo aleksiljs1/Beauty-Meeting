@@ -214,6 +214,22 @@ or "live" for up to 30 days. Now:
   admin, "paid until" in the student portal, partial months, pauses, course groups (the same course run again
   with a new start date would need a "group" level).
 
+## Materials library, repeating lessons, student details (user request, 2026-10-28)
+
+- **Materials library** (`/admin/materialet`): every uploaded file is a `MaterialFile`; a lesson's materials are
+  links (`LessonMaterial` = lesson + file + position). Upload on the library page or from a lesson (it lands in
+  both); in a lesson, **"Nga materialet"** adds existing files without uploading again.
+  - Removing a material from a lesson keeps the file in the library. Deleting a lesson keeps its files.
+    Deleting a file in the library removes it from every lesson (the confirmation says how many).
+  - The name lives on the file: renaming in a lesson renames it everywhere.
+  - Migration `material_library` moved every existing material into the library (file id = old material id);
+    no stored object changed. Student access is unchanged: always through the lesson's access policy.
+- **Repeating lessons**: the new-lesson form can repeat on chosen weekdays until a date (max 100). Each date is a
+  normal lesson (own Zoom meeting, editable on its own) with the same details and students. Times keep their
+  Tirana clock time across DST (`repeatSchedules` in `lib/admin/lesson-rules.ts`).
+- **Student details** (optional): phone, birth date (age is computed), gender, city, private admin notes — in a
+  separate `StudentProfile` table, not Better Auth's `user`. Search also matches phone numbers.
+
 ## Lesson materials: MP4 videos and multi-file upload (2026-10-23)
 
 - Materials may now include **MP4 videos** (`.mp4`/`.m4v`, declared `video/mp4`, verified by the `ftyp`

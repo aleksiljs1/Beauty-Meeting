@@ -96,14 +96,18 @@ export default async function AdminDashboardPage() {
                   <div className="space-y-0.5 text-sm">
                     <p className="font-medium">{ISSUE_LABEL[issue.kind]}</p>
                     <p className="text-muted-foreground">
-                      {issue.lessonTitle}
+                      {issue.lessonTitle ?? t.library}
                       {issue.name ? ` · ${issue.name}` : ""} · {formatDateTime(issue.at)}
                     </p>
                     {issue.message && <p className="text-destructive">{issue.message}</p>}
                   </div>
                 </div>
                 <Button variant="outline" size="sm" asChild>
-                  <Link href={`/admin/mesimet/${issue.lessonId}?tab=${ISSUE_TAB[issue.kind]}`}>{t.openLesson}</Link>
+                  {issue.lessonId ? (
+                    <Link href={`/admin/mesimet/${issue.lessonId}?tab=${ISSUE_TAB[issue.kind]}`}>{t.openLesson}</Link>
+                  ) : (
+                    <Link href="/admin/materialet">{t.openLibrary}</Link>
+                  )}
                 </Button>
               </li>
             ))}

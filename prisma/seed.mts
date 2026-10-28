@@ -140,16 +140,16 @@ function samplePdf(title: string): Uint8Array<ArrayBuffer> {
   return new TextEncoder().encode(body) as Uint8Array<ArrayBuffer>;
 }
 
-for (const l of [demo, replay, upcoming]) {
-  const bytes = samplePdf("Material demonstrues - Akademia CEM");
-  const objectKey = newObjectKey("materials", l.id);
-  const url = await presignPut({ key: objectKey, contentType: "application/pdf", contentLength: bytes.byteLength });
-  const put = await fetch(url, { method: "PUT", body: bytes, headers: { "Content-Type": "application/pdf" } });
-  if (!put.ok) throw new Error(`Sample upload failed (${put.status}). Did you run npm run storage:init?`);
-  await prisma.lessonMaterial.create({
-    data: { lessonId: l.id, objectKey, displayName: "Material demonstrues.pdf", mimeType: "application/pdf", sizeBytes: BigInt(bytes.byteLength), status: "READY", uploadedById: admin.id },
-  });
-}
+// One sample handout in the library, shown in all three lessons.
+const bytes = samplePdf("Material demonstrues - Akademia CEM");
+const objectKey = newObjectKey("materials", "library");
+const url = await presignPut({ key: objectKey, contentType: "application/pdf", contentLength: bytes.byteLength });
+const put = await fetch(url, { method: "PUT", body: bytes, headers: { "Content-Type": "application/pdf" } });
+if (!put.ok) throw new Error(`Sample upload failed (${put.status}). Did you run npm run storage:init?`);
+const handout = await prisma.materialFile.create({
+  data: { objectKey, displayName: "Material demonstrues.pdf", mimeType: "application/pdf", sizeBytes: BigInt(bytes.byteLength), status: "READY", uploadedById: admin.id },
+});
+await prisma.lessonMaterial.createMany({ data: [demo, replay, upcoming].map((l) => ({ lessonId: l.id, fileId: handout.id })) });
 
 const invite = await createInvitation({ lessonId: upcoming.id, redeemUntil: new Date(now + 2 * DAY), maxRedemptions: 30 }, admin);
 

@@ -35,7 +35,7 @@ model User {
   lessonsCreated     Lesson[]
   invitationsCreated LessonInvitation[]
   redemptions        InvitationRedemption[]
-  materialsUploaded  LessonMaterial[]
+  materialsUploaded  MaterialFile[]
   notifications      Notification[]
   auditEntries       AuditLog[]
   profile            StudentProfile?
@@ -342,20 +342,19 @@ model InvitationRedemption {
   @@index([userId])
 }
 
-model LessonMaterial {
+/// A file in the materials library. Uploaded once (from the library page or from a lesson) and
+/// reused in any number of lessons; removing it from a lesson keeps it here.
+model MaterialFile {
   id          String       @id @default(uuid(7)) @db.Uuid
-  lessonId    String       @db.Uuid
-  lesson      Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   /// Server-generated, non-guessable key in private storage. Never a public URL.
   objectKey   String       @unique
-  /// Sanitized display name.
+  /// Sanitized display name, shown wherever the file is used.
   displayName String
   /// Verified after upload, not taken from the browser.
   mimeType    String
   sizeBytes   BigInt
-  position    Int          @default(0)
   status      ObjectStatus @default(PENDING)
-  /// Open multipart upload (video materials) while PENDING; cleared once completed.
+  /// Open multipart upload (videos) while PENDING; cleared once completed.
   uploadId    String?
 
   uploadedById String
@@ -363,7 +362,25 @@ model LessonMaterial {
   createdAt    DateTime @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime @updatedAt @db.Timestamptz(3)
 
-  @@index([lessonId, status, position])
+  lessons LessonMaterial[]
+
+  @@index([status, createdAt])
+}
+
+/// A library file shown in a lesson. Access always goes through the lesson's policy.
+model LessonMaterial {
+  id       String       @id @default(uuid(7)) @db.Uuid
+  lessonId String       @db.Uuid
+  lesson   Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  fileId   String       @db.Uuid
+  file     MaterialFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  position Int          @default(0)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([lessonId, fileId])
+  @@index([lessonId, position])
+  @@index([fileId])
 }
 
 model Recording {
