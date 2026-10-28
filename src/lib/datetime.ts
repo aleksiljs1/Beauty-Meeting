@@ -89,10 +89,33 @@ export function fromZonedInputValue(value: string): Date | null {
 
 // --- Calendar dates ("YYYY-MM-DD", no time of day) --------------------------------------------
 
-/** Today's date in academy time, e.g. "2026-10-28". */
-export function todayInAcademy(now: Date = new Date()): string {
-  return toZonedInputValue(now).slice(0, 10);
+/** The academy-time calendar day of an instant, e.g. "2026-10-28". */
+export const academyDay = (value: DateInput) => toZonedInputValue(value).slice(0, 10);
+export const todayInAcademy = (now: Date = new Date()) => academyDay(now);
+
+const DAY_MS = 86_400_000;
+const pad = (n: number) => String(n).padStart(2, "0");
+const parseDay = (day: string) => day.split("-").map(Number) as [number, number, number];
+
+export function addDays(day: string, days: number): string {
+  const [y, m, d] = parseDay(day);
+  return new Date(Date.UTC(y, m - 1, d) + days * DAY_MS).toISOString().slice(0, 10);
 }
+
+/** Calendar months later, clamped to the month's last day (31 Jan + 1 → 28/29 Feb). */
+export function addMonths(day: string, months: number): string {
+  const [y, m, d] = parseDay(day);
+  const first = new Date(Date.UTC(y, m - 1 + months, 1));
+  const lastDay = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
+  return `${first.getUTCFullYear()}-${pad(first.getUTCMonth() + 1)}-${pad(Math.min(d, lastDay))}`;
+}
+
+/** 0 = Monday … 6 = Sunday (weeks start on Monday in Albania). */
+export const weekdayIndex = (day: string) => (new Date(`${day}T12:00:00Z`).getUTCDay() + 6) % 7;
+
+const monthFormatter = new Intl.DateTimeFormat(LOCALE, { timeZone: "UTC", month: "long", year: "numeric" });
+/** "2026-11-01" → "nëntor 2026" */
+export const formatMonthYear = (day: string) => monthFormatter.format(new Date(`${day}T12:00:00Z`));
 
 /** "2026-10-28" → "28 tetor 2026". Noon UTC is the same calendar day in Tirana all year. */
 export const formatCalendarDate = (value: string) => formatDate(`${value}T12:00:00Z`);

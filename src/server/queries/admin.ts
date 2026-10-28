@@ -239,6 +239,17 @@ export async function listLessons(filter: LessonListFilter, now = new Date()) {
   );
 }
 
+/** Lessons starting in [from, to) for the teachers' calendar; archived lessons are left out. */
+export async function listCalendarLessons({ from, to, courseId }: { from: Date; to: Date; courseId?: string }) {
+  const rows = await prisma.lesson.findMany({
+    where: { scheduledStartAt: { gte: from, lt: to }, publication: { not: "ARCHIVED" }, ...(courseId ? { courseId } : {}) },
+    orderBy: { scheduledStartAt: "asc" },
+    take: 500,
+    select: { id: true, title: true, scheduledStartAt: true, scheduledEndAt: true, publication: true, courseId: true, course: { select: { title: true } } },
+  });
+  return rows.map(({ course, ...lesson }) => ({ ...lesson, courseTitle: course?.title ?? null }));
+}
+
 /** `meetingStatus` is the effective one (see effectiveMeetingStatus), the same state students see. */
 export async function getAdminLesson(lessonId: string, now = new Date()) {
   const lesson = await prisma.lesson.findUnique({

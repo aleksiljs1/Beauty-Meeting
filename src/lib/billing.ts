@@ -1,3 +1,5 @@
+import { addDays, addMonths } from "./datetime";
+
 /**
  * Course billing, shared by server and browser. Payments are made outside the site (cash or
  * bank transfer) and recorded by the admin; nothing here moves money.
@@ -16,26 +18,10 @@ export type BillingStatus = "OVERDUE" | "DUE_SOON" | "PAID" | "COMPLETE";
 
 export type CourseBilling = { startsOn: string; durationMonths: number; monthlyPriceCents: number | null };
 
-const DAY_MS = 86_400_000;
-
 /** "YYYY-MM-DD" ⇄ a Postgres DATE column (read and written as UTC midnight). */
 export const fromDbDate = (date: Date) => date.toISOString().slice(0, 10);
 export const toDbDate = (day: string) => new Date(`${day}T00:00:00Z`);
-const pad = (n: number) => String(n).padStart(2, "0");
 const parse = (date: string) => date.split("-").map(Number) as [number, number, number];
-
-/** Calendar months later, clamped to the month's last day (31 Jan + 1 → 28/29 Feb). */
-export function addMonths(date: string, months: number): string {
-  const [y, m, d] = parse(date);
-  const first = new Date(Date.UTC(y, m - 1 + months, 1));
-  const lastDay = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
-  return `${first.getUTCFullYear()}-${pad(first.getUTCMonth() + 1)}-${pad(Math.min(d, lastDay))}`;
-}
-
-export function addDays(date: string, days: number): string {
-  const [y, m, d] = parse(date);
-  return new Date(Date.UTC(y, m - 1, d) + days * DAY_MS).toISOString().slice(0, 10);
-}
 
 export const courseMonthStart = (startsOn: string, month: number) => addMonths(startsOn, month - 1);
 

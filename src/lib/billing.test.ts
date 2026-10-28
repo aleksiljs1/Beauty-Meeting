@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { addMonths, billingSummary, courseMonthAt, courseMonthLabel, joiningMonth, parseEuroCents } from "./billing";
+import { billingSummary, courseMonthAt, courseMonthLabel, joiningMonth, parseEuroCents } from "./billing";
+import { addMonths } from "./datetime";
 
 const course = { startsOn: "2026-11-01", durationMonths: 26, monthlyPriceCents: 4000 };
 

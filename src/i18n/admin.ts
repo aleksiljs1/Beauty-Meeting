@@ -11,6 +11,7 @@ export const admin = {
       students: "Studentët",
       payments: "Pagesat",
       lessons: "Mësimet",
+      calendar: "Kalendari",
       content: "Përmbajtja",
       integrations: "Integrimet",
       history: "Historiku",
@@ -138,6 +139,21 @@ export const admin = {
       name: "Shkruani emrin (2–100 karaktere).",
       email: "Shkruani një email të vlefshëm.",
     },
+  },
+
+  calendar: {
+    title: "Kalendari",
+    intro: "Orari i mësimeve sipas ditëve, me kursin dhe orën. Klikoni një mësim për ta hapur.",
+    previous: "Muaji i kaluar",
+    next: "Muaji tjetër",
+    today: "Sot",
+    courseFilter: "Kursi",
+    allCourses: "Të gjitha",
+    noCourse: "Pa kurs",
+    weekdays: ["Hën", "Mar", "Mër", "Enj", "Pre", "Sht", "Die"],
+    empty: "Nuk ka mësime këtë muaj.",
+    draft: "Draft",
+    cancelled: "Anuluar",
   },
 
   payments: {
