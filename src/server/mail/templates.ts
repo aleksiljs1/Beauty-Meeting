@@ -46,36 +46,41 @@ export function lessonLiveEmail(params: { to: string; name: string; lessonTitle:
   };
 }
 
-type LessonChangeEmail = { to: string; name: string; lessonTitle: string; when: string; url: string; academyName: string };
+/** `count` > 1: one email about several lessons (e.g. a whole series); `when` then lists their dates. */
+type LessonChangeEmail = { to: string; name: string; lessonTitle: string; when: string; url: string; academyName: string; count?: number };
 const lessonChangeFootnote = "Ky email ju dërgohet sepse jeni regjistruar në këtë mësim.";
 
 export function lessonCancelledEmail(params: LessonChangeEmail): MailMessage {
-  const heading = `Mësimi u anulua: ${params.lessonTitle}`;
+  const many = (params.count ?? 1) > 1;
+  const heading = many ? `${params.count} mësime u anuluan: ${params.lessonTitle}` : `Mësimi u anulua: ${params.lessonTitle}`;
   const paragraphs = [
     `Përshëndetje ${params.name},`,
-    `Mësimi "${params.lessonTitle}" në ${params.academyName}, i planifikuar për ${params.when}, u anulua.`,
+    many
+      ? `${params.count} mësime të "${params.lessonTitle}" në ${params.academyName} u anuluan: ${params.when}.`
+      : `Mësimi "${params.lessonTitle}" në ${params.academyName}, i planifikuar për ${params.when}, u anulua.`,
     "Për çdo pyetje, kontaktoni akademinë.",
   ];
-  return {
-    to: params.to,
-    subject: heading,
-    text: `${paragraphs.join("\n\n")}\n\n${params.url}\n\n${lessonChangeFootnote}`,
-    html: layout(heading, paragraphs, { label: "Shiko mësimin", url: params.url }, lessonChangeFootnote),
-  };
+  return lessonChangeMessage(params, heading, paragraphs);
 }
 
 export function lessonRescheduledEmail(params: LessonChangeEmail): MailMessage {
-  const heading = `Orari i mësimit ndryshoi: ${params.lessonTitle}`;
+  const many = (params.count ?? 1) > 1;
+  const heading = many ? `Orari ndryshoi për ${params.count} mësime: ${params.lessonTitle}` : `Orari i mësimit ndryshoi: ${params.lessonTitle}`;
   const paragraphs = [
     `Përshëndetje ${params.name},`,
-    `Mësimi "${params.lessonTitle}" në ${params.academyName} u zhvendos.`,
+    many ? `${params.count} mësime të "${params.lessonTitle}" në ${params.academyName} u zhvendosën.` : `Mësimi "${params.lessonTitle}" në ${params.academyName} u zhvendos.`,
     `Orari i ri: ${params.when}.`,
   ];
+  return lessonChangeMessage(params, heading, paragraphs);
+}
+
+function lessonChangeMessage(params: LessonChangeEmail, heading: string, paragraphs: string[]): MailMessage {
+  const label = (params.count ?? 1) > 1 ? "Shiko mësimet" : "Shiko mësimin";
   return {
     to: params.to,
     subject: heading,
     text: `${paragraphs.join("\n\n")}\n\n${params.url}\n\n${lessonChangeFootnote}`,
-    html: layout(heading, paragraphs, { label: "Shiko mësimin", url: params.url }, lessonChangeFootnote),
+    html: layout(heading, paragraphs, { label, url: params.url }, lessonChangeFootnote),
   };
 }
 

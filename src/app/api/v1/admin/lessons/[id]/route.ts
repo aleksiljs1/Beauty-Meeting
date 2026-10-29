@@ -1,7 +1,7 @@
 import { requireApiUser } from "@/server/auth/session";
 import { ok, readJson, route } from "@/server/http";
 import { requireAdminLesson } from "@/server/queries/admin";
-import { deleteDraftLesson, updateLesson } from "@/server/services/lessons";
+import { deleteLesson, updateLesson } from "@/server/services/lessons";
 import { updateLessonSchema, uuidParam } from "@/server/validation/admin";
 import { zoomText } from "@/i18n/zoom";
 
@@ -23,9 +23,9 @@ export const PATCH = route<Ctx>(async (request, ctx) => {
   return ok({ ...(await requireAdminLesson(id)), zoomWarning: zoomSynced ? null : ZOOM_SYNC_WARNING });
 });
 
-/** Only drafts without enrolments; everything else is archived instead. */
+/** Any lesson that isn't live; its students lose access (see deleteLessons). */
 export const DELETE = route<Ctx>(async (request, ctx) => {
   const admin = await requireApiUser(request, "admin");
-  await deleteDraftLesson(await lessonId(ctx), admin);
+  await deleteLesson(await lessonId(ctx), admin);
   return ok({ deleted: true });
 });

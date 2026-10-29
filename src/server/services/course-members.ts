@@ -84,9 +84,15 @@ export async function enrollStudents(lessonId: string, userIds: string[], admin:
 
 /**
  * Replaces a student's courses. With `addToUpcoming`, the student is also enrolled in the
- * upcoming lessons of the courses they were just added to (never re-granting a revoked lesson).
+ * upcoming lessons of the courses they were just added to (never re-granting a revoked lesson);
+ * with `removeFromUpcoming`, their access to the upcoming lessons of the courses they left is revoked.
  */
-export async function setStudentCourses(userId: string, courseIds: string[], admin: AppUser, { addToUpcoming = false, now = new Date() } = {}) {
+export async function setStudentCourses(
+  userId: string,
+  courseIds: string[],
+  admin: AppUser,
+  { addToUpcoming = false, removeFromUpcoming = false, now = new Date() } = {},
+) {
   const wanted = [...new Set(courseIds)];
   const student = await prisma.user.findUnique({ where: { id: userId }, select: { role: true, banned: true } });
   if (!student || student.role !== "student") throw new ApiError("NOT_FOUND", "Studenti nuk u gjet.");
@@ -129,7 +135,18 @@ export async function setStudentCourses(userId: string, courseIds: string[], adm
     });
     for (const lesson of lessons) lessonsAdded += (await enrollStudents(lesson.id, [userId], admin)).added;
   }
-  return { added: added.length, removed: removed.length, lessonsAdded };
+
+  let lessonsRemoved = 0;
+  if (removeFromUpcoming && removed.length) {
+    const leaving = await prisma.lessonEnrollment.findMany({
+      where: { userId, revokedAt: null, lesson: upcomingLessonsWhere(removed, now) },
+      select: { id: true, lessonId: true },
+    });
+    lessonsRemoved = (await prisma.lessonEnrollment.updateMany({ where: { id: { in: leaving.map((e) => e.id) }, revokedAt: null }, data: { revokedAt: now } })).count;
+    for (const e of leaving) await audit(admin.id, "enrollment.revoke", "lesson", e.lessonId, { enrollmentId: e.id, userId, via: "course" });
+    if (lessonsRemoved) await publishFeedChanged([userId]);
+  }
+  return { added: added.length, removed: removed.length, lessonsAdded, lessonsRemoved };
 }
 
 /** Active students of a course, for pre-selecting them in a new lesson. */

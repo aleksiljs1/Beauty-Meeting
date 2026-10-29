@@ -4,9 +4,10 @@ import { ZodError } from "zod";
 import { academyDay } from "@/lib/datetime";
 import { createLesson as createFixtureLesson, createUser, resetDatabase } from "@/test/fixtures";
 
-const { createLesson, createRepeatingLesson, updateLesson, setLessonPublication, runDemoAction, deleteDraftLesson } = await import("./lessons");
+const { createLesson, createRepeatingLesson, updateLesson, setLessonPublication, runDemoAction, deleteLesson } = await import("./lessons");
 const { grantEnrollment, revokeEnrollment, restoreEnrollment, setEnrollmentDeadline } = await import("./enrollments");
 const { setStudentActive } = await import("./students");
+const { deleteCourse } = await import("./content");
 const { requireLessonCapability } = await import("@/server/access/lesson-access");
 const { prisma } = await import("@/server/db");
 
@@ -54,15 +55,40 @@ describe("lesson administration", () => {
     await expect(createLesson({ title: "X y", ...s, joinOpensAt: new Date(s.scheduledStartAt.getTime() + 1) }, true, admin)).rejects.toBeInstanceOf(ZodError);
   });
 
-  it("follows publication transitions and only deletes empty drafts", async () => {
+  it("follows publication transitions", async () => {
     const { id } = await createLesson({ title: "Mësim prove", ...schedule() }, false, admin);
     await setLessonPublication(id, "PUBLISHED", admin);
-    await expect(deleteDraftLesson(id, admin)).rejects.toThrow();
     await setLessonPublication(id, "CANCELLED", admin);
     await expect(setLessonPublication(id, "PUBLISHED", admin)).rejects.toThrow();
     await setLessonPublication(id, "DRAFT", admin);
-    await deleteDraftLesson(id, admin);
+  });
+
+  it("deletes any lesson that isn't live, with its students, and emails those expecting it", async () => {
+    const [student, revoked] = [await createUser("student"), await createUser("student")];
+    const { id } = await createLesson({ title: "Mësim prove", ...schedule() }, false, admin, [student.id, revoked.id]);
+    await setLessonPublication(id, "PUBLISHED", admin);
+    const enrollment = await prisma.lessonEnrollment.findFirstOrThrow({ where: { lessonId: id, userId: revoked.id } });
+    await revokeEnrollment(enrollment.id, admin);
+
+    const live = await createLesson({ title: "Live tani", ...schedule(-HOUR / 2) }, true, admin);
+    await prisma.lesson.update({ where: { id: live.id }, data: { publication: "PUBLISHED", meetingStatus: "LIVE" } });
+    await expect(deleteLesson(live.id, admin)).rejects.toMatchObject({ code: "CONFLICT" });
+
+    await deleteLesson(id, admin);
     expect(await prisma.lesson.findUnique({ where: { id } })).toBeNull();
+    expect(await prisma.lessonEnrollment.count({ where: { lessonId: id } })).toBe(0);
+    await expect(deleteLesson(id, admin)).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("deletes a course's lessons with it only when asked", async () => {
+    const course = (slug: string) => prisma.course.create({ data: { title: "Kurs", slug } });
+    const [kept, gone] = [await course("kurs-a"), await course("kurs-b")];
+    const orphan = await createLesson({ title: "Mbetet", courseId: kept.id, ...schedule() }, false, admin);
+    const removed = await createLesson({ title: "Fshihet", courseId: gone.id, ...schedule() }, false, admin);
+    await deleteCourse(admin, kept.id);
+    await deleteCourse(admin, gone.id, { withLessons: true });
+    expect(await prisma.lesson.findUnique({ where: { id: orphan.id } })).toMatchObject({ courseId: null });
+    expect(await prisma.lesson.findUnique({ where: { id: removed.id } })).toBeNull();
   });
 
   it("runs the demo classroom only for demo lessons", async () => {

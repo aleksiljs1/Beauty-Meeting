@@ -83,7 +83,9 @@ export const adminContent = {
     durationMonths: "Muaj",
     monthlyPrice: "Çmimi mujor (€)",
     deleteTitle: "Të fshihet kursi?",
-    deleteBody: "Kursi hiqet nga faqja dhe studentët hiqen nga kursi. Mësimet e lidhura me të nuk fshihen, por nuk do të jenë më pjesë e këtij kursi. Një kurs me pagesa të regjistruara nuk mund të fshihet.",
+    deleteBody: "Kursi hiqet nga faqja dhe studentët hiqen nga kursi. Pa zgjedhjen më poshtë, mësimet e tij mbeten, por pa kurs. Një kurs me pagesa të regjistruara nuk mund të fshihet.",
+    deleteLessons: (n: number) =>
+      `Fshi edhe ${n === 1 ? "mësimin e tij" : `${n} mësimet e tij`} (me studentët dhe regjistrimet; materialet mbeten te Materialet). Studentët që i prisnin marrin një email.`,
   },
 
   gallery: {

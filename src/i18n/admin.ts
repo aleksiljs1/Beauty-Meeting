@@ -92,9 +92,12 @@ export const admin = {
       none: "Nuk ka ende kurse. Shtojini te Përmbajtja → Kurset.",
       addToUpcoming: "Shtoje edhe në mësimet e ardhshme të kurseve të reja",
       addToUpcomingHint: "Mësimet ku aksesi i studentit është hequr më parë nuk preken.",
-      removeNote: "Heqja nga një kurs nuk ia heq aksesin në mësimet ku është tashmë — këtë e bëni te lista e studentëve të mësimit.",
-      saved: "Kurset u ruajtën.",
-      savedWithLessons: (count: number) => `Kurset u ruajtën. Studenti u shtua në ${count} ${count === 1 ? "mësim" : "mësime"}.`,
+      removeFromUpcoming: "Hiqe edhe nga mësimet e ardhshme të kurseve që hiqen",
+      removeFromUpcomingHint: "Mësimet që kanë mbaruar nuk preken, që studenti të ruajë regjistrimet e tyre deri në afatin e aksesit.",
+      saved: (added: number, removed: number) =>
+        ["Kurset u ruajtën.", added && `U shtua në ${added} ${added === 1 ? "mësim" : "mësime"}.`, removed && `U hoq nga ${removed} ${removed === 1 ? "mësim" : "mësime"}.`]
+          .filter(Boolean)
+          .join(" "),
     },
     edit: {
       open: "Ndrysho të dhënat",
@@ -337,9 +340,10 @@ export const admin = {
     archiveTitle: "Të arkivohet mësimi?",
     archiveBody: "Mësimi fshihet nga studentët. Mund ta ktheni në draft më vonë.",
     restoreDraft: "Rikthe si draft",
-    deleteDraft: "Fshi draftin",
-    deleteTitle: "Të fshihet drafti?",
-    deleteBody: "Mësimi dhe regjistrimet e tij fshihen përgjithmonë; materialet mbeten te Materialet. Kjo nuk mund të zhbëhet.",
+    deleteLesson: "Fshi mësimin",
+    deleteTitle: "Të fshihet mësimi?",
+    deleteBody: (students: number) =>
+      `Mësimi, regjistrimet e tij dhe lista e studentëve fshihen përgjithmonë; materialet mbeten te Materialet.${students ? ` ${students === 1 ? "1 student humb" : `${students} studentë humbasin`} aksesin; nëse mësimi është i publikuar dhe nuk ka mbaruar, marrin një email.` : ""} Kjo nuk mund të zhbëhet.`,
     deleted: "Mësimi u fshi.",
     done: {
       PUBLISHED: "Mësimi u publikua.",

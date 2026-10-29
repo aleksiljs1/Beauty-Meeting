@@ -107,6 +107,20 @@ describe("course students", () => {
     expect(await enrollmentOf(lesson.id, student.id)).toMatchObject({ revokedAt: null });
   });
 
+  it("with removeFromUpcoming, leaving a course revokes its upcoming lessons only", async () => {
+    const [course, other] = [await createCourse(), await createCourse()];
+    const student = await createUser("student");
+    const upcoming = await createFixtureLesson(admin.id, { courseId: course.id });
+    const past = await createFixtureLesson(admin.id, { courseId: course.id, ...schedule(-3 * DAY) });
+    const stays = await createFixtureLesson(admin.id, { courseId: other.id });
+    await setStudentCourses(student.id, [course.id, other.id], admin);
+    for (const lesson of [upcoming, past, stays]) await enrollStudents(lesson.id, [student.id], admin);
+
+    expect(await setStudentCourses(student.id, [other.id], admin, { removeFromUpcoming: true })).toMatchObject({ removed: 1, lessonsRemoved: 1 });
+    expect((await enrollmentOf(upcoming.id, student.id))?.revokedAt).not.toBeNull();
+    for (const lesson of [past, stays]) expect(await enrollmentOf(lesson.id, student.id)).toMatchObject({ revokedAt: null });
+  });
+
   it("roster candidates: members not yet in the lesson; revoked ones flagged and restored only on request", async () => {
     const course = await createCourse();
     const lesson = await createFixtureLesson(admin.id, { courseId: course.id });

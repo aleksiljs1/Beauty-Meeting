@@ -194,19 +194,22 @@ function CoursesDialog({ student, courses, onClose }: { student: Student; course
   const initial = new Set(student.courses.map((c) => c.id));
   const [selected, setSelected] = useState<Set<string>>(initial);
   const [addToUpcoming, setAddToUpcoming] = useState(true);
+  const [removeFromUpcoming, setRemoveFromUpcoming] = useState(true);
   const { run, pending } = useApiAction();
   const adding = [...selected].some((id) => !initial.has(id));
-  const changed = adding || [...initial].some((id) => !selected.has(id));
+  const removing = [...initial].some((id) => !selected.has(id));
+  const changed = adding || removing;
 
   async function save() {
     const result = await run(() =>
-      apiSend<{ lessonsAdded: number }>("put", `/admin/students/${encodeURIComponent(student.id)}/courses`, {
+      apiSend<{ lessonsAdded: number; lessonsRemoved: number }>("put", `/admin/students/${encodeURIComponent(student.id)}/courses`, {
         courseIds: [...selected],
         addToUpcoming: adding && addToUpcoming,
+        removeFromUpcoming: removing && removeFromUpcoming,
       }),
     );
     if (!result) return;
-    toast.success(result.lessonsAdded ? t.courses.savedWithLessons(result.lessonsAdded) : t.courses.saved);
+    toast.success(t.courses.saved(result.lessonsAdded, result.lessonsRemoved));
     onClose();
   }
 
@@ -236,7 +239,15 @@ function CoursesDialog({ student, courses, onClose }: { student: Student; course
                     </span>
                   </label>
                 )}
-                <p className="text-xs text-muted-foreground">{t.courses.removeNote}</p>
+                {removing && (
+                  <label className="flex items-start gap-2 text-sm">
+                    <Checkbox className="mt-0.5" checked={removeFromUpcoming} onCheckedChange={(checked) => setRemoveFromUpcoming(checked === true)} />
+                    <span>
+                      {t.courses.removeFromUpcoming}
+                      <span className="block text-xs text-muted-foreground">{t.courses.removeFromUpcomingHint}</span>
+                    </span>
+                  </label>
+                )}
               </div>
             }
           />

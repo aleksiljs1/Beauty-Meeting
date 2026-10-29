@@ -17,7 +17,7 @@ export const PATCH = route<Ctx>(async (request, { params }) => {
 export const DELETE = route<Ctx>(async (request, { params }) => {
   const admin = await requireApiUser(request, "admin");
   const id = parseContentId((await params).id);
-  await deleteCourse(admin, id);
+  await deleteCourse(admin, id, { withLessons: new URL(request.url).searchParams.get("mesimet") === "1" });
   revalidatePublicContent();
   return ok({ id });
 });

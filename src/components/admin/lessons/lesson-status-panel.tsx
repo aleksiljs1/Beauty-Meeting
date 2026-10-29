@@ -139,16 +139,16 @@ export function LessonStatusPanel({
             onConfirm={() => run(() => apiSend("delete", `/admin/lessons/${lesson.id}/live`), { success: t.endLiveDone })}
           />
         )}
-        {p === "DRAFT" && lesson.enrollmentCount === 0 && (
+        {!isLive && (
           <ConfirmAction
             trigger={
-              <Button variant="destructive" disabled={pending}>
-                <Trash2 aria-hidden /> {t.deleteDraft}
+              <Button variant="ghost" className="text-destructive" disabled={pending}>
+                <Trash2 aria-hidden /> {t.deleteLesson}
               </Button>
             }
             title={t.deleteTitle}
-            description={t.deleteBody}
-            confirmLabel={t.deleteDraft}
+            description={t.deleteBody(lesson.enrollmentCount)}
+            confirmLabel={t.deleteLesson}
             destructive
             onConfirm={async () => {
               const done = await run(() => apiSend("delete", `/admin/lessons/${lesson.id}`), { success: t.deleted, refresh: false });

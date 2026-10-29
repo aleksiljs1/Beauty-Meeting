@@ -324,7 +324,7 @@ export async function getAdminLesson(lessonId: string, now = new Date()) {
       createdAt: true,
       updatedAt: true,
       course: { select: { title: true } },
-      _count: { select: { enrollments: true } },
+      _count: { select: { enrollments: { where: { revokedAt: null } } } },
     },
   });
   if (!lesson) return null;

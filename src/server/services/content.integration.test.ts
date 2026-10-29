@@ -134,7 +134,7 @@ describe("materials library", () => {
 
     const draft = await createLesson(admin.id, { publication: "DRAFT" });
     await materials.attachFiles(admin, draft.id, [fileId]);
-    await lessons.deleteDraftLesson(draft.id, admin);
+    await lessons.deleteLesson(draft.id, admin);
     const [kept] = await listMaterialLibrary();
     expect(kept).toMatchObject({ id: fileId, status: "READY", lessons: [] });
     const { url } = await materials.previewFile(fileId);

@@ -42,7 +42,7 @@ export const createStudentSchema = z.object({
   profile: studentProfileSchema.optional(),
 });
 
-export const studentCoursesSchema = z.object({ courseIds, addToUpcoming: z.boolean().optional() });
+export const studentCoursesSchema = z.object({ courseIds, addToUpcoming: z.boolean().optional(), removeFromUpcoming: z.boolean().optional() });
 
 export const updateStudentSchema = z
   .object({

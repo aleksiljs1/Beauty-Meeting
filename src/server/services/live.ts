@@ -119,43 +119,41 @@ async function eligibleRecipients(lessonId: string, now: Date): Promise<Recipien
     .filter((e) => !isExpired(e.deadline, now));
 }
 
-type EmailLesson = { id: string; title: string; scheduledStartAt: Date; scheduledEndAt: Date };
-type EmailBuilder = (to: { email: string; name: string }, lesson: EmailLesson, academyName: string) => MailMessage;
+type EmailLesson = { title: string; scheduledStartAt: Date; scheduledEndAt: Date };
+type EmailBuilder = (to: { id: string; email: string; name: string }, academyName: string) => MailMessage;
 
 /**
  * One email per student, in the background: Zoom expects a webhook answer within seconds and
  * an admin action must not wait for a slow mail server. Failures are logged, never thrown, and
  * addresses are never logged.
  */
-function emailInBackground(kind: string, lessonId: string, userIds: string[], build: EmailBuilder) {
+function emailInBackground(kind: string, userIds: string[], build: EmailBuilder) {
   if (!userIds.length) return;
   void (async () => {
-    const [lesson, settings, users] = await Promise.all([
-      prisma.lesson.findUnique({ where: { id: lessonId }, select: { id: true, title: true, scheduledStartAt: true, scheduledEndAt: true } }),
+    const [settings, users] = await Promise.all([
       prisma.academySettings.findUnique({ where: { id: 1 }, select: { name: true } }),
-      prisma.user.findMany({ where: { id: { in: userIds } }, select: { email: true, name: true } }),
+      prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, email: true, name: true } }),
     ]);
-    if (!lesson) return;
     let failed = 0;
     for (const user of users) {
       try {
-        await sendMail(build(user, lesson, settings?.name ?? "Akademia CEM"));
+        await sendMail(build(user, settings?.name ?? "Akademia CEM"));
       } catch {
         failed += 1; // one bad address must not stop the others
       }
     }
-    if (failed) console.error(`[live] some ${kind} emails failed`, { lessonId, failed, total: users.length });
-  })().catch((error) => console.error(`[live] ${kind} emails failed`, { lessonId, error: (error as Error).message }));
+    if (failed) console.error(`[live] some ${kind} emails failed`, { failed, total: users.length });
+  })().catch((error) => console.error(`[live] ${kind} emails failed`, { error: (error as Error).message }));
 }
 
 const lessonUrl = (lessonId: string, query = "") => new URL(`/portal/mesimet/${lessonId}${query}`, env.APP_URL).toString();
 const scheduleText = (lesson: EmailLesson) =>
   `${formatWeekdayDate(lesson.scheduledStartAt)}, ${formatTimeRange(lesson.scheduledStartAt, lesson.scheduledEndAt)} (${timezoneAbbreviation(lesson.scheduledStartAt)})`;
 
-/** Ends this lesson's still-open pop-up notices of these types (they describe a time that no longer applies). */
-async function closeNotices(lessonId: string, types: ("LESSON_LIVE" | "LESSON_STARTING_SOON")[], at: Date) {
+/** Ends these lessons' still-open pop-up notices of these types (they describe a time that no longer applies). */
+async function closeNotices(lessonIds: string[], types: ("LESSON_LIVE" | "LESSON_STARTING_SOON")[], at: Date) {
   await prisma.notification.updateMany({
-    where: { lessonId, type: { in: types }, OR: [{ validUntil: null }, { validUntil: { gt: at } }] },
+    where: { lessonId: { in: lessonIds }, type: { in: types }, OR: [{ validUntil: null }, { validUntil: { gt: at } }] },
     data: { validUntil: at },
   });
 }
@@ -172,9 +170,11 @@ async function notifyLessonLive(lessonId: string, startedAt: Date) {
   }));
   if (rows.length) await prisma.notification.createMany({ data: rows, skipDuplicates: true });
   await publishFeedChanged(rows.map((r) => r.userId));
+  if (!rows.length) return;
   // "The class has started", with a link that opens the lesson and joins automatically.
-  emailInBackground("lesson-live", lessonId, rows.map((r) => r.userId), (to, lesson, academyName) =>
-    lessonLiveEmail({ to: to.email, name: to.name, lessonTitle: lesson.title, url: lessonUrl(lesson.id, "?bashkohu=1"), academyName }),
+  const lesson = await prisma.lesson.findUniqueOrThrow({ where: { id: lessonId }, select: { title: true } });
+  emailInBackground("lesson-live", rows.map((r) => r.userId), (to, academyName) =>
+    lessonLiveEmail({ to: to.email, name: to.name, lessonTitle: lesson.title, url: lessonUrl(lessonId, "?bashkohu=1"), academyName }),
   );
 }
 
@@ -192,40 +192,78 @@ export async function notifyRecordingReady(lessonId: string, recordingId: string
 
 /** A published lesson was cancelled: tell its students (in the site and by email) and close its pop-ups. */
 export async function notifyLessonCancelled(lessonId: string, now = new Date()) {
-  await closeNotices(lessonId, ["LESSON_LIVE", "LESSON_STARTING_SOON"], now);
-  const recipients = await eligibleRecipients(lessonId, now);
-  if (recipients.length) {
-    await prisma.notification.createMany({
-      data: recipients.map((r) => ({ userId: r.userId, lessonId, type: "LESSON_CANCELLED" as const, dedupeKey: `LESSON_CANCELLED:${lessonId}:${now.toISOString()}` })),
-      skipDuplicates: true,
-    });
-  }
+  await notifyLessonsChanged("cancelled", await studentsExpecting([lessonId], now), { now });
   await publishLessonChanged(lessonId);
-  emailInBackground("lesson-cancelled", lessonId, recipients.map((r) => r.userId), (to, lesson, academyName) =>
-    lessonCancelledEmail({ to: to.email, name: to.name, lessonTitle: lesson.title, when: scheduleText(lesson), url: lessonUrl(lesson.id), academyName }),
-  );
 }
 
 /** A published lesson moved: tell its students the new time and drop "starts soon" notices for the old one. */
-export async function notifyLessonRescheduled(lessonId: string, newStart: Date, now = new Date()) {
-  await closeNotices(lessonId, ["LESSON_STARTING_SOON"], now);
-  const recipients = await eligibleRecipients(lessonId, now);
-  if (recipients.length) {
+export async function notifyLessonRescheduled(lessonId: string, now = new Date()) {
+  await notifyLessonsChanged("rescheduled", await studentsExpecting([lessonId], now), { now });
+  await publishLessonChanged(lessonId);
+}
+
+type NoticeLesson = { id: string; title: string; scheduledStartAt: Date; scheduledEndAt: Date };
+/** Per student, the lessons they were expecting (earliest first). */
+export type ExpectingStudents = Map<string, NoticeLesson[]>;
+
+/**
+ * The students each of these lessons would notify, grouped per student. Read it before deleting
+ * lessons, since the notice is sent after they're gone. Callers pick the lessons (e.g. published
+ * and not over); this only applies the usual recipient rules.
+ */
+export async function studentsExpecting(lessonIds: string[], now = new Date()): Promise<ExpectingStudents> {
+  const enrollments = await prisma.lessonEnrollment.findMany({
+    where: { lessonId: { in: lessonIds }, revokedAt: null, user: { banned: { not: true }, role: "student" } },
+    orderBy: { lesson: { scheduledStartAt: "asc" } },
+    select: {
+      userId: true,
+      accessExpiresAt: true,
+      lesson: { select: { id: true, title: true, scheduledStartAt: true, scheduledEndAt: true, accessExpiresAt: true } },
+    },
+  });
+  const byStudent: ExpectingStudents = new Map();
+  for (const { userId, accessExpiresAt, lesson } of enrollments) {
+    const deadline = accessExpiresAt && accessExpiresAt < lesson.accessExpiresAt ? accessExpiresAt : lesson.accessExpiresAt;
+    if (isExpired(deadline, now)) continue;
+    byStudent.set(userId, [...(byStudent.get(userId) ?? []), lesson]);
+  }
+  return byStudent;
+}
+
+const NOTICE_TYPE = { cancelled: "LESSON_CANCELLED", rescheduled: "LESSON_RESCHEDULED" } as const;
+const MAX_LISTED_DATES = 10;
+
+/**
+ * Tells each student once, however many of their lessons were cancelled or moved (a whole series
+ * counts as one change): one in-site notice on their first such lesson and one email listing the
+ * dates. `lessonsKept: false` when the lessons were deleted: email only, linking to the portal.
+ */
+export async function notifyLessonsChanged(kind: "cancelled" | "rescheduled", students: ExpectingStudents, { lessonsKept = true, now = new Date() } = {}) {
+  if (!students.size) return;
+  const lessonIds = [...new Set([...students.values()].flat().map((l) => l.id))];
+  if (lessonsKept) {
+    await closeNotices(lessonIds, kind === "cancelled" ? ["LESSON_LIVE", "LESSON_STARTING_SOON"] : ["LESSON_STARTING_SOON"], now);
     await prisma.notification.createMany({
-      data: recipients.map((r) => ({
-        userId: r.userId,
-        lessonId,
-        type: "LESSON_RESCHEDULED" as const,
-        // Once per new time: saving the same schedule twice doesn't notify twice.
-        dedupeKey: `LESSON_RESCHEDULED:${lessonId}:${newStart.toISOString()}`,
+      data: [...students].map(([userId, [first]]) => ({
+        userId,
+        lessonId: first.id,
+        type: NOTICE_TYPE[kind],
+        // A move notifies once per new time (saving the same schedule twice doesn't repeat it).
+        dedupeKey: `${NOTICE_TYPE[kind]}:${first.id}:${(kind === "rescheduled" ? first.scheduledStartAt : now).toISOString()}`,
       })),
       skipDuplicates: true,
     });
   }
-  await publishLessonChanged(lessonId);
-  emailInBackground("lesson-rescheduled", lessonId, recipients.map((r) => r.userId), (to, lesson, academyName) =>
-    lessonRescheduledEmail({ to: to.email, name: to.name, lessonTitle: lesson.title, when: scheduleText(lesson), url: lessonUrl(lesson.id), academyName }),
-  );
+  await publishFeedChanged(students.keys());
+
+  const build = kind === "cancelled" ? lessonCancelledEmail : lessonRescheduledEmail;
+  emailInBackground(`lesson-${kind}`, [...students.keys()], (to, academyName) => {
+    const lessons = students.get(to.id)!;
+    const listed = lessons.slice(0, MAX_LISTED_DATES).map(scheduleText).join("; ");
+    const more = lessons.length > MAX_LISTED_DATES ? ` (+${lessons.length - MAX_LISTED_DATES})` : "";
+    const url = lessonsKept && lessons.length === 1 ? lessonUrl(lessons[0].id) : new URL("/portal", env.APP_URL).toString();
+    return build({ to: to.email, name: to.name, lessonTitle: lessons[0].title, when: listed + more, url, academyName, count: lessons.length });
+  });
 }
 
 // ---------------------------------------------------------------------------------------

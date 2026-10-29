@@ -16,6 +16,7 @@ import { bytesMatch, MAX_UPLOAD_BYTES, ruleForDeclaredFile, SNIFF_BYTES } from "
 import { GALLERY_IMAGE_TYPES, isGalleryKey } from "@/server/storage/public-media";
 import { deleteObject, headObject, newObjectKey, presignPut, readObjectHead } from "@/server/storage/storage";
 import { audit } from "./audit";
+import { deleteLessons } from "./lessons";
 import { assertBillingChangeKeepsPayments } from "./payments";
 
 /**
@@ -157,12 +158,14 @@ const courseSelect = {
   startsOn: true,
   durationMonths: true,
   monthlyPriceCents: true,
+  _count: { select: { lessons: true } },
 } as const;
 
 /** The start date goes out as "YYYY-MM-DD". */
-const toAdminCourse = ({ startsOn, ...course }: Prisma.CourseGetPayload<{ select: typeof courseSelect }>) => ({
+const toAdminCourse = ({ startsOn, _count, ...course }: Prisma.CourseGetPayload<{ select: typeof courseSelect }>) => ({
   ...course,
   startsOn: startsOn ? fromDbDate(startsOn) : null,
+  lessonCount: _count.lessons,
 });
 
 export async function listCoursesForAdmin() {
@@ -211,8 +214,10 @@ export async function updateCourse(admin: AppUser, id: string, input: Partial<Co
   return toAdminCourse(course);
 }
 
-export async function deleteCourse(admin: AppUser, id: string) {
+/** With `withLessons`, the course's lessons are deleted too (see deleteLessons); otherwise they stay, without a course. */
+export async function deleteCourse(admin: AppUser, id: string, { withLessons = false } = {}) {
   if (await prisma.payment.count({ where: { courseId: id } })) throw new ApiError("CONFLICT", e.courseHasPayments);
+  if (withLessons) await deleteLessons((await prisma.lesson.findMany({ where: { courseId: id }, select: { id: true } })).map((l) => l.id), admin);
   try {
     await rethrowMissing(prisma.course.delete({ where: { id } }));
   } catch (error) {

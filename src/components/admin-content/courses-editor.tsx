@@ -143,6 +143,7 @@ export function CoursesEditor({ initial }: { initial: AdminCourse[] }) {
         </>
       )}
       renderForm={(props) => <CourseForm {...props} />}
+      deleteOption={(c) => (c.lessonCount ? { label: t.deleteLessons(c.lessonCount), param: "mesimet" } : null)}
     />
   );
 }

@@ -12,7 +12,7 @@ import { deleteObject } from "@/server/storage/storage";
 import { deleteZoomMeeting, syncZoomMeetingSchedule } from "@/server/zoom/meetings";
 import { audit } from "./audit";
 import { assertActiveStudents } from "./course-members";
-import { markLessonEnded, markLessonLive, notifyLessonCancelled, notifyLessonRescheduled } from "./live";
+import { markLessonEnded, markLessonLive, notifyLessonCancelled, notifyLessonRescheduled, notifyLessonsChanged, studentsExpecting } from "./live";
 
 /**
  * Lesson administration: create/edit, publication lifecycle and the demo classroom controls.
@@ -170,7 +170,7 @@ export async function updateLesson(lessonId: string, patch: LessonPatch, confirm
   // Students who can see the lesson hear about a new time, as long as the lesson isn't over.
   const rescheduled = changed.includes("scheduledStartAt") || changed.includes("scheduledEndAt");
   if (rescheduled && current.publication === "PUBLISHED" && schedule.scheduledEndAt.getTime() > Date.now()) {
-    await notifyLessonRescheduled(lessonId, schedule.scheduledStartAt);
+    await notifyLessonRescheduled(lessonId);
   }
 
   // Keep the Zoom meeting's title/time in step. Best effort: the lesson is already saved.
@@ -233,31 +233,48 @@ export async function setLessonPublication(lessonId: string, publication: Public
   return { zoomDeleted: deleted };
 }
 
-/** Only drafts nobody is enrolled in can be deleted; everything else is archived instead. */
-export async function deleteDraftLesson(lessonId: string, admin: AppUser) {
-  const lesson = await prisma.lesson.findUnique({
-    where: { id: lessonId },
+/** Deletes one lesson; see `deleteLessons`. */
+export async function deleteLesson(lessonId: string, admin: AppUser) {
+  const { count } = await deleteLessons([lessonId], admin);
+  if (!count) throw new ApiError("NOT_FOUND", "Mësimi nuk u gjet.");
+}
+
+/**
+ * Deletes lessons for good, whatever their state, with their enrolments and recordings (their
+ * materials stay in the library). Nothing is deleted while one of them is live or has a
+ * recording upload running. Students still expecting a published lesson get one email about it.
+ */
+export async function deleteLessons(lessonIds: string[], admin: AppUser, now = new Date()) {
+  const lessons = await prisma.lesson.findMany({
+    where: { id: { in: lessonIds } },
     select: {
-      publication: true,
+      id: true,
       title: true,
+      publication: true,
+      meetingStatus: true,
+      scheduledEndAt: true,
       zoomMeetingNumber: true,
-      _count: { select: { enrollments: true } },
-      recordings: { select: { objectKey: true } },
+      recordings: { select: { objectKey: true, uploadId: true } },
+      enrollments: { where: { revokedAt: null }, select: { userId: true } },
     },
   });
-  if (!lesson) throw new ApiError("NOT_FOUND", "Mësimi nuk u gjet.");
-  if (lesson.publication !== "DRAFT") throw new ApiError("CONFLICT", "Vetëm draftet mund të fshihen. Arkivoni mësimin në vend të kësaj.");
-  if (lesson._count.enrollments > 0) throw new ApiError("CONFLICT", "Mësimi ka studentë të regjistruar. Arkivoni mësimin në vend të kësaj.");
+  if (lessons.some((l) => effectiveMeetingStatus(l, now) === "LIVE")) throw new ApiError("CONFLICT", "Një mësim është live. Përfundojeni fillimisht.");
+  if (lessons.some((l) => l.recordings.some((r) => r.uploadId))) {
+    throw new ApiError("CONFLICT", "Një ngarkim regjistrimi është në vazhdim. Ndalojeni ose fshijeni fillimisht.");
+  }
 
-  const recordings = await prisma.recording.findMany({ where: { lessonId }, select: { id: true, uploadId: true } });
-  if (recordings.some((r) => r.uploadId)) throw new ApiError("CONFLICT", "Një ngarkim regjistrimi është në vazhdim. Ndalojeni ose fshijeni fillimisht.");
+  const expecting = await studentsExpecting(lessons.filter((l) => l.publication === "PUBLISHED" && l.scheduledEndAt > now).map((l) => l.id), now);
+  for (const lesson of lessons) await deleteZoomMeeting(lesson.id, lesson.zoomMeetingNumber, admin.id);
+  await prisma.lesson.deleteMany({ where: { id: { in: lessons.map((l) => l.id) } } });
 
-  await deleteZoomMeeting(lessonId, lesson.zoomMeetingNumber, admin.id);
-  await prisma.lesson.delete({ where: { id: lessonId } });
-  // Materials stay in the library; only the lesson's own recordings are removed from storage.
-  const keys = lesson.recordings.map((r) => r.objectKey).filter((k): k is string => !!k);
+  const keys = lessons.flatMap((l) => l.recordings.map((r) => r.objectKey)).filter((k): k is string => !!k);
   await Promise.all(keys.map((key) => deleteObject(key).catch((error) => console.error("[storage] orphan lesson object", key, error))));
-  await audit(admin.id, "lesson.delete", "lesson", lessonId, { title: lesson.title });
+  await prisma.auditLog.createMany({
+    data: lessons.map((l) => ({ actorId: admin.id, action: "lesson.delete", targetType: "lesson", targetId: l.id, details: { title: l.title, publication: l.publication } })),
+  });
+  await publishFeedChanged(lessons.flatMap((l) => l.enrollments.map((e) => e.userId)));
+  await notifyLessonsChanged("cancelled", expecting, { lessonsKept: false, now });
+  return { count: lessons.length };
 }
 
 /**

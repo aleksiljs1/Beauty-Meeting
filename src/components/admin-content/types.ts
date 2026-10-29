@@ -23,6 +23,8 @@ export type AdminCourse = {
   startsOn: string | null;
   durationMonths: number | null;
   monthlyPriceCents: number | null;
+  /** Lessons in this course (offered for deletion along with it). */
+  lessonCount: number;
 };
 
 export type AdminGalleryItem = {
