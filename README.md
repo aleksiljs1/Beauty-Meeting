@@ -38,14 +38,13 @@ docker compose up -d          # Postgres, SeaweedFS, Mailpit
 npm ci                        # installs and generates the Prisma client
 npx prisma migrate deploy     # apply migrations
 npm run storage:init          # create the private bucket + CORS
-npm run db:seed               # demo data (local only)
+npm run db:seed               # local admin account only
 
 npm run dev                   # terminal 1 — http://localhost:3000
 npm run realtime              # terminal 2 — live updates
 ```
 
-Seeded local accounts (password `Demo-fjalekalim-2026`, development only):
-`admin@akademia.local` (admin), `ana@akademia.local`, `elira@akademia.local`, `sara@akademia.local` (students).
+Seeded local development account: admin@akademia.local (admin). Default password: Demo-fjalekalim-2026.
 `npm run db:reset` wipes and reseeds the development database.
 
 ### First real administrator
