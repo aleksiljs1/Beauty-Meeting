@@ -32,6 +32,7 @@ model User {
   enrollments        LessonEnrollment[]     @relation("EnrollmentStudent")
   courseMemberships  CourseMember[]
   billingStarts      BillingStart[]
+  lessonSeries       LessonSeries[]
   enrollmentsGranted LessonEnrollment[]     @relation("EnrollmentGrantor")
   lessonsCreated     Lesson[]
   invitationsCreated LessonInvitation[]
@@ -216,6 +217,9 @@ model Lesson {
   details  String?
   courseId String? @db.Uuid
   course   Course? @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  /// Set when the lesson was created as one date of a repeating lesson.
+  seriesId String?       @db.Uuid
+  series   LessonSeries? @relation(fields: [seriesId], references: [id], onDelete: SetNull)
 
   scheduledStartAt DateTime @db.Timestamptz(3)
   scheduledEndAt   DateTime @db.Timestamptz(3)
@@ -259,6 +263,18 @@ model Lesson {
   @@index([publication, scheduledStartAt])
   @@index([meetingStatus])
   @@index([courseId])
+  @@index([seriesId])
+}
+
+/// A repeating lesson: its dates are ordinary lessons (each with its own meeting, students and
+/// access window) that the admin sees and changes together. Removed when its last lesson goes.
+model LessonSeries {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  lessons Lesson[]
 }
 
 /// A student's course. Membership grants no access by itself: it decides which students are

@@ -22,6 +22,6 @@ export const POST = route(async (request) => {
   const { confirmEarlyDeadline, studentIds, repeat, ...input } = createLessonSchema.parse(await readJson(request));
   const lesson = repeat
     ? await createRepeatingLesson(input, repeat, confirmEarlyDeadline ?? false, admin, studentIds)
-    : { ...(await createLesson(input, confirmEarlyDeadline ?? false, admin, studentIds)), count: 1 };
+    : { ...(await createLesson(input, confirmEarlyDeadline ?? false, admin, studentIds)), seriesId: null, count: 1 };
   return ok(lesson, { status: 201 });
 });

@@ -214,6 +214,21 @@ or "live" for up to 30 days. Now:
   admin, "paid until" in the student portal, partial months, pauses, course groups (the same course run again
   with a new start date would need a "group" level).
 
+## Lesson series and deleting lessons (client feedback, 2026-10-29)
+
+- **Series**: a repeating lesson is one `LessonSeries`; its dates stay ordinary lessons (each needs its own Zoom
+  meeting, students and access window), but the lessons list shows the series as **one entry** and
+  `/admin/mesimet/seri/[id]` changes them together: title/texts/course, clock time and length, students,
+  publish drafts, create Zoom meetings, cancel, delete upcoming dates or the whole series. Bulk changes reach the
+  dates still to come (past, cancelled and archived dates stay as they were), go through the single-lesson
+  functions, are checked for every date before the first changes, and notify each student **once** (one in-site
+  notice and one email listing the dates: `notifyLessonsChanged` in `services/live.ts`). Each date can still be
+  changed alone from its own page, which links back to the series.
+- **Deleting**: any lesson that isn't live can be deleted (enrolments and recordings go, materials stay in the
+  library); students expecting a published upcoming lesson get an email. Deleting a course can delete its
+  lessons too (otherwise they stay, without a course). Taking a student off a course can also revoke their
+  upcoming lessons of that course.
+
 ## Materials library, repeating lessons, student details (user request, 2026-10-28)
 
 - **Materials library** (`/admin/materialet`): every uploaded file is a `MaterialFile`; a lesson's materials are

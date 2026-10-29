@@ -1,7 +1,8 @@
 import "server-only";
 import { HeadBucketCommand } from "@aws-sdk/client-s3";
-import type { Prisma } from "@/generated/prisma/client";
+import { Prisma } from "@/generated/prisma/client";
 import type { PublicationStatus } from "@/generated/prisma/enums";
+import { academyDay, weekdayIndex } from "@/lib/datetime";
 import { toProfileInput, type StudentProfileInput } from "@/lib/student-profile";
 import { END_GRACE_MS, effectiveMeetingStatus } from "@/server/access/policy";
 import { prisma } from "@/server/db";
@@ -219,44 +220,118 @@ export async function searchStudentsForLesson(lessonId: string, q: string) {
 
 export type LessonListFilter = { publication?: PublicationStatus; when?: "upcoming" | "past"; page?: number };
 
-export async function listLessons(filter: LessonListFilter, now = new Date()) {
-  const page = filter.page ?? 1;
+const lessonRowSelect = {
+  id: true,
+  title: true,
+  scheduledStartAt: true,
+  scheduledEndAt: true,
+  accessExpiresAt: true,
+  publication: true,
+  meetingStatus: true,
+  isDemo: true,
+  seriesId: true,
+  course: { select: { title: true } },
+  _count: { select: { enrollments: { where: { revokedAt: null } } as const, materials: { where: { file: { status: "READY" as const } } } } },
+} satisfies Prisma.LessonSelect;
+
+const toLessonRow = ({ _count, course, ...lesson }: Prisma.LessonGetPayload<{ select: typeof lessonRowSelect }>, now: Date) => ({
+  ...lesson,
+  meetingStatus: effectiveMeetingStatus(lesson, now),
+  courseTitle: course?.title ?? null,
+  students: _count.enrollments,
+  materials: _count.materials,
+});
+export type LessonRow = ReturnType<typeof toLessonRow>;
+
+/** A repeating lesson shown as one entry: its dates that match the list filter. */
+export type SeriesEntry = {
+  id: string;
+  title: string;
+  courseTitle: string | null;
+  isDemo: boolean;
+  lessons: LessonRow[];
+  /** Distinct weekdays of those dates, 0 = Monday. */
+  weekdays: number[];
+  /** First date still to come, if any. */
+  next: LessonRow | null;
+};
+
+export type LessonListEntry = ({ kind: "lesson" } & LessonRow) | ({ kind: "series" } & SeriesEntry);
+
+/** Lessons for the admin list; the dates of a series count (and page) as one entry. */
+export async function listLessons(filter: LessonListFilter, now = new Date()): Promise<Paged<LessonListEntry>> {
+  const page = Math.max(1, filter.page ?? 1);
   const where: Prisma.LessonWhereInput = {
     ...(filter.publication ? { publication: filter.publication } : {}),
     ...(filter.when === "upcoming" ? { scheduledEndAt: { gt: now } } : filter.when === "past" ? { scheduledEndAt: { lte: now } } : {}),
   };
-  const [rows, total] = await Promise.all([
-    prisma.lesson.findMany({
-      where,
-      orderBy: filter.when === "upcoming" ? { scheduledStartAt: "asc" } : { scheduledStartAt: "desc" },
-      ...pageArgs(page),
-      select: {
-        id: true,
-        title: true,
-        scheduledStartAt: true,
-        scheduledEndAt: true,
-        accessExpiresAt: true,
-        publication: true,
-        meetingStatus: true,
-        isDemo: true,
-        course: { select: { title: true } },
-        _count: { select: { enrollments: { where: { revokedAt: null } }, materials: { where: { file: { status: "READY" } } } } },
-      },
-    }),
-    prisma.lesson.count({ where }),
+  const conditions = [
+    Prisma.sql`TRUE`,
+    ...(filter.publication ? [Prisma.sql`"publication" = ${filter.publication}::"PublicationStatus"`] : []),
+    ...(filter.when === "upcoming" ? [Prisma.sql`"scheduledEndAt" > ${now}`] : filter.when === "past" ? [Prisma.sql`"scheduledEndAt" <= ${now}`] : []),
+  ];
+  const whereSql = Prisma.join(conditions, " AND ");
+  // Upcoming: soonest first. Otherwise newest first, a series by its latest matching date.
+  const order = filter.when === "upcoming" ? Prisma.sql`MIN("scheduledStartAt") ASC` : Prisma.sql`MAX("scheduledStartAt") DESC`;
+  const { skip, take } = pageArgs(page);
+  const [keys, [{ total }]] = await Promise.all([
+    prisma.$queryRaw<{ key: string }[]>`
+      SELECT COALESCE("seriesId", "id")::text AS key FROM "Lesson" WHERE ${whereSql}
+      GROUP BY 1 ORDER BY ${order}, 1 LIMIT ${take} OFFSET ${skip}`,
+    prisma.$queryRaw<{ total: number }[]>`SELECT COUNT(DISTINCT COALESCE("seriesId", "id"))::int AS total FROM "Lesson" WHERE ${whereSql}`,
   ]);
-  return paged(
-    rows.map(({ _count, course, ...lesson }) => ({
-      ...lesson,
-      meetingStatus: effectiveMeetingStatus(lesson, now),
-      courseTitle: course?.title ?? null,
-      students: _count.enrollments,
-      materials: _count.materials,
-    })),
-    total,
-    page,
+  const ids = keys.map((k) => k.key);
+  const rows = await prisma.lesson.findMany({
+    where: { AND: [where, { OR: [{ id: { in: ids }, seriesId: null }, { seriesId: { in: ids } }] }] },
+    orderBy: { scheduledStartAt: "asc" },
+    select: lessonRowSelect,
+  });
+  const byKey = Map.groupBy(
+    rows.map((row) => toLessonRow(row, now)),
+    (row) => row.seriesId ?? row.id,
   );
+  const items = ids.flatMap((key): LessonListEntry[] => {
+    const lessons = byKey.get(key);
+    if (!lessons) return [];
+    if (!lessons[0].seriesId) return [{ kind: "lesson", ...lessons[0] }];
+    return [{ kind: "series", ...toSeriesEntry(key, lessons, now) }];
+  });
+  return paged(items, total, page);
 }
+
+function toSeriesEntry(id: string, lessons: LessonRow[], now: Date): SeriesEntry {
+  const next = lessons.find((l) => l.scheduledEndAt > now) ?? null;
+  const shown = next ?? lessons.at(-1)!;
+  return {
+    id,
+    title: shown.title,
+    courseTitle: shown.courseTitle,
+    isDemo: shown.isDemo,
+    lessons,
+    weekdays: [...new Set(lessons.map((l) => weekdayIndex(academyDay(l.scheduledStartAt))))].sort(),
+    next,
+  };
+}
+
+/** A series with all its dates, and the students of its upcoming dates. */
+export async function getLessonSeries(seriesId: string, now = new Date()) {
+  const series = await prisma.lessonSeries.findUnique({
+    where: { id: seriesId },
+    select: { id: true, createdAt: true, lessons: { orderBy: { scheduledStartAt: "asc" }, select: { ...lessonRowSelect, summary: true, details: true, courseId: true, joinOpensAt: true } } },
+  });
+  if (!series) return null;
+  const lessons = series.lessons.map((lesson) => ({ ...toLessonRow(lesson, now), summary: lesson.summary, details: lesson.details, courseId: lesson.courseId, joinOpensAt: lesson.joinOpensAt }));
+  const upcoming = lessons.filter((l) => l.scheduledEndAt > now && (l.publication === "DRAFT" || l.publication === "PUBLISHED"));
+  const enrollments = await prisma.lessonEnrollment.findMany({
+    where: { lessonId: { in: upcoming.map((l) => l.id) }, revokedAt: null },
+    select: { user: { select: { id: true, name: true, email: true } } },
+  });
+  const students = [...Map.groupBy(enrollments, (e) => e.user.id).values()]
+    .map((list) => ({ ...list[0].user, lessons: list.length }))
+    .sort((a, b) => a.name.localeCompare(b.name, "sq"));
+  return { ...toSeriesEntry(series.id, lessons, now), lessons, upcoming, students };
+}
+export type AdminLessonSeries = NonNullable<Awaited<ReturnType<typeof getLessonSeries>>>;
 
 // --- Materials library -----------------------------------------------------------------------
 
@@ -324,12 +399,19 @@ export async function getAdminLesson(lessonId: string, now = new Date()) {
       createdAt: true,
       updatedAt: true,
       course: { select: { title: true } },
+      series: { select: { id: true, _count: { select: { lessons: true } } } },
       _count: { select: { enrollments: { where: { revokedAt: null } } } },
     },
   });
   if (!lesson) return null;
-  const { _count, course, ...rest } = lesson;
-  return { ...rest, meetingStatus: effectiveMeetingStatus(lesson, now), courseTitle: course?.title ?? null, enrollmentCount: _count.enrollments };
+  const { _count, course, series, ...rest } = lesson;
+  return {
+    ...rest,
+    meetingStatus: effectiveMeetingStatus(lesson, now),
+    courseTitle: course?.title ?? null,
+    enrollmentCount: _count.enrollments,
+    series: series ? { id: series.id, lessons: series._count.lessons } : null,
+  };
 }
 
 export async function requireAdminLesson(lessonId: string) {

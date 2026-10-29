@@ -37,6 +37,11 @@ function throwScheduleIssues(issues: ScheduleIssue[]) {
   throw new z.ZodError(issues.map((issue) => ({ code: "custom" as const, path: [issue.path], message: issue.message, input: undefined })));
 }
 
+/** Checks several schedules before anything is written (a series is changed all or nothing). */
+export function assertSchedules(schedules: LessonSchedule[], confirmEarlyDeadline: boolean) {
+  for (const schedule of schedules) throwScheduleIssues(validateLessonSchedule(schedule, confirmEarlyDeadline));
+}
+
 const clean = (value: string | null | undefined) => {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
@@ -72,7 +77,7 @@ export async function createRepeatingLesson(input: LessonInput, repeat: RepeatRu
  * half a series behind.
  */
 async function createLessons(input: LessonInput, schedules: LessonSchedule[], confirmEarlyDeadline: boolean, admin: AppUser, studentIds: string[]) {
-  for (const schedule of schedules) throwScheduleIssues(validateLessonSchedule(schedule, confirmEarlyDeadline));
+  assertSchedules(schedules, confirmEarlyDeadline);
   await assertCourse(input.courseId);
   assertDemoAllowed(input.isDemo);
   const ids = [...new Set(studentIds)];
@@ -85,6 +90,8 @@ async function createLessons(input: LessonInput, schedules: LessonSchedule[], co
   const isDemo = input.isDemo ?? false;
 
   const lessons = await prisma.$transaction(async (tx) => {
+    // Several dates are one series, so the admin can manage them together.
+    const series = schedules.length > 1 ? await tx.lessonSeries.create({ data: { createdById: admin.id }, select: { id: true } }) : null;
     const created = await tx.lesson.createManyAndReturn({
       data: schedules.map(({ scheduledStartAt, scheduledEndAt, joinOpensAt, accessExpiresAt }) => ({
         title: input.title.trim(),
@@ -100,8 +107,9 @@ async function createLessons(input: LessonInput, schedules: LessonSchedule[], co
         meetingStatus: isDemo ? "SCHEDULED" : "NOT_PROVISIONED",
         publication: "DRAFT",
         createdById: admin.id,
+        seriesId: series?.id ?? null,
       })),
-      select: { id: true, scheduledStartAt: true },
+      select: { id: true, scheduledStartAt: true, seriesId: true },
     });
     const enrollments = created.flatMap((lesson) =>
       ids.map((userId) => ({ lessonId: lesson.id, userId, source: members.has(userId) ? ("COURSE" as const) : ("ADMIN" as const), grantedById: admin.id })),
@@ -116,10 +124,11 @@ async function createLessons(input: LessonInput, schedules: LessonSchedule[], co
     return created.sort((a, b) => a.scheduledStartAt.getTime() - b.scheduledStartAt.getTime());
   });
   await publishFeedChanged(ids);
-  return { id: lessons[0].id, enrolled: ids.length, count: lessons.length };
+  return { id: lessons[0].id, seriesId: lessons[0].seriesId, enrolled: ids.length, count: lessons.length };
 }
 
-export async function updateLesson(lessonId: string, patch: LessonPatch, confirmEarlyDeadline: boolean, admin: AppUser) {
+/** `notify: false` when the caller tells students itself (a whole series changing at once). */
+export async function updateLesson(lessonId: string, patch: LessonPatch, confirmEarlyDeadline: boolean, admin: AppUser, { notify = true } = {}) {
   const current = await prisma.lesson.findUnique({ where: { id: lessonId } });
   if (!current) throw new ApiError("NOT_FOUND", "Mësimi nuk u gjet.");
 
@@ -169,7 +178,7 @@ export async function updateLesson(lessonId: string, patch: LessonPatch, confirm
 
   // Students who can see the lesson hear about a new time, as long as the lesson isn't over.
   const rescheduled = changed.includes("scheduledStartAt") || changed.includes("scheduledEndAt");
-  if (rescheduled && current.publication === "PUBLISHED" && schedule.scheduledEndAt.getTime() > Date.now()) {
+  if (notify && rescheduled && current.publication === "PUBLISHED" && schedule.scheduledEndAt.getTime() > Date.now()) {
     await notifyLessonRescheduled(lessonId);
   }
 
@@ -198,7 +207,8 @@ const TRANSITIONS: Record<PublicationStatus, PublicationStatus[]> = {
   ARCHIVED: ["DRAFT"],
 };
 
-export async function setLessonPublication(lessonId: string, publication: PublicationStatus, admin: AppUser) {
+/** `notify: false` when the caller tells students itself (a whole series changing at once). */
+export async function setLessonPublication(lessonId: string, publication: PublicationStatus, admin: AppUser, { notify = true } = {}) {
   const lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
     select: { publication: true, meetingStatus: true, scheduledEndAt: true, zoomMeetingNumber: true },
@@ -215,7 +225,7 @@ export async function setLessonPublication(lessonId: string, publication: Public
   if (result.count === 0) throw new ApiError("CONFLICT", "Mësimi u ndryshua ndërkohë. Rifreskoni faqen.");
   await audit(admin.id, PUBLICATION_ACTION[publication], "lesson", lessonId, { from: lesson.publication });
   // Students only knew about it if it was published; a lesson that's already over needs no notice.
-  if (publication === "CANCELLED" && lesson.publication === "PUBLISHED" && lesson.scheduledEndAt.getTime() > Date.now()) {
+  if (notify && publication === "CANCELLED" && lesson.publication === "PUBLISHED" && lesson.scheduledEndAt.getTime() > Date.now()) {
     await notifyLessonCancelled(lessonId);
   } else {
     await publishLessonChanged(lessonId);
@@ -254,6 +264,7 @@ export async function deleteLessons(lessonIds: string[], admin: AppUser, now = n
       meetingStatus: true,
       scheduledEndAt: true,
       zoomMeetingNumber: true,
+      seriesId: true,
       recordings: { select: { objectKey: true, uploadId: true } },
       enrollments: { where: { revokedAt: null }, select: { userId: true } },
     },
@@ -266,6 +277,8 @@ export async function deleteLessons(lessonIds: string[], admin: AppUser, now = n
   const expecting = await studentsExpecting(lessons.filter((l) => l.publication === "PUBLISHED" && l.scheduledEndAt > now).map((l) => l.id), now);
   for (const lesson of lessons) await deleteZoomMeeting(lesson.id, lesson.zoomMeetingNumber, admin.id);
   await prisma.lesson.deleteMany({ where: { id: { in: lessons.map((l) => l.id) } } });
+  const seriesIds = [...new Set(lessons.flatMap((l) => (l.seriesId ? [l.seriesId] : [])))];
+  await prisma.lessonSeries.deleteMany({ where: { id: { in: seriesIds }, lessons: { none: {} } } }); // its last date just went
 
   const keys = lessons.flatMap((l) => l.recordings.map((r) => r.objectKey)).filter((k): k is string => !!k);
   await Promise.all(keys.map((key) => deleteObject(key).catch((error) => console.error("[storage] orphan lesson object", key, error))));

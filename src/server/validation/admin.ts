@@ -86,6 +86,19 @@ export const updateLessonSchema = z.object({
   confirmEarlyDeadline: z.boolean().optional(),
 });
 
+/** Changes for every upcoming date of a lesson series. */
+export const updateSeriesSchema = z.object({
+  title: lessonFields.title.optional(),
+  summary: lessonFields.summary,
+  details: lessonFields.details,
+  courseId: lessonFields.courseId,
+  time: z
+    .object({ start: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Ora nuk është e vlefshme."), durationMinutes: z.number().int().min(15).max(12 * 60) })
+    .optional(),
+  confirmEarlyDeadline: z.boolean().optional(),
+});
+export const seriesPublicationSchema = z.object({ publication: z.enum(["PUBLISHED", "CANCELLED"]) });
+
 export const publicationSchema = z.object({ publication: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED", "CANCELLED"]) });
 export const demoActionSchema = z.object({ action: z.enum(["live", "end", "reset"]) });
 

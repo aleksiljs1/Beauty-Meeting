@@ -6,6 +6,7 @@ import {
   MAX_REPEATED_LESSONS,
   needsEarlyDeadlineConfirmation,
   repeatSchedules,
+  retimeSchedule,
   scheduleChanged,
   suggestedStart,
   validateLessonSchedule,
@@ -95,6 +96,14 @@ describe("repeating lessons", () => {
       "2026-10-29T17:00",
       "2026-11-03T17:00",
     ]);
+  });
+
+  it("moves a lesson to a new clock time on the same day, keeping join and deadline offsets", () => {
+    const moved = retimeSchedule(first, "09:30", 90);
+    expect(toZonedInputValue(moved.scheduledStartAt)).toBe("2026-10-20T09:30");
+    expect(toZonedInputValue(moved.scheduledEndAt)).toBe("2026-10-20T11:00");
+    expect(moved.scheduledStartAt.getTime() - moved.joinOpensAt.getTime()).toBe(first.scheduledStartAt.getTime() - first.joinOpensAt.getTime());
+    expect(moved.accessExpiresAt.getTime() - moved.scheduledEndAt.getTime()).toBe(first.accessExpiresAt.getTime() - first.scheduledEndAt.getTime());
   });
 
   it("keeps the Tirana clock time for every field across the summer-time change (25 Oct)", () => {

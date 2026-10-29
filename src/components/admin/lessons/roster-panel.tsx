@@ -214,7 +214,11 @@ function CourseStudents({ lessonId, course, courseTitle }: { lessonId: string; c
 
 type SearchResult = { id: string; name: string; email: string; enrollment: "ACTIVE" | "REVOKED" | null };
 
-function AddStudent({ lessonId }: { lessonId: string }) {
+/**
+ * Search and add one student. `lessonId` is the lesson the search marks students against; `addTo`
+ * sends the add elsewhere (a series adds to all its upcoming dates).
+ */
+export function AddStudent({ lessonId, addTo }: { lessonId: string; addTo?: { url: string; body: (student: SearchResult) => unknown } }) {
   const [query, setQuery] = useState("");
   const [state, setState] = useState<{ status: "idle" | "loading" | "done" | "error"; results: SearchResult[]; error?: string }>({ status: "idle", results: [] });
   const { run, pending } = useApiAction();
@@ -236,7 +240,8 @@ function AddStudent({ lessonId }: { lessonId: string }) {
   }, [query, lessonId]);
 
   async function add(student: SearchResult) {
-    const done = await run(() => apiSend("post", `/admin/lessons/${lessonId}/enrollments`, { userId: student.id }), { success: t.add.success(student.name) });
+    const [url, body] = addTo ? [addTo.url, addTo.body(student)] : [`/admin/lessons/${lessonId}/enrollments`, { userId: student.id }];
+    const done = await run(() => apiSend("post", url, body), { success: t.add.success(student.name) });
     if (done) setQuery("");
   }
 

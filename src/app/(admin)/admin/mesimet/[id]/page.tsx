@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Repeat } from "lucide-react";
 import { InvitationsPanel } from "@/components/admin/lessons/invitations-panel";
 import { LessonForm } from "@/components/admin/lessons/lesson-form";
 import { LessonStatusPanel } from "@/components/admin/lessons/lesson-status-panel";
@@ -56,6 +56,16 @@ export default async function LessonDetailPage({ params, searchParams }: PagePro
       <Link href="/admin/mesimet" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ChevronLeft className="size-4" aria-hidden /> {admin.lessons.backToList}
       </Link>
+      {lesson.series && (
+        <div className="flex flex-col gap-2 rounded-md border border-dashed p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <span className="inline-flex items-center gap-2 text-muted-foreground">
+            <Repeat className="size-4" aria-hidden /> {admin.series.partOf(lesson.series.lessons)}
+          </span>
+          <Link href={`/admin/mesimet/seri/${lesson.series.id}`} className="font-medium underline-offset-2 hover:underline">
+            {admin.series.open}
+          </Link>
+        </div>
+      )}
       <div className="space-y-2">
         <PageHeader title={lesson.title} />
         <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">

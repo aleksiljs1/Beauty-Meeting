@@ -116,3 +116,19 @@ export function repeatSchedules(first: LessonSchedule, rule: RepeatRule): Lesson
   }
   return schedules;
 }
+
+/**
+ * The same lesson day at a new Tirana start time ("HH:MM") and length. Join opening and the
+ * access deadline keep their distance from the start and end, so a series can be moved together.
+ */
+export function retimeSchedule(current: LessonSchedule, startTime: string, durationMinutes: number): LessonSchedule {
+  const start = fromZonedInputValue(`${academyDay(current.scheduledStartAt)}T${startTime}`);
+  if (!start) throw new Error(`Invalid start time ${startTime}`);
+  const end = new Date(start.getTime() + durationMinutes * MINUTE);
+  return {
+    scheduledStartAt: start,
+    scheduledEndAt: end,
+    joinOpensAt: new Date(start.getTime() - (current.scheduledStartAt.getTime() - current.joinOpensAt.getTime())),
+    accessExpiresAt: new Date(end.getTime() + (current.accessExpiresAt.getTime() - current.scheduledEndAt.getTime())),
+  };
+}

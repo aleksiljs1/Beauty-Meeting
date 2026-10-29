@@ -1,14 +1,16 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { Plus } from "lucide-react";
-import { DemoBadge, EmptyState, MeetingBadge, PageHeader, Pagination, PublicationBadge } from "@/components/admin/page-parts";
+import { Plus, Repeat } from "lucide-react";
+import { LessonItem, lessonRowClass } from "@/components/admin/lessons/lesson-list-item";
+import { DemoBadge, EmptyState, PageHeader, Pagination, PublicationBadge } from "@/components/admin/page-parts";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { admin } from "@/i18n/admin";
 import { common } from "@/i18n/common";
-import { formatTimeRange, formatWeekdayDate } from "@/lib/datetime";
+import { formatDate, formatTimeRange, formatWeekdayDate } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 import { requirePageUser } from "@/server/auth/session";
-import { listLessons, type LessonListFilter } from "@/server/queries/admin";
+import { listLessons, type LessonListFilter, type SeriesEntry } from "@/server/queries/admin";
 
 export const metadata: Metadata = { title: admin.lessons.title };
 
@@ -98,38 +100,47 @@ export default async function LessonsPage({ searchParams }: PageProps<"/admin/me
         <EmptyState>{filtered ? t.emptyFiltered : t.empty}</EmptyState>
       ) : (
         <ul className="divide-y rounded-md border bg-card">
-          {result.items.map((lesson) => (
-            <li key={lesson.id}>
-              <Link
-                href={`/admin/mesimet/${lesson.id}`}
-                className="group flex flex-col gap-2 px-4 py-4 transition-colors duration-200 outline-none hover:bg-muted/40 focus-visible:bg-muted md:flex-row md:items-center md:justify-between"
-              >
-                <div className="min-w-0 space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium group-hover:underline">{lesson.title}</span>
-                    {lesson.isDemo && <DemoBadge />}
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {formatWeekdayDate(lesson.scheduledStartAt)} · {formatTimeRange(lesson.scheduledStartAt, lesson.scheduledEndAt)}
-                    {lesson.courseTitle ? ` · ${lesson.courseTitle}` : ""}
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground md:justify-end">
-                  <PublicationBadge publication={lesson.publication} />
-                  <MeetingBadge status={lesson.meetingStatus} />
-                  <span>
-                    {t.columns.students}: {lesson.students}
-                  </span>
-                  <span>
-                    {t.columns.materials}: {lesson.materials}
-                  </span>
-                </div>
-              </Link>
-            </li>
+          {result.items.map((entry) => (
+            <li key={entry.id}>{entry.kind === "series" ? <SeriesItem series={entry} /> : <LessonItem lesson={entry} />}</li>
           ))}
         </ul>
       )}
       <Pagination page={result.page} pageCount={result.pageCount} href={(p) => buildHref({ statusi, koha, faqe: p })} />
     </div>
+  );
+}
+
+/** A repeating lesson as one entry: its weekdays, date range and how many dates are in each state. */
+function SeriesItem({ series }: { series: SeriesEntry }) {
+  const first = series.lessons[0];
+  const last = series.lessons.at(-1)!;
+  const counts = PUBLICATIONS.map((p) => [p, series.lessons.filter((l) => l.publication === p).length] as const).filter(([, n]) => n > 0);
+  return (
+    <Link href={`/admin/mesimet/seri/${series.id}`} className={lessonRowClass}>
+      <div className="min-w-0 space-y-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <Repeat className="size-4 text-muted-foreground" aria-hidden />
+          <span className="font-medium group-hover:underline">{series.title}</span>
+          <Badge variant="secondary">{admin.series.badge(series.lessons.length)}</Badge>
+          {series.isDemo && <DemoBadge />}
+        </div>
+        <p className="text-sm text-muted-foreground">
+          {admin.series.rhythm(series.weekdays.map((d) => admin.calendar.weekdays[d]))} · {formatTimeRange(first.scheduledStartAt, first.scheduledEndAt)} ·{" "}
+          {formatDate(first.scheduledStartAt)} – {formatDate(last.scheduledStartAt)}
+          {series.courseTitle ? ` · ${series.courseTitle}` : ""}
+        </p>
+        {series.next && <p className="text-xs text-muted-foreground">{admin.series.next(formatWeekdayDate(series.next.scheduledStartAt))}</p>}
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground md:justify-end">
+        {counts.map(([p, n]) => (
+          <span key={p} className="inline-flex items-center gap-1">
+            <PublicationBadge publication={p} /> ×{n}
+          </span>
+        ))}
+        <span>
+          {t.columns.students}: {Math.max(...series.lessons.map((l) => l.students))}
+        </span>
+      </div>
+    </Link>
   );
 }

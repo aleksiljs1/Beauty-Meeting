@@ -183,10 +183,10 @@ export function LessonForm({
         form.reset(values);
         router.refresh();
       } else {
-        const created = await apiSend<{ id: string; enrolled: number; count: number }>("post", "/admin/lessons", body);
-        if (created.count > 1) {
+        const created = await apiSend<{ id: string; seriesId: string | null; enrolled: number; count: number }>("post", "/admin/lessons", body);
+        if (created.seriesId) {
           toast.success(t.repeat.created(created.count));
-          router.push(`/admin/kalendari?muaji=${values.scheduledStartAt.slice(0, 7)}`);
+          router.push(`/admin/mesimet/seri/${created.seriesId}`);
         } else {
           toast.success(created.enrolled ? t.createdWithStudents(created.enrolled) : t.created);
           router.push(`/admin/mesimet/${created.id}`);
