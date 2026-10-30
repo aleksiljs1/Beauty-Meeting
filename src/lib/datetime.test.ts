@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { academyDay, addDays, formatDate, formatMonthYear, formatTimeRange, fromZonedInputValue, isCalendarDay, timezoneAbbreviation, toZonedInputValue, weekdayIndex } from "./datetime";
+import { academyDay, addDays, formatDate, formatDayInput, maskDigits, parseDayInput, parseTimeInput, formatMonthYear, formatTimeRange, fromZonedInputValue, isCalendarDay, timezoneAbbreviation, toZonedInputValue, weekdayIndex } from "./datetime";
 
 describe("academy timezone (Europe/Tirane)", () => {
   it("converts admin-entered local time to UTC in winter (CET, UTC+1) and summer (CEST, UTC+2)", () => {
@@ -47,5 +47,33 @@ describe("academy timezone (Europe/Tirane)", () => {
   it("rejects days that don't exist instead of rolling them over", () => {
     expect(isCalendarDay("2028-02-29")).toBe(true);
     for (const day of ["2026-02-29", "2026-02-31", "2026-04-31", "2026-13-01", "2026-00-10", "2026-1-5", ""]) expect(isCalendarDay(day)).toBe(false);
+  });
+});
+
+describe("typed dates and times", () => {
+  it("writes and reads days as DD/MM/YYYY", () => {
+    expect(formatDayInput("2026-10-28")).toBe("28/10/2026");
+    expect(formatDayInput("")).toBe("");
+    expect(parseDayInput("28/10/2026")).toBe("2026-10-28");
+    expect(parseDayInput(" 1.2.2026 ")).toBe("2026-02-01");
+    expect(parseDayInput("28-10-2026")).toBe("2026-10-28");
+    for (const text of ["31/02/2026", "10/28/2026", "28/10/26", "2026-10-28", ""]) expect(parseDayInput(text), text).toBeNull();
+  });
+
+  it("reads 24-hour times", () => {
+    expect(parseTimeInput("9:05")).toBe("09:05");
+    expect(parseTimeInput("1730")).toBe("17:30");
+    for (const text of ["24:00", "12:60", "7", "7pm"]) expect(parseTimeInput(text), text).toBeNull();
+  });
+
+  it("adds separators while only digits are typed", () => {
+    expect(maskDigits("2810", [2, 2, 4], "/")).toBe("28/10");
+    expect(maskDigits("281020261", [2, 2, 4], "/")).toBe("28/10/2026");
+    expect(maskDigits("1/5/2026", [2, 2, 4], "/")).toBe("1/5/2026");
+    expect(maskDigits("173", [2, 2], ":")).toBe("17:3");
+    expect(maskDigits("28/102", [2, 2, 4], "/")).toBe("28/10/2");
+    expect(maskDigits("28/", [2, 2, 4], "/")).toBe("28/");
+    expect(maskDigits("28/10/", [2, 2, 4], "/")).toBe("28/10/");
+    expect(maskDigits("1/", [2, 2, 4], "/")).toBe("1/");
   });
 });

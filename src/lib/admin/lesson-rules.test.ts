@@ -5,6 +5,7 @@ import {
   EARLY_DEADLINE_ISSUE_PATH,
   MAX_REPEATED_LESSONS,
   needsEarlyDeadlineConfirmation,
+  peakOverlap,
   repeatSchedules,
   retimeSchedule,
   scheduleChanged,
@@ -79,6 +80,21 @@ describe("scheduleChanged", () => {
     expect(scheduleChanged(base, {})).toBe(false);
     expect(scheduleChanged(base, { scheduledStartAt: new Date(base.scheduledStartAt) })).toBe(false);
     expect(scheduleChanged(base, { accessExpiresAt: at("2026-12-03T11:00:00Z") })).toBe(true);
+  });
+});
+
+describe("peakOverlap", () => {
+  const span = (from: string, to: string) => ({ scheduledStartAt: at(`2026-11-02T${from}:00Z`), scheduledEndAt: at(`2026-11-02T${to}:00Z`) });
+  const lesson = span("10:00", "12:00");
+
+  it("counts the most lessons running at one moment, not every lesson that touches the window", () => {
+    // 09-11 and 11-13 never run together, so at most two are on at once (with 10:30-11:30).
+    expect(peakOverlap(lesson, [span("09:00", "11:00"), span("11:00", "13:00"), span("10:30", "11:30")])).toBe(2);
+    expect(peakOverlap(lesson, [span("09:00", "13:00"), span("10:00", "12:00"), span("11:00", "11:15")])).toBe(3);
+  });
+
+  it("ignores lessons that only meet it at the edges", () => {
+    expect(peakOverlap(lesson, [span("08:00", "10:00"), span("12:00", "14:00")])).toBe(0);
   });
 });
 

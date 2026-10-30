@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { Plus, Repeat } from "lucide-react";
+import { BulkDeleteLessons } from "@/components/admin/lessons/bulk-delete-lessons";
 import { LessonItem, lessonRowClass } from "@/components/admin/lessons/lesson-list-item";
 import { DemoBadge, EmptyState, PageHeader, Pagination, PublicationBadge } from "@/components/admin/page-parts";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +11,7 @@ import { common } from "@/i18n/common";
 import { formatDate, formatTimeRange, formatWeekdayDate } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 import { requirePageUser } from "@/server/auth/session";
-import { listLessons, type LessonListFilter, type SeriesEntry } from "@/server/queries/admin";
+import { countFilteredLessons, listLessons, type LessonListFilter, type SeriesEntry } from "@/server/queries/admin";
 
 export const metadata: Metadata = { title: admin.lessons.title };
 
@@ -53,7 +54,7 @@ export default async function LessonsPage({ searchParams }: PageProps<"/admin/me
   const page = Math.max(1, Number(one(params.faqe)) || 1);
 
   const filter: LessonListFilter = { publication: statusi, when: koha ? WHEN[koha] : undefined, page };
-  const result = await listLessons(filter);
+  const [result, counts] = await Promise.all([listLessons(filter), countFilteredLessons(filter)]);
   const filtered = !!statusi || !!koha;
 
   return (
@@ -62,11 +63,14 @@ export default async function LessonsPage({ searchParams }: PageProps<"/admin/me
         title={t.title}
         intro={t.intro}
         actions={
-          <Button asChild>
-            <Link href="/admin/mesimet/i-ri">
-              <Plus aria-hidden /> {t.newLesson}
-            </Link>
-          </Button>
+          <>
+            <BulkDeleteLessons filter={{ publication: filter.publication, when: filter.when }} counts={counts} />
+            <Button asChild>
+              <Link href="/admin/mesimet/i-ri">
+                <Plus aria-hidden /> {t.newLesson}
+              </Link>
+            </Button>
+          </>
         }
       />
 

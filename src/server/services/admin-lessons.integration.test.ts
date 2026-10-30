@@ -4,7 +4,7 @@ import { ZodError } from "zod";
 import { academyDay } from "@/lib/datetime";
 import { createLesson as createFixtureLesson, createUser, resetDatabase } from "@/test/fixtures";
 
-const { createLesson, createRepeatingLesson, updateLesson, setLessonPublication, runDemoAction, deleteLesson } = await import("./lessons");
+const { createLesson, createRepeatingLesson, updateLesson, setLessonPublication, runDemoAction, deleteLesson, deleteFilteredLessons } = await import("./lessons");
 const { grantEnrollment, revokeEnrollment, restoreEnrollment, setEnrollmentDeadline } = await import("./enrollments");
 const { setStudentActive } = await import("./students");
 const { deleteCourse } = await import("./content");
@@ -101,6 +101,37 @@ describe("lesson administration", () => {
     await runDemoAction(demo.id, "end", admin);
     await runDemoAction(demo.id, "reset", admin);
     expect((await prisma.lesson.findUniqueOrThrow({ where: { id: demo.id } })).meetingStatus).toBe("SCHEDULED");
+  });
+});
+
+describe("lessons at the same time", () => {
+  it("allows three at once and refuses a fourth, also when moving or restoring one", async () => {
+    for (let i = 0; i < 3; i++) await createLesson({ title: `Mësim ${i}`, ...schedule() }, false, admin);
+    await expect(createLesson({ title: "I katërti", ...schedule(HOUR + DAY) }, false, admin)).rejects.toMatchObject({ code: "CONFLICT" });
+
+    const later = await createLesson({ title: "Më vonë", ...schedule(DAY + 3 * HOUR) }, false, admin); // starts as the others end
+    await expect(updateLesson(later.id, schedule(DAY + HOUR), false, admin)).rejects.toMatchObject({ code: "CONFLICT" });
+
+    const first = await prisma.lesson.findFirstOrThrow({ where: { title: "Mësim 0" } });
+    await setLessonPublication(first.id, "CANCELLED", admin);
+    await createLesson({ title: "Në vend të tij", ...schedule() }, false, admin); // a cancelled lesson frees its place
+    await expect(setLessonPublication(first.id, "DRAFT", admin)).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+});
+
+describe("bulk delete from the lessons list", () => {
+  it("deletes only the drafts, or every lesson matching the filter", async () => {
+    await createLesson({ title: "Draft", ...schedule() }, false, admin);
+    const published = await createLesson({ title: "Publikuar", ...schedule() }, false, admin);
+    await setLessonPublication(published.id, "PUBLISHED", admin);
+    await createLesson({ title: "E kaluar", ...schedule(-2 * DAY) }, false, admin);
+
+    expect(await deleteFilteredLessons({}, "drafts", admin)).toEqual({ count: 2, skipped: 0 });
+    expect(await prisma.lesson.findMany({ select: { id: true } })).toEqual([{ id: published.id }]);
+
+    await createLesson({ title: "E kaluar 2", ...schedule(-2 * DAY) }, false, admin);
+    expect(await deleteFilteredLessons({ when: "upcoming" }, "all", admin)).toEqual({ count: 1, skipped: 0 });
+    expect(await prisma.lesson.count()).toBe(1); // the past one stays
   });
 });
 

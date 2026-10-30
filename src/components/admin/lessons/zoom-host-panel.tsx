@@ -2,7 +2,6 @@
 
 import { CircleHelp, RefreshCw, Video } from "lucide-react";
 import Link from "next/link";
-import { ConfirmAction } from "@/components/admin/confirm-action";
 import { useApiAction } from "@/components/admin/use-api-action";
 import { Button } from "@/components/ui/button";
 import { ZoomAppLink } from "@/components/zoom/zoom-app-link";
@@ -21,9 +20,9 @@ type Props = {
 };
 
 /**
- * Admin Zoom controls for one lesson: create the meeting, start it as host inside the site (or,
- * deliberately, in the Zoom desktop app), and re-sync its status from Zoom if a webhook was
- * missed. Host credentials are requested from the server per session and handed straight to the
+ * Admin Zoom controls for one lesson: start it as host inside the site (or, deliberately, in the
+ * Zoom desktop app; the meeting is created on the first start), and re-sync its status from Zoom
+ * if a webhook was missed. Host credentials are requested from the server per session and handed straight to the
  * isolated frame / the Zoom link; nothing is kept.
  */
 export function ZoomHostPanel({ lessonId, zoomLive, meetingNumber, publication, meetingStatus }: Props) {
@@ -31,9 +30,8 @@ export function ZoomHostPanel({ lessonId, zoomLive, meetingNumber, publication, 
   if (!zoomLive) return <p className="text-sm text-muted-foreground">{t.notLive}</p>;
 
   const finished = meetingStatus === "ENDED" || meetingStatus === "ERROR";
-  const canCreate = !meetingNumber && publication !== "CANCELLED" && publication !== "ARCHIVED" && !finished;
   const ended = meetingStatus === "ENDED";
-  const canHost = !!meetingNumber && publication === "PUBLISHED" && meetingStatus !== "ERROR";
+  const canHost = publication === "PUBLISHED" && meetingStatus !== "ERROR";
 
   return (
     <div className="space-y-4">
@@ -42,25 +40,10 @@ export function ZoomHostPanel({ lessonId, zoomLive, meetingNumber, publication, 
           {t.meetingNumber}: <span className="font-medium text-foreground tabular-nums">{meetingNumber}</span>
         </p>
       ) : (
-        <p className="text-sm text-muted-foreground">{t.needsMeeting}</p>
+        <p className="text-sm text-muted-foreground">{t.createdOnStart}</p>
       )}
 
       <div className="flex flex-wrap items-center gap-2">
-        {canCreate && (
-          <ConfirmAction
-            trigger={
-              <Button variant="outline" disabled={pending}>
-                <Video aria-hidden />
-                {t.createMeeting}
-              </Button>
-            }
-            title={t.createTitle}
-            description={t.createDescription}
-            confirmLabel={t.createMeeting}
-            onConfirm={() => run(() => apiSend("post", `/admin/lessons/${lessonId}/zoom-meeting`), { success: t.created })}
-          />
-        )}
-
         {canHost && (
           // Its own tab: the call keeps running while the admin portal is used in this one.
           <Button asChild>
@@ -95,7 +78,7 @@ export function ZoomHostPanel({ lessonId, zoomLive, meetingNumber, publication, 
         </div>
       )}
 
-      {meetingNumber && publication !== "PUBLISHED" && !finished && <p className="text-sm text-muted-foreground">{t.needsPublish}</p>}
+      {publication !== "PUBLISHED" && !finished && <p className="text-sm text-muted-foreground">{t.needsPublish}</p>}
       {ended && <p className="text-sm text-muted-foreground">{t.ended}</p>}
       {meetingStatus === "ERROR" && <p className="text-sm text-muted-foreground">{t.finished}</p>}
 

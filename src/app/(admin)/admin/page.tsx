@@ -19,14 +19,12 @@ const ISSUE_LABEL: Record<DashboardIssue["kind"], string> = {
   RECORDING_STALLED: t.stalledRecording,
   MATERIAL_FAILED: t.failedMaterial,
   MATERIAL_STALLED: t.stalledMaterial,
-  ZOOM_MEETING_MISSING: t.zoomMeetingMissing,
 };
 const ISSUE_TAB: Record<DashboardIssue["kind"], string> = {
   RECORDING_FAILED: "regjistrimet",
   RECORDING_STALLED: "regjistrimet",
   MATERIAL_FAILED: "materialet",
   MATERIAL_STALLED: "materialet",
-  ZOOM_MEETING_MISSING: "detaje",
 };
 
 function Stat({ label, value }: { label: string; value: number }) {

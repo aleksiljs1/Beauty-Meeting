@@ -1,15 +1,13 @@
 import "server-only";
-import type { PublicationStatus } from "@/generated/prisma/enums";
 import { retimeSchedule } from "@/lib/admin/lesson-rules";
 import { effectiveMeetingStatus } from "@/server/access/policy";
 import type { AppUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
 import { ApiError } from "@/server/http";
 import { publishFeedChanged } from "@/server/realtime/publish";
-import { createZoomMeetingForLesson } from "@/server/zoom/meetings";
 import { audit } from "./audit";
 import { enrollStudents } from "./course-members";
-import { assertSchedules, deleteLessons, setLessonPublication, updateLesson } from "./lessons";
+import { ACTIVE_PUBLICATIONS, assertConcurrencyLimit, assertSchedules, deleteLessons, setLessonPublication, updateLesson } from "./lessons";
 import { notifyLessonsChanged, studentsExpecting } from "./live";
 
 /**
@@ -19,8 +17,7 @@ import { notifyLessonsChanged, studentsExpecting } from "./live";
  * over, not cancelled or archived); past dates stay as they happened.
  */
 
-const ACTIVE: PublicationStatus[] = ["DRAFT", "PUBLISHED"];
-const upcoming = (now: Date) => ({ scheduledEndAt: { gt: now }, publication: { in: ACTIVE } });
+const upcoming = (now: Date) => ({ scheduledEndAt: { gt: now }, publication: { in: ACTIVE_PUBLICATIONS } });
 
 const lessonSelect = {
   id: true,
@@ -63,10 +60,15 @@ export async function updateSeries(seriesId: string, patch: SeriesPatch, confirm
   const { time, ...fields } = patch;
   const changes = lessons.map((lesson) => ({ lesson, schedule: time ? retimeSchedule(lesson, time.start, time.durationMinutes) : null }));
   assertSchedules(changes.flatMap((c) => (c.schedule ? [c.schedule] : [])), confirmEarlyDeadline);
+  // Every new time is checked before the first date moves, against the others' new times too.
+  if (time) {
+    const real = changes.filter((c) => !c.lesson.isDemo);
+    await assertConcurrencyLimit(real.map((c) => c.schedule!), real.map((c) => c.lesson.id));
+  }
 
   let zoomSynced = true;
   for (const { lesson, schedule } of changes) {
-    const result = await updateLesson(lesson.id, { ...fields, ...schedule }, confirmEarlyDeadline, admin, { notify: false });
+    const result = await updateLesson(lesson.id, { ...fields, ...schedule }, confirmEarlyDeadline, admin, { notify: false, checkConcurrency: false });
     zoomSynced &&= result.zoomSynced;
   }
   const moved = changes.filter((c) => c.schedule && c.lesson.publication === "PUBLISHED" && c.schedule.scheduledStartAt.getTime() !== c.lesson.scheduledStartAt.getTime());
@@ -119,17 +121,3 @@ export async function removeSeriesStudent(seriesId: string, userId: string, admi
   return { removed: count };
 }
 
-/** Creates the Zoom meeting of every upcoming date that has none yet; reports how many failed. */
-export async function createSeriesZoomMeetings(seriesId: string, admin: AppUser, now = new Date()) {
-  const lessons = (await upcomingLessons(seriesId, now)).filter((l) => !l.isDemo && !l.zoomMeetingNumber);
-  let failed = 0;
-  for (const lesson of lessons) {
-    try {
-      await createZoomMeetingForLesson(lesson.id, admin);
-    } catch (error) {
-      failed += 1;
-      console.error("[zoom] series meeting failed", { lessonId: lesson.id, error: (error as Error).message });
-    }
-  }
-  return { created: lessons.length - failed, failed };
-}

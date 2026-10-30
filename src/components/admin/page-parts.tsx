@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { admin } from "@/i18n/admin";
 import { common } from "@/i18n/common";
+import { pageItems } from "@/lib/pagination";
 import { cn } from "@/lib/utils";
 
 /** Small presentational pieces shared by admin pages (server-compatible). */
@@ -30,28 +31,40 @@ export function EmptyState({ children, className }: { children: ReactNode; class
   );
 }
 
+/** Previous · 1 · … · 20 · [21] · 22 · … · 50 · Next */
 export function Pagination({ page, pageCount, href }: { page: number; pageCount: number; href: (page: number) => string }) {
   if (pageCount <= 1) return null;
+  const t = admin.pagination;
   return (
-    <nav className="flex items-center justify-between gap-2 pt-2 text-sm" aria-label={admin.pagination.page(page, pageCount)}>
-      {page > 1 ? (
+    <nav className="flex flex-wrap items-center justify-center gap-1 pt-2 text-sm" aria-label={t.page(page, pageCount)}>
+      {page > 1 && (
         <Button variant="outline" size="sm" asChild>
           <Link href={href(page - 1)}>
-            <ChevronLeft aria-hidden /> {admin.pagination.previous}
+            <ChevronLeft aria-hidden /> <span className="hidden sm:inline">{t.previous}</span>
+            <span className="sr-only sm:hidden">{t.previous}</span>
           </Link>
         </Button>
-      ) : (
-        <span />
       )}
-      <span className="text-muted-foreground">{admin.pagination.page(page, pageCount)}</span>
-      {page < pageCount ? (
+      {pageItems(page, pageCount).map((item, index) =>
+        item === "gap" ? (
+          <span key={`gap-${index}`} className="px-1 text-muted-foreground" aria-hidden>
+            …
+          </span>
+        ) : (
+          <Button key={item} variant={item === page ? "default" : "ghost"} size="sm" className="min-w-8 tabular-nums" asChild>
+            <Link href={href(item)} aria-current={item === page ? "page" : undefined} aria-label={t.page(item, pageCount)}>
+              {item}
+            </Link>
+          </Button>
+        ),
+      )}
+      {page < pageCount && (
         <Button variant="outline" size="sm" asChild>
           <Link href={href(page + 1)}>
-            {admin.pagination.next} <ChevronRight aria-hidden />
+            <span className="hidden sm:inline">{t.next}</span>
+            <span className="sr-only sm:hidden">{t.next}</span> <ChevronRight aria-hidden />
           </Link>
         </Button>
-      ) : (
-        <span />
       )}
     </nav>
   );

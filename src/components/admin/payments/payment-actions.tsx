@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { CalendarClock, History, MoreHorizontal, Plus } from "lucide-react";
 import { z } from "zod";
+import { DateInput } from "@/components/admin/date-inputs";
 import { FormField } from "@/components/admin/form-field";
 import { errorMessage, useApiAction } from "@/components/admin/use-api-action";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,7 @@ import { admin } from "@/i18n/admin";
 import { common } from "@/i18n/common";
 import { apiGet, apiSend } from "@/lib/api/client";
 import { centsToEuroInput, courseMonthLabel, formatEuro, parseEuroCents } from "@/lib/billing";
-import { formatCalendarDate, todayInAcademy } from "@/lib/datetime";
+import { formatCalendarDate, isCalendarDay, todayInAcademy } from "@/lib/datetime";
 import type { PaymentHistoryEntry } from "@/server/queries/payments";
 
 const t = admin.payments;
@@ -88,7 +89,7 @@ function AccountDialog({ title, account, onClose, children }: { title: string; a
 const recordSchema = z.object({
   months: z.string().regex(/^[1-9]\d{0,2}$/, t.record.invalidMonths),
   amount: z.string().refine((value) => parseEuroCents(value) !== null, t.record.invalidAmount),
-  paidOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  paidOn: z.string().refine((value) => isCalendarDay(value) && value <= todayInAcademy(), t.record.invalidPaidOn),
   method: z.enum(METHODS),
   note: z.string().max(500),
 });
@@ -146,9 +147,15 @@ function RecordPaymentDialog({ account, onClose }: { account: PaymentActionsAcco
           {price !== null && <span className="block text-xs">{t.record.amountHint(formatEuro(price))}</span>}
         </p>
         <div className="grid grid-cols-2 gap-4">
-          <FormField label={t.record.paidOn} error={form.formState.errors.paidOn?.message}>
-            <Input type="date" max={todayInAcademy()} {...form.register("paidOn")} />
-          </FormField>
+          <Controller
+            control={form.control}
+            name="paidOn"
+            render={({ field }) => (
+              <FormField label={t.record.paidOn} error={form.formState.errors.paidOn?.message}>
+                <DateInput max={todayInAcademy()} {...field} />
+              </FormField>
+            )}
+          />
           <Controller
             control={form.control}
             name="method"

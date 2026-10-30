@@ -219,7 +219,7 @@ or "live" for up to 30 days. Now:
 - **Series**: a repeating lesson is one `LessonSeries`; its dates stay ordinary lessons (each needs its own Zoom
   meeting, students and access window), but the lessons list shows the series as **one entry** and
   `/admin/mesimet/seri/[id]` changes them together: title/texts/course, clock time and length, students,
-  publish drafts, create Zoom meetings, cancel, delete upcoming dates or the whole series. Bulk changes reach the
+  publish drafts, cancel, delete upcoming dates or the whole series. Bulk changes reach the
   dates still to come (past, cancelled and archived dates stay as they were), go through the single-lesson
   functions, are checked for every date before the first changes, and notify each student **once** (one in-site
   notice and one email listing the dates: `notifyLessonsChanged` in `services/live.ts`). Each date can still be
@@ -228,6 +228,28 @@ or "live" for up to 30 days. Now:
   library); students expecting a published upcoming lesson get an email. Deleting a course can delete its
   lessons too (otherwise they stay, without a course). Taking a student off a course can also revoke their
   upcoming lessons of that course.
+
+## Test round fixes (client testing, 2026-10-30)
+
+- **Zoom meetings are created on the first start**: no "Create Zoom meeting" button (lesson or series); the host's
+  "Start the live class" (browser or Zoom app) creates the meeting when the lesson has none
+  (`loadHostableLesson` in `zoom/host.ts`). The dashboard warning about published lessons without a meeting went
+  with it.
+- **At most 3 lessons at the same moment** (`MAX_CONCURRENT_LESSONS`, `peakOverlap` in `lesson-rules.ts`,
+  `assertConcurrencyLimit` in `services/lessons.ts`): checked when lessons are created, moved, a series is
+  retimed, or a cancelled/archived lesson is restored. Drafts count (publishing can't break it); demo, cancelled
+  and archived lessons don't; back-to-back lessons don't overlap. Not locked against two admins saving at the
+  same instant.
+- **Bulk delete** on the lessons list ("Fshi mësimet"): only drafts, or all lessons, matching the current
+  filters (`deleteFilteredLessons`, `DELETE /api/v1/admin/lessons?scope=drafts|all`). Live lessons and ones
+  with an upload running are skipped and reported.
+- **Dates are typed DD/MM/YYYY and times 24-hour** everywhere in the admin (`components/admin/date-inputs.tsx`),
+  whatever the browser's language; the icon opens the browser's calendar. Values stay ISO underneath.
+- Numbered pagination (`lib/pagination.ts`), phone numbers checked for 7–15 digits with an optional + / 00
+  prefix, dark scroll bars (`color-scheme: dark`).
+- **Not done yet**: the Excel import doesn't take the new student fields (phone, birth date, gender, city,
+  notes) nor has a template; the video "Watch" behaviour on laptops is still to be decided; automatic clean-up
+  of old materials (retention period to be decided) is planned.
 
 ## Materials library, repeating lessons, student details (user request, 2026-10-28)
 

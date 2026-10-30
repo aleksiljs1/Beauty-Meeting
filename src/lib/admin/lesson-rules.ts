@@ -81,6 +81,31 @@ export function scheduleChanged(before: LessonSchedule, after: Partial<LessonSch
   );
 }
 
+// --- Lessons at the same time -----------------------------------------------------------------
+
+/** At most this many (non-demo) lessons may run at the same moment: one Zoom meeting each. */
+export const MAX_CONCURRENT_LESSONS = 3;
+
+type Span = Pick<LessonSchedule, "scheduledStartAt" | "scheduledEndAt">;
+
+/** The most of `others` running at one moment during `lesson` (the lesson itself not counted). */
+export function peakOverlap(lesson: Span, others: Span[]): number {
+  const start = lesson.scheduledStartAt.getTime();
+  const end = lesson.scheduledEndAt.getTime();
+  const events: [time: number, change: number][] = [];
+  for (const other of others) {
+    const from = Math.max(other.scheduledStartAt.getTime(), start);
+    const to = Math.min(other.scheduledEndAt.getTime(), end);
+    if (from < to) events.push([from, 1], [to, -1]);
+  }
+  // At the same instant an end comes before a start: back-to-back lessons don't overlap.
+  events.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  let running = 0;
+  let peak = 0;
+  for (const [, change] of events) peak = Math.max(peak, (running += change));
+  return peak;
+}
+
 // --- Repeating lessons ------------------------------------------------------------------------
 
 /** At most this many lessons are created from one form. */

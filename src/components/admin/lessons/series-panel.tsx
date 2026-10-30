@@ -2,9 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Ban, Send, Trash2, UserMinus, Video } from "lucide-react";
+import { Ban, Send, Trash2, UserMinus } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmAction } from "@/components/admin/confirm-action";
+import { TimeInput } from "@/components/admin/date-inputs";
 import { FormField } from "@/components/admin/form-field";
 import { AddStudent } from "@/components/admin/lessons/roster-panel";
 import { useApiAction } from "@/components/admin/use-api-action";
@@ -95,7 +96,7 @@ export function SeriesEditForm({ seriesId, next, courses }: { seriesId: string; 
         {changeTime && (
           <div className="grid gap-4 sm:grid-cols-2">
             <FormField label={t.startTime}>
-              <Input type="time" value={values.start} onChange={(e) => set("start")(e.target.value)} required />
+              <TimeInput value={values.start} onChange={set("start")} required />
             </FormField>
             <FormField label={t.duration}>
               <Input type="number" min={15} max={720} step={5} value={values.duration} onChange={(e) => set("duration")(e.target.value)} required />
@@ -112,18 +113,15 @@ export function SeriesEditForm({ seriesId, next, courses }: { seriesId: string; 
   );
 }
 
-/** Publish, Zoom, cancel and delete for the whole series. */
+/** Publish, cancel and delete for the whole series. */
 export function SeriesActions({
   seriesId,
   drafts,
-  withoutZoom,
   upcoming,
   total,
 }: {
   seriesId: string;
   drafts: number;
-  /** Upcoming non-demo dates that have no Zoom meeting yet. */
-  withoutZoom: number;
   upcoming: number;
   total: number;
 }) {
@@ -143,18 +141,6 @@ export function SeriesActions({
       {drafts > 0 && (
         <Button disabled={pending} onClick={() => run(() => apiSend("post", `${url}/publication`, { publication: "PUBLISHED" }), { success: t.published(drafts) })}>
           <Send aria-hidden /> {t.publish(drafts)}
-        </Button>
-      )}
-      {withoutZoom > 0 && (
-        <Button
-          variant="outline"
-          disabled={pending}
-          onClick={async () => {
-            const result = await run(() => apiSend<{ created: number; failed: number }>("post", `${url}/zoom-meetings`));
-            if (result) (result.failed ? toast.warning : toast.success)(t.zoomDone(result.created, result.failed));
-          }}
-        >
-          <Video aria-hidden /> {t.zoom(withoutZoom)}
         </Button>
       )}
       {upcoming > 0 && (

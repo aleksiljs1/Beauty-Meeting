@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
+import { DateInput } from "@/components/admin/date-inputs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -93,7 +94,7 @@ function CourseForm({ item, onSaved, onCancel }: ItemFormProps<AdminCourse>) {
         <p className="text-sm text-muted-foreground">{t.billingHint}</p>
         <div className="grid gap-4 sm:grid-cols-4">
           <Field id="course-starts-on" label={t.startsOn} error={err.startsOn?.message}>
-            {(aria) => <Input type="date" {...aria} {...register("startsOn")} />}
+            {(aria) => <Controller control={control} name="startsOn" render={({ field }) => <DateInput {...aria} {...field} />} />}
           </Field>
           <Field id="course-years" label={t.durationYears} error={err.duration?.years?.message}>
             {(aria) => <Input inputMode="numeric" {...aria} {...register("duration.years")} />}

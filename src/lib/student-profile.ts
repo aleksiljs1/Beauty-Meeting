@@ -13,8 +13,22 @@ export const GENDERS = ["FEMALE", "MALE", "OTHER"] as const;
 
 const text = (max: number) => z.string().trim().max(max, v.tooLong);
 
+/** Longest phone number written out: 15 digits (the international maximum) plus separators. */
+export const PHONE_MAX_LENGTH = 22;
+
+/**
+ * A phone number as people write it: an optional international prefix ("+" or "00"), then 7–15
+ * digits (15 is the international maximum, prefix included) with spaces, dots, dashes or brackets
+ * between them. E.g. "+355 69 123 4567", "0691234567", "(04) 222-333".
+ */
+export function isPhoneNumber(value: string): boolean {
+  if (value.length > PHONE_MAX_LENGTH || !/^(\+|00)?[\d\s().-]+$/.test(value)) return false;
+  const digits = value.replace(/^\+|^00/, "").replace(/\D/g, "");
+  return digits.length >= 7 && digits.length <= 15;
+}
+
 export const studentProfileSchema = z.object({
-  phone: text(40).refine((value) => value === "" || /^\+?[\d\s()-]{6,}$/.test(value), v.phone),
+  phone: text(PHONE_MAX_LENGTH).refine((value) => value === "" || isPhoneNumber(value), v.phone),
   /** "YYYY-MM-DD"; age is worked out from it, so it never goes stale. */
   birthDate: text(10).refine((value) => value === "" || (isCalendarDay(value) && value >= "1900-01-01" && value <= todayInAcademy()), v.birthDate),
   gender: z.union([z.literal(""), z.enum(GENDERS)]),

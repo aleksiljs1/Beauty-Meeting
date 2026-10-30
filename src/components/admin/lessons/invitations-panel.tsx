@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { Check, Copy, Link2, Plus, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmAction } from "@/components/admin/confirm-action";
+import { DateTimeInput } from "@/components/admin/date-inputs";
 import { FormField } from "@/components/admin/form-field";
 import { EmptyState } from "@/components/admin/page-parts";
 import { useApiAction } from "@/components/admin/use-api-action";
@@ -209,10 +210,10 @@ function CreateInvitationDialog({ lesson }: { lesson: { id: string; scheduledEnd
                 <Input type="number" min={1} max={1000} inputMode="numeric" value={max} onChange={(e) => setMax(e.target.value)} />
               </FormField>
               <FormField label={t.redeemUntil} hint={`${t.redeemUntilHint} ${zone(lesson.accessExpiresAt)}`} error={errors.redeemUntil}>
-                <Input type="datetime-local" value={redeemUntil} max={lessonMax} onChange={(e) => setRedeemUntil(e.target.value)} />
+                <DateTimeInput value={redeemUntil} max={lessonMax} onChange={setRedeemUntil} />
               </FormField>
               <FormField label={t.accessExpiresAt} hint={t.accessExpiresAtHint} error={errors.accessUntil}>
-                <Input type="datetime-local" value={accessUntil} max={lessonMax} onChange={(e) => setAccessUntil(e.target.value)} />
+                <DateTimeInput value={accessUntil} max={lessonMax} onChange={setAccessUntil} />
               </FormField>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => changeOpen(false)}>

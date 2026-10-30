@@ -126,3 +126,51 @@ export const formatMonthYear = (day: string) => monthFormatter.format(new Date(`
 
 /** "2026-10-28" → "28 tetor 2026". Noon UTC is the same calendar day in Tirana all year. */
 export const formatCalendarDate = (value: string) => formatDate(`${value}T12:00:00Z`);
+
+// --- Typed dates and times (DD/MM/YYYY, 24-hour HH:MM) ------------------------------------------
+
+/** "2026-10-28" → "28/10/2026", the way dates are written in Albania. */
+export const formatDayInput = (day: string) => (isCalendarDay(day) ? `${day.slice(8, 10)}/${day.slice(5, 7)}/${day.slice(0, 4)}` : "");
+
+/** "28/10/2026" (also "28.10.2026", "28-10-2026", "1/2/2026") → "2026-10-28"; null when it isn't a real day. */
+export function parseDayInput(text: string): string | null {
+  const match = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(text.trim());
+  if (!match) return null;
+  const day = `${match[3]}-${match[2].padStart(2, "0")}-${match[1].padStart(2, "0")}`;
+  return isCalendarDay(day) ? day : null;
+}
+
+/** "9:05" / "09:05" / "0905" → "09:05"; null when it isn't a time of day. */
+export function parseTimeInput(text: string): string | null {
+  const match = /^(\d{1,2}):?(\d{2})$/.exec(text.trim());
+  if (!match || Number(match[1]) > 23 || Number(match[2]) > 59) return null;
+  return `${match[1].padStart(2, "0")}:${match[2]}`;
+}
+
+/**
+ * Puts the separators in by themselves while typing: "2810" → "28/10", "28/102026" →
+ * "28/10/2026" (`groups` 2,2,4 with "/"; 2,2 with ":" for a time). Text the admin separates
+ * differently ("1/5/2026") is left as typed.
+ */
+export function maskDigits(text: string, groups: number[], separator: string): string {
+  const pieces = text.split(separator);
+  if (!pieces.every((piece) => /^\d*$/.test(piece))) return text;
+  // Separators typed by hand must sit where the automatic ones would.
+  const boundaries = groups.map((_, i) => groups.slice(0, i + 1).reduce((a, b) => a + b, 0));
+  let before = 0;
+  for (const piece of pieces.slice(0, -1)) {
+    before += piece.length;
+    if (!boundaries.includes(before)) return text;
+  }
+  let rest = pieces.join("").slice(0, boundaries.at(-1));
+  const parts: string[] = [];
+  for (const size of groups) {
+    if (!rest) break;
+    parts.push(rest.slice(0, size));
+    rest = rest.slice(size);
+  }
+  const masked = parts.join(separator);
+  // Keep a separator the admin just typed, so it doesn't vanish under their cursor.
+  const typedSeparator = text.endsWith(separator) && boundaries.slice(0, -1).includes(parts.join("").length);
+  return typedSeparator ? masked + separator : masked;
+}

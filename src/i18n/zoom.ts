@@ -6,15 +6,10 @@ export const zoomText = {
   },
   admin: {
     sectionTitle: "Klasa live në Zoom",
-    createMeeting: "Krijo takimin Zoom",
-    createTitle: "Të krijohet takimi në Zoom?",
-    createDescription:
-      "Krijohet një takim në llogarinë Zoom të akademisë dhe lidhet me këtë mësim. Takimi nuk nis automatikisht; studentët hyjnë vetëm përmes faqes së mësimit.",
-    created: "Takimi Zoom u krijua.",
     meetingNumber: "Numri i takimit Zoom",
     sync: "Rifresko statusin nga Zoom",
     synced: "Statusi u rifreskua nga Zoom.",
-    needsMeeting: "Krijoni fillimisht takimin Zoom për këtë mësim.",
+    createdOnStart: "Takimi Zoom krijohet automatikisht herën e parë që nisni klasën.",
     needsPublish: "Publikoni mësimin para se të nisni klasën live.",
     demoLesson: "Kjo është klasë demo. Përdorni kontrollet e simulimit.",
     finished: "Takimi ka një gabim dhe nuk mund të niset nga kjo faqe.",

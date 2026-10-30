@@ -8,6 +8,7 @@ import { Info } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { CheckList } from "@/components/admin/check-list";
+import { DateInput, DateTimeInput } from "@/components/admin/date-inputs";
 import { FormField } from "@/components/admin/form-field";
 import { errorMessage } from "@/components/admin/use-api-action";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -38,7 +39,7 @@ import {
   type LessonSchedule,
   type RepeatRule,
 } from "@/lib/admin/lesson-rules";
-import { academyDay, ACADEMY_TIMEZONE_LABEL, addMonths, formatDate, fromZonedInputValue, timezoneAbbreviation, toZonedInputValue, weekdayIndex } from "@/lib/datetime";
+import { academyDay, ACADEMY_TIMEZONE_LABEL, addMonths, formatDate, fromZonedInputValue, isCalendarDay, timezoneAbbreviation, toZonedInputValue, weekdayIndex } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 import { admin } from "@/i18n/admin";
 import { common } from "@/i18n/common";
@@ -244,18 +245,31 @@ export function LessonForm({
           <Info className="size-4" aria-hidden /> {t.timezone(ACADEMY_TIMEZONE_LABEL, timezoneAbbreviation(zoneAt))}
         </p>
         <div className="grid gap-4 sm:grid-cols-2">
-          <FormField label={t.start} error={errors.scheduledStartAt?.message}>
-            <Input type="datetime-local" {...form.register("scheduledStartAt", { onChange: (e) => onStartChange(e.target.value) })} />
-          </FormField>
-          <FormField label={t.end} error={errors.scheduledEndAt?.message}>
-            <Input type="datetime-local" {...form.register("scheduledEndAt", { onChange: (e) => onEndChange(e.target.value) })} />
-          </FormField>
-          <FormField label={t.joinOpens} hint={t.joinOpensHint} error={errors.joinOpensAt?.message}>
-            <Input type="datetime-local" {...form.register("joinOpensAt")} />
-          </FormField>
-          <FormField label={t.deadline} hint={t.deadlineHint} error={errors.accessExpiresAt?.message}>
-            <Input type="datetime-local" {...form.register("accessExpiresAt")} />
-          </FormField>
+          {(
+            [
+              ["scheduledStartAt", t.start, undefined, onStartChange],
+              ["scheduledEndAt", t.end, undefined, onEndChange],
+              ["joinOpensAt", t.joinOpens, t.joinOpensHint, undefined],
+              ["accessExpiresAt", t.deadline, t.deadlineHint, undefined],
+            ] as const
+          ).map(([name, label, hint, follow]) => (
+            <Controller
+              key={name}
+              control={form.control}
+              name={name}
+              render={({ field }) => (
+                <FormField label={label} hint={hint} error={errors[name]?.message}>
+                  <DateTimeInput
+                    {...field}
+                    onChange={(value) => {
+                      field.onChange(value);
+                      follow?.(value);
+                    }}
+                  />
+                </FormField>
+              )}
+            />
+          ))}
         </div>
         {!isEdit && <RepeatField rule={repeat} onToggle={toggleRepeat} onChange={setRepeat} startDay={firstStart && weekdayIndex(academyDay(firstStart))} schedules={repeated ?? []} problem={repeatProblem} />}
         <div aria-live="polite">
@@ -391,7 +405,7 @@ function RepeatField({
             </div>
           </fieldset>
           <FormField label={r.until}>
-            <Input type="date" value={rule.until} onChange={(e) => e.target.value && onChange({ ...rule, until: e.target.value })} />
+            <DateInput value={rule.until} onChange={(until) => isCalendarDay(until) && onChange({ ...rule, until })} />
           </FormField>
           <p className={cn("text-sm sm:col-span-2", problem ? "text-destructive" : "text-muted-foreground")} aria-live="polite">
             {problem ?? (dates.length > 0 && r.preview(schedules.length, dates, last))}

@@ -27,6 +27,13 @@ export const admin = {
     notFound: "Nuk u gjet.",
   },
 
+  dateInput: {
+    datePlaceholder: "dd/mm/vvvv",
+    timePlaceholder: "hh:mm",
+    time: "Ora",
+    pick: "Zgjidhni datën në kalendar",
+  },
+
   pagination: {
     previous: "Mëparshmja",
     next: "Tjetra",
@@ -48,7 +55,6 @@ export const admin = {
     stalledRecording: "Ngarkim regjistrimi i papërfunduar (mbi 1 orë)",
     failedMaterial: "Materiali nuk u verifikua",
     stalledMaterial: "Ngarkim materiali i papërfunduar (mbi 1 orë)",
-    zoomMeetingMissing: "Mësim i publikuar pa takim Zoom: studentët nuk mund të bashkohen. Krijoni takimin.",
     paymentsOverdue: (count: number, amount: string) => `${count === 1 ? "1 student ka" : `${count} studentë kanë`} pagesa me vonesë${amount ? ` (${amount})` : ""}`,
     paymentsDueSoon: (count: number) => `${count === 1 ? "1 pagesë" : `${count} pagesa`} me afat këtë javë`,
     openPayments: "Hap pagesat",
@@ -118,7 +124,7 @@ export const admin = {
       age: (years: number) => `${years} vjeç`,
       validation: {
         tooLong: "Teksti është shumë i gjatë.",
-        phone: "Shkruani një numër telefoni, p.sh. +355 69 123 4567.",
+        phone: "Shkruani një numër telefoni të vlefshëm (7–15 shifra), p.sh. +355 69 123 4567.",
         birthDate: "Zgjidhni një datë të vlefshme.",
       },
     },
@@ -209,6 +215,7 @@ export const admin = {
       amount: "Shuma (€)",
       amountHint: (price: string) => `Çmimi mujor: ${price}. Ndryshojeni nëse ka pasur zbritje.`,
       paidOn: "Data e pagesës",
+      invalidPaidOn: "Shkruani datën e pagesës (dd/mm/vvvv), jo në të ardhmen.",
       method: "Mënyra",
       methods: { CASH: "Para në dorë", BANK: "Transfertë bankare", OTHER: "Tjetër" },
       note: "Shënim (opsional)",
@@ -265,6 +272,19 @@ export const admin = {
     },
     demoBadge: "Demo",
     backToList: "Të gjitha mësimet",
+    bulkDelete: {
+      trigger: "Fshi mësimet",
+      filtered: "Fshihen mësimet që përputhen me filtrat e zgjedhur.",
+      drafts: (n: number) => `Vetëm draftet (${n})`,
+      all: (n: number) => `Të gjitha mësimet (${n})`,
+      draftsTitle: "Të fshihen draftet?",
+      allTitle: "Të fshihen të gjitha mësimet?",
+      draftsBody: (n: number) => `Fshihen ${n === 1 ? "1 mësim draft" : `${n} mësime draft`} me studentët e tyre. Mësimet e publikuara mbeten. Materialet mbeten te "Materialet".`,
+      allBody: (n: number) =>
+        `Fshihen ${n === 1 ? "1 mësim" : `${n} mësime`}, edhe të publikuarat, me studentët dhe regjistrimet e tyre. Studentët që prisnin një mësim të publikuar marrin një email. Materialet mbeten te "Materialet". Kjo nuk kthehet pas.`,
+      done: (count: number, skipped: number) =>
+        `U fshinë ${count} mësime.${skipped ? ` ${skipped} nuk u fshinë sepse janë live ose kanë një ngarkim në vazhdim.` : ""}`,
+    },
     tabs: { details: "Detaje", students: "Studentët", invitations: "Ftesat", materials: "Materialet", recordings: "Regjistrimet" },
   },
 
@@ -290,8 +310,6 @@ export const admin = {
     cancelTitle: "Të anulohen datat e ardhshme?",
     cancelBody: (n: number) => `${n} ${n === 1 ? "mësim anulohet" : "mësime anulohen"}. Studentët që i prisnin marrin një njoftim dhe një email për të gjitha bashkë.`,
     cancelled: (n: number) => `U anuluan ${n} ${n === 1 ? "mësim" : "mësime"}.`,
-    zoom: (n: number) => `Krijo takimet Zoom (${n})`,
-    zoomDone: (created: number, failed: number) => `U krijuan ${created} takime Zoom.${failed ? ` ${failed} dështuan: provojini nga faqja e çdo date.` : ""}`,
     deleteUpcoming: "Fshi datat e ardhshme",
     deleteUpcomingBody: (n: number) => `${n} ${n === 1 ? "datë që nuk ka mbaruar fshihet" : "data që nuk kanë mbaruar fshihen"} përgjithmonë, me studentët dhe regjistrimet. Datat e kaluara mbeten.`,
     deleteAll: "Fshi serinë",

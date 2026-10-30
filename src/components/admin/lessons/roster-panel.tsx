@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { CalendarClock, MoreHorizontal, Plus, RotateCcw, UserMinus, UserPlus } from "lucide-react";
 import { CheckList } from "@/components/admin/check-list";
 import { ConfirmAction } from "@/components/admin/confirm-action";
+import { DateTimeInput } from "@/components/admin/date-inputs";
 import { FormField } from "@/components/admin/form-field";
 import { EmptyState } from "@/components/admin/page-parts";
 import { errorMessage, useApiAction } from "@/components/admin/use-api-action";
@@ -154,7 +155,7 @@ function DeadlineDialog({ row, lessonDeadline, onClose }: { row: RosterRow; less
           hint={`${t.lessonDeadline}: ${formatDateTime(lessonDeadline)} (${zoneLabel(lessonDeadline)})`}
           error={error}
         >
-          <Input type="datetime-local" value={value} max={toZonedInputValue(lessonDeadline)} onChange={(e) => setValue(e.target.value)} />
+          <DateTimeInput value={value} max={toZonedInputValue(lessonDeadline)} onChange={setValue} />
         </FormField>
         <DialogFooter className="gap-2">
           {row.ownDeadline && (

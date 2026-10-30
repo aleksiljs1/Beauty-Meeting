@@ -8,7 +8,6 @@ import { DemoBadge, PageHeader, SectionCard } from "@/components/admin/page-part
 import { admin } from "@/i18n/admin";
 import { formatDate, formatTimeRange } from "@/lib/datetime";
 import { requirePageUser } from "@/server/auth/session";
-import { zoomLive } from "@/server/env";
 import { getLessonSeries, listCourses } from "@/server/queries/admin";
 
 const t = admin.series;
@@ -52,7 +51,6 @@ export default async function LessonSeriesPage({ params }: PageProps<"/admin/mes
         <SeriesActions
           seriesId={series.id}
           drafts={series.upcoming.filter((l) => l.publication === "DRAFT").length}
-          withoutZoom={zoomLive ? series.upcoming.filter((l) => !l.isDemo && l.meetingStatus === "NOT_PROVISIONED").length : 0}
           upcoming={series.upcoming.length}
           total={series.lessons.length}
         />

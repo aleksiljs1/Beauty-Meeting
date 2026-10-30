@@ -2,9 +2,11 @@ import "server-only";
 import { z } from "zod";
 import type { PublicationStatus } from "@/generated/prisma/enums";
 import { effectiveMeetingStatus } from "@/server/access/policy";
-import { MAX_REPEATED_LESSONS, repeatSchedules, validateLessonSchedule, type LessonSchedule, type RepeatRule, type ScheduleIssue } from "@/lib/admin/lesson-rules";
+import { MAX_CONCURRENT_LESSONS, MAX_REPEATED_LESSONS, peakOverlap, repeatSchedules, scheduleChanged, validateLessonSchedule, type LessonSchedule, type RepeatRule, type ScheduleIssue } from "@/lib/admin/lesson-rules";
+import { formatTimeRange, formatWeekdayDate } from "@/lib/datetime";
 import type { AppUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
+import { lessonFilterWhere, type LessonListFilter } from "@/server/queries/admin";
 import { env } from "@/server/env";
 import { ApiError } from "@/server/http";
 import { publishFeedChanged, publishLessonChanged } from "@/server/realtime/publish";
@@ -40,6 +42,35 @@ function throwScheduleIssues(issues: ScheduleIssue[]) {
 /** Checks several schedules before anything is written (a series is changed all or nothing). */
 export function assertSchedules(schedules: LessonSchedule[], confirmEarlyDeadline: boolean) {
   for (const schedule of schedules) throwScheduleIssues(validateLessonSchedule(schedule, confirmEarlyDeadline));
+}
+
+/** Lessons that are (or will be) held; cancelled and archived ones are not. */
+export const ACTIVE_PUBLICATIONS: PublicationStatus[] = ["DRAFT", "PUBLISHED"];
+
+/**
+ * At most MAX_CONCURRENT_LESSONS real lessons may run at the same moment (each needs its own Zoom
+ * meeting). Drafts count too, so publishing can never break the limit; demo, cancelled and
+ * archived lessons don't. `schedules` are checked against each other as well (a new series), and
+ * `excludeIds` are the lessons being moved, whose current times no longer count.
+ */
+export async function assertConcurrencyLimit(schedules: LessonSchedule[], excludeIds: string[] = []) {
+  if (!schedules.length) return;
+  const others = await prisma.lesson.findMany({
+    where: {
+      isDemo: false,
+      publication: { in: ACTIVE_PUBLICATIONS },
+      id: { notIn: excludeIds },
+      scheduledStartAt: { lt: new Date(Math.max(...schedules.map((s) => s.scheduledEndAt.getTime()))) },
+      scheduledEndAt: { gt: new Date(Math.min(...schedules.map((s) => s.scheduledStartAt.getTime()))) },
+    },
+    select: { scheduledStartAt: true, scheduledEndAt: true },
+  });
+  schedules.forEach((schedule, index) => {
+    const rest = [...others, ...schedules.filter((_, i) => i !== index)];
+    if (peakOverlap(schedule, rest) < MAX_CONCURRENT_LESSONS) return;
+    const when = `${formatWeekdayDate(schedule.scheduledStartAt)}, ${formatTimeRange(schedule.scheduledStartAt, schedule.scheduledEndAt)}`;
+    throw new ApiError("CONFLICT", `Më ${when} ka tashmë ${MAX_CONCURRENT_LESSONS} mësime në të njëjtën kohë. Mund të zhvillohen deri në ${MAX_CONCURRENT_LESSONS} mësime njëkohësisht: zgjidhni një orë tjetër.`);
+  });
 }
 
 const clean = (value: string | null | undefined) => {
@@ -88,6 +119,7 @@ async function createLessons(input: LessonInput, schedules: LessonSchedule[], co
       : [],
   );
   const isDemo = input.isDemo ?? false;
+  if (!isDemo) await assertConcurrencyLimit(schedules);
 
   const lessons = await prisma.$transaction(async (tx) => {
     // Several dates are one series, so the admin can manage them together.
@@ -127,8 +159,11 @@ async function createLessons(input: LessonInput, schedules: LessonSchedule[], co
   return { id: lessons[0].id, seriesId: lessons[0].seriesId, enrolled: ids.length, count: lessons.length };
 }
 
-/** `notify: false` when the caller tells students itself (a whole series changing at once). */
-export async function updateLesson(lessonId: string, patch: LessonPatch, confirmEarlyDeadline: boolean, admin: AppUser, { notify = true } = {}) {
+/**
+ * `notify: false` when the caller tells students itself, `checkConcurrency: false` when it has
+ * checked the new times itself (both: a whole series changing at once).
+ */
+export async function updateLesson(lessonId: string, patch: LessonPatch, confirmEarlyDeadline: boolean, admin: AppUser, { notify = true, checkConcurrency = true } = {}) {
   const current = await prisma.lesson.findUnique({ where: { id: lessonId } });
   if (!current) throw new ApiError("NOT_FOUND", "Mësimi nuk u gjet.");
 
@@ -148,6 +183,12 @@ export async function updateLesson(lessonId: string, patch: LessonPatch, confirm
     assertDemoAllowed(patch.isDemo);
     if (patch.isDemo && current.meetingStatus === "NOT_PROVISIONED") meetingStatus = "SCHEDULED";
     if (!patch.isDemo && current.meetingStatus === "SCHEDULED") meetingStatus = "NOT_PROVISIONED";
+  }
+
+  const isDemo = patch.isDemo ?? current.isDemo;
+  const retimed = scheduleChanged(current, { scheduledStartAt: schedule.scheduledStartAt, scheduledEndAt: schedule.scheduledEndAt });
+  if (checkConcurrency && !isDemo && ACTIVE_PUBLICATIONS.includes(current.publication) && (retimed || current.isDemo)) {
+    await assertConcurrencyLimit([schedule], [lessonId]);
   }
 
   const changed = Object.keys(patch).filter((key) => {
@@ -211,11 +252,15 @@ const TRANSITIONS: Record<PublicationStatus, PublicationStatus[]> = {
 export async function setLessonPublication(lessonId: string, publication: PublicationStatus, admin: AppUser, { notify = true } = {}) {
   const lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
-    select: { publication: true, meetingStatus: true, scheduledEndAt: true, zoomMeetingNumber: true },
+    select: { publication: true, meetingStatus: true, isDemo: true, scheduledStartAt: true, scheduledEndAt: true, joinOpensAt: true, accessExpiresAt: true, zoomMeetingNumber: true },
   });
   if (!lesson) throw new ApiError("NOT_FOUND", "Mësimi nuk u gjet.");
   if (lesson.publication === publication) return { zoomDeleted: true };
   if (!TRANSITIONS[lesson.publication].includes(publication)) throw new ApiError("CONFLICT", "Ky ndryshim statusi nuk lejohet.");
+  // A cancelled or archived lesson brought back takes up its time again.
+  if (!lesson.isDemo && !ACTIVE_PUBLICATIONS.includes(lesson.publication) && ACTIVE_PUBLICATIONS.includes(publication)) {
+    await assertConcurrencyLimit([lesson], [lessonId]);
+  }
   if (effectiveMeetingStatus(lesson, new Date()) === "LIVE" && publication !== "PUBLISHED") {
     throw new ApiError("CONFLICT", "Përfundoni fillimisht mësimin live.");
   }
@@ -288,6 +333,23 @@ export async function deleteLessons(lessonIds: string[], admin: AppUser, now = n
   await publishFeedChanged(lessons.flatMap((l) => l.enrollments.map((e) => e.userId)));
   await notifyLessonsChanged("cancelled", expecting, { lessonsKept: false, now });
   return { count: lessons.length };
+}
+
+/**
+ * The lessons list's bulk delete: every lesson matching its filter, either only the drafts
+ * (published, cancelled and archived ones stay) or all of them. Lessons that are live or have a
+ * recording upload running are skipped instead of stopping the rest; the others go as in
+ * `deleteLessons` (students expecting one hear about it once).
+ */
+export async function deleteFilteredLessons(filter: Omit<LessonListFilter, "page">, scope: "drafts" | "all", admin: AppUser, now = new Date()) {
+  const where = lessonFilterWhere(filter, now);
+  const lessons = await prisma.lesson.findMany({
+    where: scope === "drafts" ? { AND: [where, { publication: "DRAFT" }] } : where,
+    select: { id: true, meetingStatus: true, scheduledEndAt: true, recordings: { where: { uploadId: { not: null } }, select: { id: true } } },
+  });
+  const deletable = lessons.filter((l) => effectiveMeetingStatus(l, now) !== "LIVE" && !l.recordings.length);
+  const { count } = deletable.length ? await deleteLessons(deletable.map((l) => l.id), admin, now) : { count: 0 };
+  return { count, skipped: lessons.length - deletable.length };
 }
 
 /**

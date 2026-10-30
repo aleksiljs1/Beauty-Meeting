@@ -6,7 +6,7 @@ import { academyDay, weekdayIndex } from "@/lib/datetime";
 import { toProfileInput, type StudentProfileInput } from "@/lib/student-profile";
 import { END_GRACE_MS, effectiveMeetingStatus } from "@/server/access/policy";
 import { prisma } from "@/server/db";
-import { env, ZOOM_LIVE_VARIABLES, zoomLive } from "@/server/env";
+import { env, ZOOM_LIVE_VARIABLES } from "@/server/env";
 import { ApiError } from "@/server/http";
 import { s3 } from "@/server/storage/storage";
 import { invitationStatus, rosterEntryState } from "./invitation-status";
@@ -47,7 +47,7 @@ const dashboardLessonSelect = {
 } as const;
 
 export type DashboardIssue = {
-  kind: "RECORDING_FAILED" | "RECORDING_STALLED" | "MATERIAL_FAILED" | "MATERIAL_STALLED" | "ZOOM_MEETING_MISSING";
+  kind: "RECORDING_FAILED" | "RECORDING_STALLED" | "MATERIAL_FAILED" | "MATERIAL_STALLED";
   id: string;
   /** Null for a library file no lesson uses yet (the issue links to the library instead). */
   lessonId: string | null;
@@ -65,7 +65,7 @@ const fileIssuePlace = (file: { lessons: { lesson: { id: string; title: string }
 
 export async function getAdminDashboard(now = new Date()) {
   const stale = new Date(now.getTime() - HOUR);
-  const [activeStudents, live, upcoming, upcomingCount, failedRecordings, stalledRecordings, failedMaterials, stalledMaterials, withoutMeeting] = await Promise.all([
+  const [activeStudents, live, upcoming, upcomingCount, failedRecordings, stalledRecordings, failedMaterials, stalledMaterials] = await Promise.all([
     prisma.user.count({ where: activeStudentWhere }),
     prisma.lesson.findMany({
       // Same rule as effectiveMeetingStatus: a LIVE lesson is over END_GRACE_MS after its scheduled end.
@@ -105,15 +105,6 @@ export async function getAdminDashboard(now = new Date()) {
       take: 20,
       select: { ...issueFileSelect, createdAt: true },
     }),
-    // Published, still ahead, and students can't join: no Zoom meeting yet (live mode only).
-    zoomLive
-      ? prisma.lesson.findMany({
-          where: { publication: "PUBLISHED", isDemo: false, zoomMeetingNumber: null, scheduledEndAt: { gt: now } },
-          orderBy: { scheduledStartAt: "asc" },
-          take: 20,
-          select: { id: true, title: true, scheduledStartAt: true },
-        })
-      : Promise.resolve([]),
   ]);
 
   const issues: DashboardIssue[] = [
@@ -121,7 +112,6 @@ export async function getAdminDashboard(now = new Date()) {
     ...stalledRecordings.map((r) => ({ kind: "RECORDING_STALLED" as const, id: r.id, lessonId: r.lessonId, lessonTitle: r.lesson.title, name: r.displayName, message: null, at: r.updatedAt })),
     ...failedMaterials.map((m) => ({ kind: "MATERIAL_FAILED" as const, id: m.id, ...fileIssuePlace(m), name: m.displayName, message: null, at: m.updatedAt })),
     ...stalledMaterials.map((m) => ({ kind: "MATERIAL_STALLED" as const, id: m.id, ...fileIssuePlace(m), name: m.displayName, message: null, at: m.createdAt })),
-    ...withoutMeeting.map((l) => ({ kind: "ZOOM_MEETING_MISSING" as const, id: l.id, lessonId: l.id, lessonTitle: l.title, name: null, message: null, at: l.scheduledStartAt })),
   ].sort((a, b) => b.at.getTime() - a.at.getTime());
 
   const toCard = ({ _count, ...lesson }: (typeof live)[number]) => ({ ...lesson, students: _count.enrollments });
@@ -259,12 +249,24 @@ export type SeriesEntry = {
 export type LessonListEntry = ({ kind: "lesson" } & LessonRow) | ({ kind: "series" } & SeriesEntry);
 
 /** Lessons for the admin list; the dates of a series count (and page) as one entry. */
-export async function listLessons(filter: LessonListFilter, now = new Date()): Promise<Paged<LessonListEntry>> {
-  const page = Math.max(1, filter.page ?? 1);
-  const where: Prisma.LessonWhereInput = {
+/** The lessons list's filter as a query condition (the list itself and its bulk delete). */
+export function lessonFilterWhere(filter: Omit<LessonListFilter, "page">, now: Date): Prisma.LessonWhereInput {
+  return {
     ...(filter.publication ? { publication: filter.publication } : {}),
     ...(filter.when === "upcoming" ? { scheduledEndAt: { gt: now } } : filter.when === "past" ? { scheduledEndAt: { lte: now } } : {}),
   };
+}
+
+/** How many lessons the bulk delete would take with this filter: only drafts, or all. */
+export async function countFilteredLessons(filter: Omit<LessonListFilter, "page">, now = new Date()) {
+  const where = lessonFilterWhere(filter, now);
+  const [drafts, all] = await Promise.all([prisma.lesson.count({ where: { AND: [where, { publication: "DRAFT" }] } }), prisma.lesson.count({ where })]);
+  return { drafts, all };
+}
+
+export async function listLessons(filter: LessonListFilter, now = new Date()): Promise<Paged<LessonListEntry>> {
+  const page = Math.max(1, filter.page ?? 1);
+  const where = lessonFilterWhere(filter, now);
   const conditions = [
     Prisma.sql`TRUE`,
     ...(filter.publication ? [Prisma.sql`"publication" = ${filter.publication}::"PublicationStatus"`] : []),

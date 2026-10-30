@@ -7,7 +7,7 @@ import { ApiError } from "@/server/http";
 import { audit } from "@/server/services/audit";
 import { requireZoomCredentials, toApiError, zoomRequest } from "./client";
 import { createMeetingSdkHostSignature } from "./meeting-sdk-signature";
-import { fetchZoomMeetingLinks, openPasscode } from "./meetings";
+import { createZoomMeetingForLesson, fetchZoomMeetingLinks, openPasscode } from "./meetings";
 
 /** ZAK lifetime requested from Zoom — only needed to start the meeting. */
 const ZAK_TTL_SECONDS = 300;
@@ -34,10 +34,14 @@ async function loadHostableLesson(lessonId: string, admin: AppUser, now: number)
   if (!lesson) throw new ApiError("NOT_FOUND", "Mësimi nuk u gjet.");
   if (lesson.isDemo) throw new ApiError("CONFLICT", "Kjo klasë është demonstrim dhe nuk përdor Zoom real.");
   if (lesson.publication !== "PUBLISHED") throw new ApiError("CONFLICT", "Publikoni mësimin para se të nisni klasën live.");
-  if (!lesson.zoomMeetingNumber) throw new ApiError("INTEGRATION_NOT_CONFIGURED", "Ky mësim nuk ka ende një takim Zoom.");
   // An ENDED meeting may be restarted (e.g. ended by mistake) until the scheduled end below.
   if (lesson.meetingStatus === "ERROR") throw new ApiError("CONFLICT", "Ky takim ka një gabim dhe nuk mund të niset.");
   if (now >= lesson.scheduledEndAt.getTime()) throw new ApiError("CONFLICT", "Orari i këtij mësimi ka përfunduar.");
+  if (!lesson.zoomMeetingNumber) {
+    // The meeting is made the first time the class is started: there's no separate "create" step.
+    await createZoomMeetingForLesson(lesson.id, admin);
+    return loadHostableLesson(lessonId, admin, now);
+  }
   return { ...lesson, zoomMeetingNumber: lesson.zoomMeetingNumber }; // keeps the narrowed (non-null) type
 }
 
