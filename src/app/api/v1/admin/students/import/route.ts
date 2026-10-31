@@ -5,13 +5,25 @@ import { prisma } from "@/server/db";
 import { createAccount, sendAccountSetupEmail } from "@/server/services/accounts";
 import { audit } from "@/server/services/audit";
 import { setStudentCourses } from "@/server/services/course-members";
-import { MAX_IMPORT_STUDENTS } from "@/app/api/v1/admin/students/csvparse";
+import { MAX_IMPORT_NOTE_LENGTH, MAX_IMPORT_STUDENTS } from "@/app/api/v1/admin/students/csvparse";
+import { studentProfileSchema } from "@/lib/student-profile";
+import { saveImportedStudentProfile } from "@/server/services/students";
+
+const nullableOptional = <T extends z.ZodType>(schema: T) => schema.nullable().optional();
+const importProfileSchema = z.object({
+  phone: nullableOptional(studentProfileSchema.shape.phone),
+  birthDate: nullableOptional(studentProfileSchema.shape.birthDate),
+  gender: nullableOptional(studentProfileSchema.shape.gender),
+  city: nullableOptional(studentProfileSchema.shape.city),
+  notes: nullableOptional(studentProfileSchema.shape.notes.max(MAX_IMPORT_NOTE_LENGTH, `Shënimet mund të kenë maksimumi ${MAX_IMPORT_NOTE_LENGTH} karaktere.`)),
+});
 
 const importSchema = z.object({
   students: z.array(z.object({
     emri: z.string().trim().min(2).max(100),
     email: z.email().trim().toLowerCase().max(200),
     abonimi: z.array(z.string().trim().min(1).max(200)).max(50),
+    profile: importProfileSchema.nullable().optional(),
   })).min(1).max(MAX_IMPORT_STUDENTS),
   addToUpcoming: z.boolean().default(true),
 });
@@ -45,6 +57,7 @@ export const POST = route(async (request) => {
   const results: { email: string; mailSent: boolean; lessonsAdded: number }[] = [];
   for (const row of input.students) {
     const student = await createAccount({ name: row.emri, email: row.email, role: "student" }, admin.id);
+    if (row.profile) await saveImportedStudentProfile(student.id, row.profile, admin);
     const courseIds = [...new Set(row.abonimi.map((name) => courseByName.get(normalizeCourseName(name))!.id))];
     const courseResult = courseIds.length
       ? await setStudentCourses(student.id, courseIds, admin, { addToUpcoming: input.addToUpcoming })

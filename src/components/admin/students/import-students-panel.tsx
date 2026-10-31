@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FileSpreadsheet, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -10,8 +10,38 @@ import { Input } from "@/components/ui/input";
 import { api, apiSend } from "@/lib/api/client";
 import { errorMessage } from "@/components/admin/use-api-action";
 
-type ImportRow = { emri: string; email: string; abonimi: string[] };
+type ImportRow = {
+  emri: string;
+  email: string;
+  abonimi: string[];
+  profile: { phone: string; birthDate: string; gender: string; city: string; notes: string };
+};
 type Course = { id: string; title: string };
+
+function MarqueeText({ text }: { text: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [overflows, setOverflows] = useState(false);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const measure = () => setOverflows(element.scrollWidth > element.clientWidth + 1);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [text]);
+
+  return (
+    <div ref={ref} className={`student-import-marquee${overflows ? " student-import-marquee--overflow" : ""}`} title={text}>
+      {overflows ? (
+        <div className="student-import-marquee__track"><span>{text}</span><span aria-hidden="true">{text}</span></div>
+      ) : (
+        <span className="student-import-marquee__text">{text}</span>
+      )}
+    </div>
+  );
+}
 
 function courseKey(value: string) {
   return value.trim().normalize("NFKC").toLowerCase();
@@ -89,12 +119,12 @@ export function ImportStudentsPanel({
   }
 
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        Ngarkoni .xlsx me kolonat <strong>Emrat</strong>, <strong>Email</strong> dhe <strong>Abonimet</strong>.
+    <div className="min-w-0 max-w-full space-y-4">
+      <p className="max-w-full break-words text-sm text-muted-foreground">
+        Ngarkoni .xlsx me kolonat <strong>Emrat</strong>, <strong>Email</strong> dhe <strong>Abonimet</strong>. Optional: Telefoni, Datelindja (DD/MM/YYYY), Gjinia, Qyteti, Shenime (max 100 chars).
         Ndani disa abonime me presje ose pikëpresje. Skedari lexohet vetëm në memorie.
       </p>
-      <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed p-4 text-sm hover:bg-muted/40">
+      <label className="flex w-full min-w-0 max-w-full cursor-pointer items-center gap-3 rounded-lg border border-dashed p-4 text-sm hover:bg-muted/40">
         <FileSpreadsheet aria-hidden className="size-5 shrink-0" />
         <span className="min-w-0 flex-1 truncate">{fileName || "Zgjidhni skedarin Excel (.xlsx)"}</span>
         <Upload aria-hidden className="size-4 shrink-0" />
@@ -116,17 +146,26 @@ export function ImportStudentsPanel({
 
       {students.length > 0 && (
         <>
-          <div className="max-h-64 overflow-auto rounded-lg border">
-            <table className="w-full text-left text-xs">
+          <div className="w-full min-w-0 max-w-full max-h-64 overflow-auto rounded-lg border">
+            <table className="student-import-table w-full min-w-[1160px] table-fixed text-left text-xs">
               <thead className="sticky top-0 bg-muted text-muted-foreground">
-                <tr><th className="p-2">Emrat</th><th className="p-2">Email</th><th className="p-2">Abonimet</th></tr>
+                <tr>
+                  <th className="p-2">Emrat</th><th className="p-2">Email</th><th className="p-2">Telefoni</th>
+                  <th className="p-2">Datëlindja</th><th className="p-2">Gjinia</th><th className="p-2">Qyteti</th>
+                  <th className="p-2">Shënime</th><th className="p-2">Abonimet</th>
+                </tr>
               </thead>
               <tbody>
                 {students.map((student, index) => (
                   <tr key={`${student.email}-${index}`} className="border-t align-top">
-                    <td className="p-2">{student.emri}</td>
-                    <td className="p-2">{student.email}</td>
-                    <td className="p-2">{student.abonimi.join(", ") || "—"}</td>
+                    <td className="p-2"><MarqueeText text={student.emri} /></td>
+                    <td className="p-2"><MarqueeText text={student.email} /></td>
+                    <td className="p-2"><MarqueeText text={student.profile.phone || "?"} /></td>
+                    <td className="p-2"><MarqueeText text={student.profile.birthDate || "?"} /></td>
+                    <td className="p-2"><MarqueeText text={student.profile.gender || "?"} /></td>
+                    <td className="p-2"><MarqueeText text={student.profile.city || "?"} /></td>
+                    <td className="p-2"><MarqueeText text={student.profile.notes || "?"} /></td>
+                    <td className="p-2"><MarqueeText text={student.abonimi.join(", ") || "?"} /></td>
                   </tr>
                 ))}
               </tbody>

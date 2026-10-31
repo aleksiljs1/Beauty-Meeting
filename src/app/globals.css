@@ -174,3 +174,32 @@
     background-size: 100% 1px;
   }
 }
+
+/* Keep the student-import preview inside its scroll container; long values can be read on hover. */
+.student-import-table th:nth-child(1),
+.student-import-table td:nth-child(1) { width: 10rem; }
+.student-import-table th:nth-child(2),
+.student-import-table td:nth-child(2) { width: 14rem; }
+.student-import-table th:nth-child(3),
+.student-import-table td:nth-child(3) { width: 10rem; }
+.student-import-table th:nth-child(4),
+.student-import-table td:nth-child(4) { width: 8rem; }
+.student-import-table th:nth-child(5),
+.student-import-table td:nth-child(5) { width: 6rem; }
+.student-import-table th:nth-child(6),
+.student-import-table td:nth-child(6) { width: 10rem; }
+.student-import-table th:nth-child(7),
+.student-import-table td:nth-child(7) { width: 18rem; }
+.student-import-table th:nth-child(8),
+.student-import-table td:nth-child(8) { width: 14rem; }
+.student-import-table th,
+.student-import-table td { box-sizing: border-box; }
+.student-import-table td { min-width: 0; overflow: hidden; white-space: nowrap; }
+.student-import-marquee { display: block; width: 100%; max-width: 100%; min-width: 0; overflow: hidden; white-space: nowrap; }
+.student-import-marquee__text { display: inline-block; width: max-content; }
+.student-import-marquee__track { display: inline-flex; width: max-content; gap: 2rem; }
+.student-import-marquee--overflow .student-import-marquee__track { width: max-content; }
+.student-import-marquee--overflow:hover .student-import-marquee__track { animation: student-import-marquee 9s linear infinite; }
+@keyframes student-import-marquee {
+  to { transform: translateX(-50%); }
+}

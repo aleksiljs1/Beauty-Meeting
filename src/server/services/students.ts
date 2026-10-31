@@ -38,6 +38,25 @@ export async function saveStudentProfile(userId: string, input: StudentProfileIn
   await audit(admin.id, "account.profile", "user", userId);
 }
 
+/** Applies only supplied import fields; null, omitted, and blank values are ignored. */
+export async function saveImportedStudentProfile(
+  userId: string,
+  input: Partial<{ phone: string | null; birthDate: string | null; gender: StudentProfileInput["gender"] | null; city: string | null; notes: string | null }>,
+  admin: AppUser,
+) {
+  const data: { phone?: string; birthDate?: Date; gender?: Exclude<StudentProfileInput["gender"], "">; city?: string; notes?: string } = {};
+  if (input.phone?.trim()) data.phone = input.phone.trim();
+  if (input.birthDate?.trim()) data.birthDate = toDbDate(input.birthDate.trim());
+  if (input.gender) data.gender = input.gender;
+  if (input.city?.trim()) data.city = input.city.trim();
+  if (input.notes?.trim()) data.notes = input.notes.trim();
+  if (Object.keys(data).length === 0) return;
+
+  await findStudent(userId);
+  await prisma.studentProfile.upsert({ where: { userId }, create: { userId, ...data }, update: data });
+  await audit(admin.id, "account.profile", "user", userId);
+}
+
 /** Corrects a student's email, invalidates old credentials/setup links, and sends a fresh setup link. */
 export async function updateStudentEmail(userId: string, email: string, admin: AppUser) {
   const student = await findStudent(userId);
