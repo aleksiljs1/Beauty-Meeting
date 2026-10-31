@@ -555,6 +555,10 @@ export const admin = {
     moveUp: "Lëviz lart",
     moveDown: "Lëviz poshtë",
     open: "Shiko",
+    previewDescription: "Pamja hapet ketu ne faqe. Per Word dhe PowerPoint, shkarkojeni skedarin per ta pare.",
+    previewUnsupported: "Ky format dokumenti nuk mund te shfaqet direkt ne shfletues.",
+    previewExpired: "Pamja skadoi. Mbylleni dhe hapeni perseri.",
+    download: "Shkarko",
     deleteTitle: "Të fshihet materiali?",
     deleteBody: (name: string, lessons: number) =>
       `“${name}” do të fshihet përgjithmonë nga biblioteka${lessons ? ` dhe nga ${lessons === 1 ? "1 mësim" : `${lessons} mësime`} që e përdorin` : ""}.`,

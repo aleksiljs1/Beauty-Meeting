@@ -1,17 +1,18 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
-import { ExternalLink, FileText, Film, Pencil } from "lucide-react";
+import { useCallback, useState, type ReactNode } from "react";
+import { Download, Eye, FileText, Film, Loader2, Pencil } from "lucide-react";
 import { FormField } from "@/components/admin/form-field";
 import { formatBytes } from "@/components/admin/uploads";
-import { useApiAction } from "@/components/admin/use-api-action";
+import { errorMessage, useApiAction } from "@/components/admin/use-api-action";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { apiSend } from "@/lib/api/client";
 import { admin } from "@/i18n/admin";
 import { common } from "@/i18n/common";
+import { ProtectedVideo, type VideoGrant } from "@/components/portal/protected-video";
 
 /** Pieces shared by a lesson's material list and the materials library. */
 
@@ -39,24 +40,96 @@ export function FileSummary({ file, extra }: { file: FileInfo; extra?: ReactNode
   );
 }
 
-/** "Shiko": opens a short-lived preview of a ready file in a new tab. */
+type FileGrant = VideoGrant;
+
+function previewKind(mimeType: string): "pdf" | "image" | "video" | null {
+  if (mimeType === "application/pdf") return "pdf";
+  if (mimeType.startsWith("image/")) return "image";
+  if (mimeType === "video/mp4") return "video";
+  return null;
+}
+
+function AdminMaterialVideo({ file, grant }: { file: FileInfo; grant: FileGrant }) {
+  const requestGrant = useCallback(
+    () => apiSend<FileGrant>("post", `/admin/library/${file.fileId}/access`, { mode: "view" }),
+    [file.fileId],
+  );
+  return <ProtectedVideo requestGrant={requestGrant} initialGrant={grant} visible label={file.displayName} expiredMessage={t.previewExpired} />;
+}
+
+/** "Shiko": previews browser-supported materials in a dialog without leaving the page. */
 export function OpenFileButton({ file }: { file: FileInfo }) {
-  const { run, pending } = useApiAction();
+  const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [grant, setGrant] = useState<FileGrant | null>(null);
+  const [error, setError] = useState<string | null>(null);
   if (file.status !== "READY") return null;
 
-  async function open() {
-    // Open the tab synchronously (popup blockers), then point it at the short-lived URL.
-    const tab = window.open("about:blank", "_blank");
-    if (tab) tab.opener = null;
-    const grant = await run(() => apiSend<{ url: string }>("post", `/admin/library/${file.fileId}/access`), { refresh: false });
-    if (grant && tab) tab.location.href = grant.url;
-    else tab?.close();
+  async function openPreview() {
+    setOpen(true);
+    setGrant(null);
+    setError(null);
+    setPending(true);
+    try {
+      setGrant(await apiSend<FileGrant>("post", `/admin/library/${file.fileId}/access`, { mode: "view" }));
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function downloadFile() {
+    setDownloading(true);
+    setError(null);
+    try {
+      const grant = await apiSend<FileGrant>("post", `/admin/library/${file.fileId}/access`, { mode: "download" });
+      window.location.assign(grant.url);
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setDownloading(false);
+    }
   }
 
   return (
-    <Button variant="ghost" size="sm" onClick={open} disabled={pending}>
-      <ExternalLink aria-hidden /> {t.open}
-    </Button>
+    <>
+      <Button variant="ghost" size="sm" onClick={() => void openPreview()} disabled={pending}>
+        {pending ? <Loader2 aria-hidden className="animate-spin" /> : <Eye aria-hidden />} {t.open}
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="w-full min-w-0 sm:max-w-5xl">
+          <DialogHeader className="min-w-0 pr-8">
+            <DialogTitle className="truncate">{file.displayName}</DialogTitle>
+            <DialogDescription>{t.previewDescription}</DialogDescription>
+          </DialogHeader>
+          {pending ? <div className="flex min-h-48 items-center justify-center"><Loader2 aria-label={common.actions.loading} className="size-8 animate-spin" /></div> : null}
+          {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+          {grant && previewKind(file.mimeType) === "video" ? <AdminMaterialVideo file={file} grant={grant} /> : null}
+          {grant && previewKind(file.mimeType) === "image" ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={grant.url} alt={file.displayName} className="max-h-[70vh] w-full rounded-md border bg-muted object-contain" />
+          ) : null}
+          {grant && previewKind(file.mimeType) === "pdf" ? (
+            <iframe src={grant.url} title={file.displayName} className="h-[70vh] min-h-96 w-full rounded-md border bg-muted" />
+          ) : null}
+          {grant && !previewKind(file.mimeType) ? (
+            <div className="grid justify-items-center gap-3 rounded-md border bg-muted/30 p-8 text-center">
+              <p className="text-sm text-muted-foreground">{t.previewUnsupported}</p>
+            </div>
+          ) : null}
+          {grant ? (
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => void downloadFile()} disabled={downloading}>
+                {downloading ? <Loader2 aria-hidden className="animate-spin" /> : <Download aria-hidden />}
+                {t.download}
+              </Button>
+            </DialogFooter>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

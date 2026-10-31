@@ -86,10 +86,10 @@ export async function grantMaterialAccess(user: AppUser, lessonId: string, mater
 }
 
 /** Admin preview of a library file, whether or not any lesson uses it. */
-export async function previewFile(fileId: string) {
+export async function previewFile(fileId: string, mode: "view" | "download" = "view") {
   const file = await prisma.materialFile.findFirst({ where: { id: fileId, status: "READY" } });
   if (!file) throw new ApiError("NOT_FOUND", "Materiali nuk u gjet.");
-  const inline = isInlineSafe("material", file.mimeType);
+  const inline = mode === "view" && isInlineSafe("material", file.mimeType);
   const ttl = inline && isVideo(file.mimeType) ? PLAYBACK_URL_TTL_SECONDS : READ_URL_MAX_TTL_SECONDS;
   const url = await presignGet({ key: file.objectKey, expiresIn: ttl, maxTtlSeconds: ttl, contentType: file.mimeType, filename: file.displayName, disposition: inline ? "inline" : "attachment" });
   return { url, expiresInSeconds: ttl };
