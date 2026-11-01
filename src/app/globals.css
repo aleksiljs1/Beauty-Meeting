@@ -89,6 +89,13 @@
   body {
     @apply bg-background text-foreground;
     text-rendering: optimizeLegibility;
+    /* A long unbroken string (a pasted link, "aaaa…") wraps instead of pushing the page wider than
+       the screen, also inside flex and grid items. */
+    overflow-wrap: anywhere;
+  }
+  /* Tables keep whole words: their columns size to the text and scroll inside their wrapper. */
+  table {
+    overflow-wrap: break-word;
   }
   h1,
   h2,
