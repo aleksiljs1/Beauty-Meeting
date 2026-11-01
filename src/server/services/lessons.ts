@@ -345,9 +345,11 @@ export async function deleteFilteredLessons(filter: Omit<LessonListFilter, "page
   const where = lessonFilterWhere(filter, now);
   const lessons = await prisma.lesson.findMany({
     where: scope === "drafts" ? { AND: [where, { publication: "DRAFT" }] } : where,
-    select: { id: true, meetingStatus: true, scheduledEndAt: true, recordings: { where: { uploadId: { not: null } }, select: { id: true } } },
+    // Recordings (finished or still uploading) are too valuable to lose in a bulk action: such
+    // lessons are skipped and can only be deleted one by one.
+    select: { id: true, meetingStatus: true, scheduledEndAt: true, _count: { select: { recordings: true } } },
   });
-  const deletable = lessons.filter((l) => effectiveMeetingStatus(l, now) !== "LIVE" && !l.recordings.length);
+  const deletable = lessons.filter((l) => effectiveMeetingStatus(l, now) !== "LIVE" && !l._count.recordings);
   const { count } = deletable.length ? await deleteLessons(deletable.map((l) => l.id), admin, now) : { count: 0 };
   return { count, skipped: lessons.length - deletable.length };
 }

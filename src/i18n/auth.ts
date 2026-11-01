@@ -22,6 +22,7 @@ export const authText = {
   },
   failures: {
     INVALID_CREDENTIALS: "Email-i ose fjalëkalimi nuk është i saktë.",
+    DEACTIVATED: "Llogaria juaj është çaktivizuar. Kontaktoni akademinë për ta riaktivizuar.",
     RATE_LIMITED: "Shumë përpjekje. Prisni pak minuta dhe provoni përsëri.",
     NETWORK: "Nuk ka lidhje me serverin. Kontrolloni internetin.",
     UNKNOWN: "Ndodhi një gabim. Provoni përsëri.",

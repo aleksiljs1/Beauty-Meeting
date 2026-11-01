@@ -8,12 +8,14 @@ import { notifySignedOut } from "./auth-events";
  * protected by Better Auth's Origin checks; the browser sends the Origin header itself.
  */
 
-export type AuthFailure = "INVALID_CREDENTIALS" | "RATE_LIMITED" | "NETWORK" | "UNKNOWN";
+export type AuthFailure = "INVALID_CREDENTIALS" | "DEACTIVATED" | "RATE_LIMITED" | "NETWORK" | "UNKNOWN";
 
 function toFailure(error: unknown): AuthFailure {
   if (!axios.isAxiosError(error)) return "UNKNOWN";
   if (!error.response) return "NETWORK";
   if (error.response.status === 429) return "RATE_LIMITED";
+  // Only sent once the password was right, so it reveals nothing about which emails exist.
+  if ((error.response.data as { code?: string } | undefined)?.code === "BANNED_USER") return "DEACTIVATED";
   if (error.response.status === 401 || error.response.status === 403) return "INVALID_CREDENTIALS";
   return "UNKNOWN";
 }

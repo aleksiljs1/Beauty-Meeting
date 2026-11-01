@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Download, FileSpreadsheet, Upload } from "lucide-react";
+import { Download, FileSpreadsheet, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -63,6 +63,7 @@ export function ImportStudentsPanel({
   const [addToUpcoming, setAddToUpcoming] = useState(true);
   const [previewing, setPreviewing] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState("");
   const courseMap = useMemo(() => new Map(courses.map((course) => [courseKey(course.title), course])), [courses]);
 
@@ -96,6 +97,24 @@ export function ImportStudentsPanel({
     }
   }
 
+  /** Through the API client: the route needs the Bearer token, which a plain link wouldn't send. */
+  async function downloadTemplate() {
+    setDownloading(true);
+    try {
+      const response = await api.get<Blob>("/admin/students/import/template", { responseType: "blob" });
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "studentet-shablloni.xlsx";
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   async function importStudents() {
     setError("");
     setImporting(true);
@@ -126,10 +145,8 @@ export function ImportStudentsPanel({
         Ngarkoni .xlsx me kolonat <strong>Emrat</strong>, <strong>Email</strong> dhe <strong>Abonimet</strong>. Optional: Telefoni, Datelindja (DD/MM/YYYY), Gjinia, Qyteti, Shenime (max 100 chars).
         Ndani disa abonime me presje ose pikëpresje. Skedari lexohet vetëm në memorie.
       </p>
-      <Button asChild variant="outline" size="sm">
-        <a href="/api/v1/admin/students/import/template" download>
-          <Download aria-hidden /> Shkarko shabllonin Excel
-        </a>
+      <Button type="button" variant="outline" size="sm" onClick={() => void downloadTemplate()} disabled={downloading}>
+        {downloading ? <Loader2 aria-hidden className="animate-spin" /> : <Download aria-hidden />} Shkarko shabllonin Excel
       </Button>
       <label className="flex w-full min-w-0 max-w-full cursor-pointer items-center gap-3 rounded-lg border border-dashed p-4 text-sm hover:bg-muted/40">
         <FileSpreadsheet aria-hidden className="size-5 shrink-0" />

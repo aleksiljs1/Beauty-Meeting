@@ -118,8 +118,12 @@ export function checkCapability(access: LessonAccess, capability: Capability, le
   if (meeting === "ENDED") {
     return { allowed: false, code: "LESSON_JOIN_NOT_OPEN", message: "Mësimi live ka përfunduar." };
   }
-  if (meeting === "NOT_PROVISIONED" || meeting === "ERROR") {
+  if (meeting === "ERROR") {
     return { allowed: false, code: "LESSON_JOIN_NOT_OPEN", message: "Klasa live nuk është gati ende." };
+  }
+  // The Zoom meeting is created when the teacher starts the class: until then there is nothing to join.
+  if (meeting === "NOT_PROVISIONED") {
+    return { allowed: false, code: "LESSON_JOIN_NOT_OPEN", message: "Mësuesja nuk e ka nisur ende klasën. Faqja përditësohet vetë kur të fillojë." };
   }
   // The join window only applies before the host starts: once the class is LIVE (the teacher may
   // start early), enrolled students can join straight away. Access deadlines still apply above.

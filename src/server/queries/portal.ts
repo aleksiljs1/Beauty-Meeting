@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import type { Prisma } from "@/generated/prisma/client";
 import { requireLessonCapability } from "@/server/access/lesson-access";
 import { checkCapability, effectiveMeetingStatus, evaluateLessonAccess, lessonPhase, type LessonAccess, type LessonPhase } from "@/server/access/policy";
 import type { AppUser } from "@/server/auth/session";
@@ -50,28 +51,38 @@ export type StudentLessonCard = {
 
 const deadlineOf = (access: LessonAccess) => (access.status === "admin" ? null : access.deadline);
 
-/** All lessons the student is enrolled in that they may still see as a card (one query). */
+const cardSelect = (user: AppUser) =>
+  ({
+    id: true,
+    title: true,
+    summary: true,
+    publication: true,
+    meetingStatus: true,
+    scheduledStartAt: true,
+    scheduledEndAt: true,
+    joinOpensAt: true,
+    accessExpiresAt: true,
+    isDemo: true,
+    course: { select: { title: true } },
+    enrollments: { where: { userId: user.id }, select: { accessExpiresAt: true, revokedAt: true }, take: 1 },
+    _count: { select: { recordings: { where: { status: "READY" } } } },
+  }) satisfies Prisma.LessonSelect;
+
+const MAX_CURRENT_CARDS = 200;
+const MAX_PAST_CARDS = 100;
+
+/**
+ * The lessons the student is enrolled in that they may still see as a card: live first, then
+ * upcoming soonest first, then past ones newest first. The limits apply to each group, so a long
+ * history never pushes upcoming lessons out of the list.
+ */
 export async function listStudentLessons(user: AppUser, now = new Date()): Promise<StudentLessonCard[]> {
-  const rows = await prisma.lesson.findMany({
-    where: { enrollments: { some: { userId: user.id } } },
-    orderBy: { scheduledStartAt: "asc" },
-    take: 200,
-    select: {
-      id: true,
-      title: true,
-      summary: true,
-      publication: true,
-      meetingStatus: true,
-      scheduledStartAt: true,
-      scheduledEndAt: true,
-      joinOpensAt: true,
-      accessExpiresAt: true,
-      isDemo: true,
-      course: { select: { title: true } },
-      enrollments: { where: { userId: user.id }, select: { accessExpiresAt: true, revokedAt: true }, take: 1 },
-      _count: { select: { recordings: { where: { status: "READY" } } } },
-    },
-  });
+  const enrolled = { enrollments: { some: { userId: user.id } } };
+  const [current, past] = await Promise.all([
+    prisma.lesson.findMany({ where: { ...enrolled, scheduledEndAt: { gte: now } }, orderBy: { scheduledStartAt: "asc" }, take: MAX_CURRENT_CARDS, select: cardSelect(user) }),
+    prisma.lesson.findMany({ where: { ...enrolled, scheduledEndAt: { lt: now } }, orderBy: { scheduledStartAt: "desc" }, take: MAX_PAST_CARDS, select: cardSelect(user) }),
+  ]);
+  const rows = [...current, ...past];
 
   const cards: StudentLessonCard[] = [];
   for (const row of rows) {
@@ -93,7 +104,8 @@ export async function listStudentLessons(user: AppUser, now = new Date()): Promi
       isDemo: row.isDemo,
     });
   }
-  return cards;
+  // A class still running past its scheduled end sits in the past group: bring it to the top.
+  return cards.sort((a, b) => Number(b.phase === "LIVE") - Number(a.phase === "LIVE"));
 }
 
 export type LessonFilter = "all" | "upcoming" | "live" | "replay" | "expired";
@@ -171,7 +183,9 @@ export async function getClassroom(user: AppUser, rawLessonId: string, now = new
   let stage: StageState;
   if (meeting === "LIVE") stage = "LIVE";
   else if (meeting === "ENDED") stage = "ENDED";
-  else if (meeting === "NOT_PROVISIONED" || meeting === "ERROR") stage = "NOT_READY";
+  // A real lesson's Zoom meeting is created when the teacher first starts it, so "not provisioned"
+  // is the normal wait — unless Zoom isn't set up at all (demo mode) and the class can never start.
+  else if (meeting === "ERROR" || (meeting === "NOT_PROVISIONED" && !zoomLive && !base.isDemo)) stage = "NOT_READY";
   else stage = now.getTime() < base.joinOpensAt.getTime() ? "NOT_OPEN" : "WAITING";
 
   const [materials, recordings] = hasAccess && !history ? await Promise.all([listMaterials(user, lessonId), listRecordings(user, lessonId)]) : [[], []];

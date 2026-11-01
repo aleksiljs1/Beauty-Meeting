@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 import { prisma } from "@/server/db";
 import { ApiError } from "@/server/http";
+import { REQUEST_PATH_HEADER, safeNextPath } from "@/lib/safe-next";
 import { readBearerToken, verifyAccessToken } from "./access-token";
 import { auth } from "./auth";
 import type { Role } from "./roles";
@@ -41,7 +42,11 @@ export const getPageUser = cache(async (): Promise<AppUser | null> => {
 /** For protected pages: redirects to login when signed out, and away when the role is wrong. */
 export async function requirePageUser(role?: Role): Promise<AppUser> {
   const user = await getPageUser();
-  if (!user) redirect("/hyr");
+  if (!user) {
+    // A cookie without a live session (signed out elsewhere, password reset): back here after login.
+    const next = safeNextPath((await headers()).get(REQUEST_PATH_HEADER));
+    redirect(next ? `/hyr?next=${encodeURIComponent(next)}` : "/hyr");
+  }
   if (role && user.role !== role) redirect(user.role === "admin" ? "/admin" : "/portal");
   return user;
 }

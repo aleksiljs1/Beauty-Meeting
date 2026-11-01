@@ -400,3 +400,23 @@ completed on branch `zoom-integration` (2026-10-22): see "Review fixes" below.
   next minute until the lesson starts. Turning it on, or lengthening the time, sends at once for lessons already
   inside the window.
 - Migration `20261101120000_admin_lesson_reminders` — run `npx prisma migrate deploy` after pulling.
+
+## Review fixes (2026-11-01)
+
+From a full read-only review (student journey, admin workflows, structure, security):
+- **Students before the teacher starts**: a real lesson has no Zoom meeting until the host's first start, and that
+  is now the normal wait (countdown, then "the lesson hasn't started yet, this page updates itself"). "Klasa nuk
+  është gati" is only for a Zoom error, or demo mode where a real class can never start.
+- **Personal deadline** saved equal to the lesson's deadline is stored as none, so it follows the lesson.
+- **Pagesat** keeps students taken off a course when they have payments ("Jo më në kurs"), never chased for debt.
+- **Login**: a deactivated account is told so (only after a correct password); a page asked for with an expired
+  session (e.g. `?bashkohu=1` from the email) is kept through login (`x-academy-path` header from the proxy).
+- **Student lesson list**: live first, upcoming soonest first, past newest first (limits per group).
+- **Video** isn't reloaded every few minutes while playing (renewed when paused or on error); **PDFs** open in a
+  new tab on phones; the material viewer scrolls into view; the **Zoom class** fills the phone screen (bottom
+  bar hidden while in class), full screen only where supported; Zoom errors in plain Albanian.
+- **Bulk delete** never deletes lessons with recordings, and "all" asks to type the number of lessons.
+- **Dashboard** warns about drafts starting within 48 hours. Reminders skip demo lessons.
+- **Security hardening**: Better Auth `/update-user`, `/change-email`, `/delete-user` disabled (names/emails are
+  admin-managed; a student could rename themselves "Mësuesja" in Zoom); the reset email is sent without waiting
+  (no timing hint about which emails exist); SMTP requires TLS with a login and has timeouts; logs mask addresses.

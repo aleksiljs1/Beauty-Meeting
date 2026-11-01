@@ -31,7 +31,7 @@ export type ZoomCredentials = { accountId: string; clientId: string; clientSecre
 export function requireZoomCredentials(): ZoomCredentials {
   const { ZOOM_S2S_ACCOUNT_ID, ZOOM_S2S_CLIENT_ID, ZOOM_S2S_CLIENT_SECRET, ZOOM_HOST_USER_ID } = env;
   if (!zoomLive || !ZOOM_S2S_ACCOUNT_ID || !ZOOM_S2S_CLIENT_ID || !ZOOM_S2S_CLIENT_SECRET || !ZOOM_HOST_USER_ID) {
-    throw new ApiError("INTEGRATION_NOT_CONFIGURED", "Zoom nuk është aktivizuar (ZOOM_MODE=demo ose mungon konfigurimi).");
+    throw new ApiError("INTEGRATION_NOT_CONFIGURED", "Zoom nuk është lidhur ende me llogarinë e akademisë. Kontaktoni zhvilluesin e faqes.");
   }
   return { accountId: ZOOM_S2S_ACCOUNT_ID, clientId: ZOOM_S2S_CLIENT_ID, clientSecret: ZOOM_S2S_CLIENT_SECRET, hostUserId: ZOOM_HOST_USER_ID };
 }

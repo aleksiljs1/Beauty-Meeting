@@ -41,3 +41,6 @@ export function postLoginDestination(role: "admin" | "student", next: unknown): 
   if (path === "/hyr" || path.startsWith("/hyr?") || path.startsWith("/fjalekalimi")) return home;
   return path;
 }
+
+/** Request header the proxy sets to the page being asked for (path + query), for login redirects. */
+export const REQUEST_PATH_HEADER = "x-academy-path";

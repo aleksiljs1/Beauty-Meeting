@@ -12,6 +12,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { common } from "@/i18n/common";
 
 /**
@@ -27,6 +29,7 @@ export function ConfirmAction({
   onConfirm,
   open: controlledOpen,
   onOpenChange,
+  typeToConfirm,
 }: {
   /** Omit when the dialog is opened from elsewhere (e.g. a dropdown item) via `open`. */
   trigger?: ReactNode;
@@ -37,11 +40,15 @@ export function ConfirmAction({
   onConfirm: () => Promise<unknown>;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** For the most destructive actions: the confirm button stays off until this is typed. */
+  typeToConfirm?: { text: string; label: string };
 }) {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const open = controlledOpen ?? uncontrolledOpen;
   const setOpen = onOpenChange ?? setUncontrolledOpen;
   const [busy, setBusy] = useState(false);
+  const [typed, setTyped] = useState("");
+  const typedOk = !typeToConfirm || typed.trim() === typeToConfirm.text;
 
   async function confirm() {
     setBusy(true);
@@ -54,16 +61,29 @@ export function ConfirmAction({
   }
 
   return (
-    <AlertDialog open={open} onOpenChange={(next) => !busy && setOpen(next)}>
+    <AlertDialog
+      open={open}
+      onOpenChange={(next) => {
+        if (busy) return;
+        setTyped("");
+        setOpen(next);
+      }}
+    >
       {trigger && <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>}
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
+        {typeToConfirm && (
+          <div className="grid gap-1.5">
+            <Label htmlFor="confirm-typed">{typeToConfirm.label}</Label>
+            <Input id="confirm-typed" autoComplete="off" inputMode="numeric" value={typed} onChange={(event) => setTyped(event.target.value)} disabled={busy} />
+          </div>
+        )}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>{common.actions.cancel}</AlertDialogCancel>
-          <Button variant={destructive ? "destructive" : "default"} onClick={confirm} disabled={busy} aria-busy={busy}>
+          <Button variant={destructive ? "destructive" : "default"} onClick={confirm} disabled={busy || !typedOk} aria-busy={busy}>
             {busy ? common.actions.loading : confirmLabel}
           </Button>
         </AlertDialogFooter>

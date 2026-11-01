@@ -15,6 +15,8 @@ export type PaymentAccount = {
   name: string;
   email: string;
   active: boolean;
+  /** False when the student was taken off the course but has payments for it: still listed, never chased. */
+  member: boolean;
   firstMonth: number;
   durationMonths: number;
   monthlyPriceCents: number | null;
@@ -32,11 +34,17 @@ export async function listPaymentAccounts(filter: { courseId?: string } = {}, no
   });
   const billed = courses.filter((c) => c.startsOn && c.durationMonths);
   const courseIds = billed.map((c) => c.id);
-  const [members, starts, sums] = await Promise.all([
+  const [members, paying, starts, sums] = await Promise.all([
     prisma.courseMember.findMany({
       where: { courseId: { in: courseIds }, user: { role: "student" } },
       orderBy: { user: { name: "asc" } },
       take: MAX_ACCOUNTS,
+      select: { courseId: true, user: { select: { id: true, name: true, email: true, banned: true } } },
+    }),
+    // Everyone with a payment for the course, so a student taken off it doesn't take their payments along.
+    prisma.payment.findMany({
+      where: { courseId: { in: courseIds } },
+      distinct: ["courseId", "userId"],
       select: { courseId: true, user: { select: { id: true, name: true, email: true, banned: true } } },
     }),
     prisma.billingStart.findMany({ where: { courseId: { in: courseIds } }, select: { courseId: true, userId: true, firstMonth: true } }),
@@ -50,7 +58,10 @@ export async function listPaymentAccounts(filter: { courseId?: string } = {}, no
   const courseById = new Map(billed.map((c) => [c.id, c]));
   const paid = new Map(sums.map((s) => [`${s.courseId}:${s.userId}`, s._sum]));
   const firstMonths = new Map(starts.map((s) => [`${s.courseId}:${s.userId}`, s.firstMonth]));
-  const accounts: PaymentAccount[] = members.map(({ courseId, user }) => {
+  const memberKeys = new Set(members.map((m) => `${m.courseId}:${m.user.id}`));
+  const former = paying.filter((p) => !memberKeys.has(`${p.courseId}:${p.user.id}`)).map((p) => ({ ...p, member: false }));
+  const rows = [...members.map((m) => ({ ...m, member: true })), ...former];
+  const accounts: PaymentAccount[] = rows.map(({ courseId, user, member }) => {
     const course = courseById.get(courseId)!;
     const firstMonth = firstMonths.get(`${courseId}:${user.id}`) ?? 1;
     const billing = { startsOn: fromDbDate(course.startsOn!), durationMonths: course.durationMonths!, monthlyPriceCents: course.monthlyPriceCents };
@@ -63,6 +74,7 @@ export async function listPaymentAccounts(filter: { courseId?: string } = {}, no
       name: user.name,
       email: user.email,
       active: !user.banned,
+      member,
       firstMonth,
       durationMonths: billing.durationMonths,
       monthlyPriceCents: billing.monthlyPriceCents,
@@ -82,7 +94,7 @@ export async function listPaymentAccounts(filter: { courseId?: string } = {}, no
 
 /** For the dashboard: active students who owe money now or soon. */
 export async function getPaymentAlerts(now = new Date()) {
-  const active = (await listPaymentAccounts({}, now)).accounts.filter((a) => a.active);
+  const active = (await listPaymentAccounts({}, now)).accounts.filter((a) => a.active && a.member);
   const overdue = active.filter((a) => a.status === "OVERDUE");
   return {
     overdue: overdue.length,

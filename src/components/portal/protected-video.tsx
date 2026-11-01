@@ -15,10 +15,13 @@ type Status = "idle" | "loading" | "ready" | "error" | "expired";
 const MAX_ERROR_RENEWALS = 3;
 
 /**
- * Plays a private video from a short-lived grant (recordings and video materials). The grant
- * is renewed shortly before it expires and whenever the media request fails; the position and
- * play state are restored. Once the access deadline passes, renewal is refused and the player
- * stops. `initialGrant` skips the "Luaj" placeholder when the caller already fetched one.
+ * Plays a private video from a short-lived grant (recordings and video materials). A playing video
+ * streams over a request that was authorized when it started, so the grant is never swapped while
+ * it plays (that would restart the stream): it is renewed once it goes stale while the video is
+ * paused or not started, and whenever a media request fails (an expired grant on a seek or a
+ * dropped connection), restoring the position and play state. Once the access deadline passes,
+ * renewal is refused and the player stops. `initialGrant` skips the "Luaj" placeholder when the
+ * caller already fetched one.
  */
 export function ProtectedVideo({
   requestGrant,
@@ -41,12 +44,21 @@ export function ProtectedVideo({
   const resume = useRef<{ time: number; playing: boolean } | null>(initialGrant ? { time: 0, playing: true } : null);
   const renewTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const errorRenewals = useRef(0);
+  /** The current grant is about to expire: renew at the next pause rather than mid-play. */
+  const stale = useRef(false);
   const loadRef = useRef<(preserve: boolean) => Promise<void>>(async () => undefined);
   const requestRef = useRef(requestGrant);
 
   useEffect(() => {
     requestRef.current = requestGrant;
   }, [requestGrant]);
+
+  /** Renews now when nothing is playing, otherwise when the viewer next pauses. */
+  const markStale = () => {
+    stale.current = true;
+    const video = videoRef.current;
+    if (!video || video.paused || video.ended) void loadRef.current(true);
+  };
 
   const load = useCallback(
     async (preserve: boolean) => {
@@ -60,9 +72,10 @@ export function ProtectedVideo({
       if (!preserve) setStatus("loading");
       try {
         const grant = await requestRef.current();
+        stale.current = false;
         setSrc(grant.url);
         setStatus("ready");
-        renewTimer.current = setTimeout(() => void loadRef.current(true), grantRenewDelayMs(grant.expiresInSeconds));
+        renewTimer.current = setTimeout(markStale, grantRenewDelayMs(grant.expiresInSeconds));
       } catch (error) {
         const code = error instanceof ApiClientError ? error.code : null;
         if (code === "LESSON_ACCESS_EXPIRED" || code === "LESSON_NOT_AVAILABLE" || code === "NOT_FOUND") {
@@ -84,7 +97,7 @@ export function ProtectedVideo({
 
   // A grant handed in by the caller is renewed on the same schedule as one fetched here.
   useEffect(() => {
-    if (initialGrant) renewTimer.current = setTimeout(() => void loadRef.current(true), grantRenewDelayMs(initialGrant.expiresInSeconds));
+    if (initialGrant) renewTimer.current = setTimeout(markStale, grantRenewDelayMs(initialGrant.expiresInSeconds));
     return () => clearTimeout(renewTimer.current);
     // Only the grant present at mount; later grants are scheduled by `load`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -102,6 +115,10 @@ export function ProtectedVideo({
     resume.current = null;
     video.currentTime = state.time;
     if (state.playing) void video.play().catch(() => undefined);
+  };
+
+  const onPause = () => {
+    if (stale.current) void load(true);
   };
 
   const onError = () => {
@@ -136,6 +153,7 @@ export function ProtectedVideo({
             onPlaying={() => {
               errorRenewals.current = 0;
             }}
+            onPause={onPause}
             onError={onError}
           >
             {t.videoUnsupported}

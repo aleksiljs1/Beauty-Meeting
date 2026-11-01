@@ -43,9 +43,10 @@ export default async function PaymentsPage({ searchParams }: PageProps<"/admin/p
   const courseId = courses.find((c) => c.id === one(params.kursi))?.id;
   const status = STATUSES.find((s) => s === one(params.gjendja));
   const { accounts, unbilledCourses } = await listPaymentAccounts({ courseId });
-  // Deactivated students (usually dropouts) aren't chased for money: they stay listed under "all",
-  // with what they paid, but count toward neither the debt nor the status filters.
-  const active = accounts.filter((a) => a.active);
+  // Deactivated students and students taken off the course (usually dropouts) aren't chased for
+  // money: they stay listed under "all", with what they paid, but count toward neither the debt nor
+  // the status filters.
+  const active = accounts.filter((a) => a.active && a.member);
   const shown = status ? active.filter((a) => a.status === status) : accounts;
   const sum = (list: typeof accounts, pick: (a: (typeof accounts)[number]) => number | null) => list.reduce((total, a) => total + (pick(a) ?? 0), 0);
 
@@ -125,6 +126,7 @@ export default async function PaymentsPage({ searchParams }: PageProps<"/admin/p
                 <span className="flex flex-wrap items-center gap-2 font-medium">
                   {a.name}
                   {!a.active && <Badge variant="destructive">{t.inactive}</Badge>}
+                  {a.active && !a.member && <Badge variant="outline">{t.leftCourse}</Badge>}
                 </span>
                 <span className="col-start-1 text-sm md:col-start-auto">
                   {a.courseTitle}

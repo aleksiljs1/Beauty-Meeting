@@ -46,6 +46,7 @@ export async function sendDueLessonReminders(now = new Date()): Promise<number> 
     const lessons = await prisma.lesson.findMany({
       where: {
         publication: "PUBLISHED",
+        isDemo: false,
         meetingStatus: { notIn: ["LIVE", "ENDED"] },
         scheduledStartAt: { gt: now, lte: new Date(now.getTime() + lessonReminderMinutes * MINUTE) },
       },

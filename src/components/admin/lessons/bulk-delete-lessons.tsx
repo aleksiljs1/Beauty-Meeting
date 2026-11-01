@@ -67,6 +67,7 @@ export function BulkDeleteLessons({
         description={confirm === "all" ? t.allBody(counts.all) : t.draftsBody(counts.drafts)}
         confirmLabel={common.actions.delete}
         destructive
+        typeToConfirm={confirm === "all" ? { text: String(counts.all), label: t.typeCount(counts.all) } : undefined}
         onConfirm={() => remove(confirm!)}
       />
     </>

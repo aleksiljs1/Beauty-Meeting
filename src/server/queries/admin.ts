@@ -47,7 +47,7 @@ const dashboardLessonSelect = {
 } as const;
 
 export type DashboardIssue = {
-  kind: "RECORDING_FAILED" | "RECORDING_STALLED" | "MATERIAL_FAILED" | "MATERIAL_STALLED";
+  kind: "RECORDING_FAILED" | "RECORDING_STALLED" | "MATERIAL_FAILED" | "MATERIAL_STALLED" | "DRAFT_STARTING";
   id: string;
   /** Null for a library file no lesson uses yet (the issue links to the library instead). */
   lessonId: string | null;
@@ -63,9 +63,12 @@ const fileIssuePlace = (file: { lessons: { lesson: { id: string; title: string }
   lessonTitle: file.lessons[0]?.lesson.title ?? null,
 });
 
+/** Drafts starting within this time are flagged on the dashboard. */
+const DRAFT_WARNING_MS = 48 * HOUR;
+
 export async function getAdminDashboard(now = new Date()) {
   const stale = new Date(now.getTime() - HOUR);
-  const [activeStudents, live, upcoming, upcomingCount, failedRecordings, stalledRecordings, failedMaterials, stalledMaterials] = await Promise.all([
+  const [activeStudents, live, upcoming, upcomingCount, failedRecordings, stalledRecordings, failedMaterials, stalledMaterials, draftsSoon] = await Promise.all([
     prisma.user.count({ where: activeStudentWhere }),
     prisma.lesson.findMany({
       // Same rule as effectiveMeetingStatus: a LIVE lesson is over END_GRACE_MS after its scheduled end.
@@ -105,6 +108,13 @@ export async function getAdminDashboard(now = new Date()) {
       take: 20,
       select: { ...issueFileSelect, createdAt: true },
     }),
+    // New lessons start as drafts: one about to start that nobody published is invisible to students.
+    prisma.lesson.findMany({
+      where: { publication: "DRAFT", scheduledStartAt: { gt: now, lte: new Date(now.getTime() + DRAFT_WARNING_MS) } },
+      orderBy: { scheduledStartAt: "asc" },
+      take: 20,
+      select: { id: true, title: true, scheduledStartAt: true },
+    }),
   ]);
 
   const issues: DashboardIssue[] = [
@@ -112,6 +122,7 @@ export async function getAdminDashboard(now = new Date()) {
     ...stalledRecordings.map((r) => ({ kind: "RECORDING_STALLED" as const, id: r.id, lessonId: r.lessonId, lessonTitle: r.lesson.title, name: r.displayName, message: null, at: r.updatedAt })),
     ...failedMaterials.map((m) => ({ kind: "MATERIAL_FAILED" as const, id: m.id, ...fileIssuePlace(m), name: m.displayName, message: null, at: m.updatedAt })),
     ...stalledMaterials.map((m) => ({ kind: "MATERIAL_STALLED" as const, id: m.id, ...fileIssuePlace(m), name: m.displayName, message: null, at: m.createdAt })),
+    ...draftsSoon.map((l) => ({ kind: "DRAFT_STARTING" as const, id: l.id, lessonId: l.id, lessonTitle: l.title, name: null, message: null, at: l.scheduledStartAt })),
   ].sort((a, b) => b.at.getTime() - a.at.getTime());
 
   const toCard = ({ _count, ...lesson }: (typeof live)[number]) => ({ ...lesson, students: _count.enrollments });

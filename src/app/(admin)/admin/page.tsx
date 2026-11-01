@@ -19,12 +19,14 @@ const ISSUE_LABEL: Record<DashboardIssue["kind"], string> = {
   RECORDING_STALLED: t.stalledRecording,
   MATERIAL_FAILED: t.failedMaterial,
   MATERIAL_STALLED: t.stalledMaterial,
+  DRAFT_STARTING: t.draftStarting,
 };
 const ISSUE_TAB: Record<DashboardIssue["kind"], string> = {
   RECORDING_FAILED: "regjistrimet",
   RECORDING_STALLED: "regjistrimet",
   MATERIAL_FAILED: "materialet",
   MATERIAL_STALLED: "materialet",
+  DRAFT_STARTING: "detaje",
 };
 
 function Stat({ label, value }: { label: string; value: number }) {

@@ -111,7 +111,7 @@ export const portalText = {
   demo: {
     label: "Klasa demo — pa lidhje me Zoom",
     title: "Skenë shembull e klasës",
-    body: "Kjo është një klasë demonstruese. Nuk ka lidhje me Zoom, nuk ka video dhe nuk ka pjesëmarrës të tjerë. Në versionin përfundimtar, klasa live do të shfaqet pikërisht këtu, pa dalë nga faqja.",
+    body: "Kjo është një klasë demonstruese. Nuk ka lidhje me Zoom, nuk ka video dhe nuk ka pjesëmarrës të tjerë. Klasat e vërteta live shfaqen pikërisht këtu, pa dalë nga faqja.",
     hint: "Ndërkohë mund të hapni materialet në panelin anësor — klasa mbetet e hapur.",
     noCamera: "Kamera dhe mikrofoni nuk përdoren.",
   },

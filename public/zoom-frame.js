@@ -4,9 +4,9 @@
   // Zoom's own error code/message (no secrets in it), shown so a failed join can be diagnosed.
   const zoomReason = (failure) => {
     const code = failure?.errorCode ?? failure?.result?.errorCode;
-    const text = failure?.errorMessage ?? failure?.reason ?? failure?.result?.errorMessage;
+    // Zoom's own wording stays in the console; the person sees plain text and, for support, the code.
     console.error("[zoom-frame] Zoom error", failure);
-    return code || text ? ` (Zoom: ${[code, text].filter(Boolean).join(" – ")})` : "";
+    return code ? ` (kodi ${code})` : "";
   };
 
   const VERSION = "6.5.0";
@@ -43,7 +43,7 @@
   const zoom = window.ZoomMtg;
 
   if (!zoom) {
-    showError("SDK i Zoom nuk u ngarkua. Kontrolloni lidhjen dhe CSP.");
+    showError("Zoom nuk u ngarkua. Kontrolloni internetin dhe provoni përsëri, ose hapeni klasën në aplikacionin Zoom.");
     return;
   }
 
@@ -63,7 +63,7 @@
     const config = event.data.payload;
 
     if (!config || typeof config !== "object") {
-      showError("Konfigurimi i klasës është i pavlefshëm.");
+      showError("Klasa nuk u hap dot. Rifreskoni faqen dhe provoni përsëri.");
       return;
     }
 
@@ -90,7 +90,7 @@
       (password != null && typeof password !== "string") ||
       (isHost && (typeof zak !== "string" || !zak))
     ) {
-      showError("Të dhënat e autorizimit të klasës janë të pavlefshme.");
+      showError("Klasa nuk u hap dot. Rifreskoni faqen dhe provoni përsëri.");
       return;
     }
 
@@ -103,7 +103,7 @@
       zoom.preLoadWasm();
       zoom.prepareWebSDK();
     } catch {
-      showError("Përgatitja e Zoom SDK dështoi.");
+      showError("Zoom nuk u hap dot në këtë shfletues. Provoni përsëri, ose hapeni klasën në aplikacionin Zoom.");
       joinStarted = false;
       return;
     }
@@ -136,19 +136,19 @@
                 joinStarted = false;
                 return;
               }
-              showError(`Zoom nuk mundi të të fusë në takim. Kontrolloni autorizimin dhe konfigurimin.${zoomReason(failure)}`);
+              showError(`Zoom nuk ju futi dot në klasë. Provoni përsëri pas pak, ose hapeni klasën në aplikacionin Zoom.${zoomReason(failure)}`);
               joinStarted = false;
             },
           });
         },
 
         error: (failure) => {
-          showError(`Inicializimi i Zoom dështoi.${zoomReason(failure)}`);
+          showError(`Zoom nuk u hap dot. Provoni përsëri, ose hapeni klasën në aplikacionin Zoom.${zoomReason(failure)}`);
           joinStarted = false;
         },
       });
     } catch {
-      showError("Ndodhi një gabim gjatë nisjes së Zoom.");
+      showError("Ndodhi një gabim gjatë hapjes së Zoom. Provoni përsëri, ose hapeni klasën në aplikacionin Zoom.");
       joinStarted = false;
     }
   });

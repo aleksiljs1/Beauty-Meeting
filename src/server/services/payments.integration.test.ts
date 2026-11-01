@@ -43,6 +43,18 @@ describe("course payments", () => {
     expect(await getPaymentAlerts(feb)).toEqual({ overdue: 1, dueSoon: 0, amountOwedCents: 8000 });
   });
 
+  it("keeps a student taken off the course listed with their payments, without chasing them", async () => {
+    const { id: courseId } = await course();
+    const student = await createUser("student");
+    await setStudentCourses(student.id, [courseId], admin, { now: new Date("2026-10-20T10:00:00Z") });
+    await pay(courseId, student.id, 1);
+    await setStudentCourses(student.id, [], admin);
+
+    const feb = new Date("2027-02-03T10:00:00Z");
+    expect(await account(student.id, feb)).toMatchObject({ member: false, amountPaidCents: 4000, monthsPaid: 1 });
+    expect(await getPaymentAlerts(feb)).toEqual({ overdue: 0, dueSoon: 0, amountOwedCents: 0 });
+  });
+
   it("never records more months than the course has left", async () => {
     const { id: courseId } = await course();
     const student = await createUser("student");

@@ -33,7 +33,10 @@ export function ReminderSettingsForm({ initial, accountEmail }: { initial: Remin
   const valid = Number.isFinite(minutes) && minutes > 0;
 
   async function save() {
-    const parsed = reminderSettingsSchema.safeParse({ enabled, minutes, email: email.trim() });
+    // Switched off, the greyed-out fields can't block saving: an unusable value keeps the saved one.
+    const usable = <K extends "minutes" | "email">(key: K, value: ReminderSettings[K]) =>
+      enabled || reminderSettingsSchema.shape[key].safeParse(value).success ? value : initial[key];
+    const parsed = reminderSettingsSchema.safeParse({ enabled, minutes: usable("minutes", minutes), email: usable("email", email.trim()) });
     if (!parsed.success) {
       const issue = (path: string) => parsed.error.issues.find((i) => i.path[0] === path)?.message;
       return setErrors({ minutes: issue("minutes"), email: issue("email") });

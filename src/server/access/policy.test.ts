@@ -131,6 +131,14 @@ describe("checkCapability", () => {
       });
     }
   });
+
+  it("says the teacher hasn't started when the meeting isn't created yet (it is created on first start)", () => {
+    const l = lesson({ meetingStatus: "NOT_PROVISIONED" });
+    expect(checkCapability(evaluateLessonAccess(student, l, enrolled(), now), "JOIN_LIVE", l, now)).toMatchObject({
+      allowed: false,
+      message: expect.stringContaining("nuk e ka nisur"),
+    });
+  });
 });
 
 describe("effectiveMeetingStatus (a lost Zoom event never leaves a lesson stuck)", () => {

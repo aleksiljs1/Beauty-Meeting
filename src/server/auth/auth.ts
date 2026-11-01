@@ -29,8 +29,12 @@ export const auth = betterAuth({
     maxPasswordLength: 128,
     resetPasswordTokenExpiresIn: 60 * 60,
     revokeSessionsOnPasswordReset: true,
+    // Not awaited: the reply must take as long for an unknown email as for a real account, or
+    // the wait would tell who has one. The server is long-running, so the send still completes.
     sendResetPassword: async ({ user, url }) => {
-      await sendMail(passwordResetEmail({ to: user.email, name: user.name, url }));
+      void sendMail(passwordResetEmail({ to: user.email, name: user.name, url })).catch((error) =>
+        console.error("[mail] password reset email failed", user.id, error),
+      );
     },
   },
 
@@ -70,6 +74,10 @@ export const auth = betterAuth({
       trustedProxies: env.TRUSTED_PROXIES,
     },
   },
+
+  // Names and emails are managed by the admin (our own API, audited). Self-service would let a
+  // student rename themselves, e.g. "Mësuesja", which is the name shown in the Zoom class.
+  disabledPaths: ["/update-user", "/change-email", "/delete-user"],
 
   // Account-level throttle on top of the IP limits (see email-throttle.ts).
   hooks: {

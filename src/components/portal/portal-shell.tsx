@@ -51,7 +51,6 @@ function initials(name: string) {
  */
 function useSessionBootstrap() {
   const router = useRouter();
-  const pathname = usePathname();
 
   useEffect(() => {
     let cancelled = false;
@@ -63,7 +62,7 @@ function useSessionBootstrap() {
           refreshLiveFeed();
         } else {
           clearSessionHint();
-          router.replace(`/hyr?next=${encodeURIComponent(pathname)}`);
+          router.replace(`/hyr?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
         }
       })
       .catch(() => undefined); // offline: keep the page; requests will retry
@@ -79,7 +78,7 @@ function useSessionBootstrap() {
       onSignedOut((reason) => {
         clearSessionHint();
         if (reason === "expired") toast.info(t.sessionExpired);
-        router.replace(reason === "expired" ? `/hyr?next=${encodeURIComponent(window.location.pathname)}` : "/hyr");
+        router.replace(reason === "expired" ? `/hyr?next=${encodeURIComponent(window.location.pathname + window.location.search)}` : "/hyr");
         router.refresh();
       }),
     [router],
@@ -184,7 +183,7 @@ export function PortalShell({ user, academyName, children }: { user: { name: str
 
       <nav
         aria-label={t.mobileNavLabel}
-        className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm in-class:hidden md:hidden"
       >
         <ul className="mx-auto grid max-w-md grid-cols-4">
           {[...NAV, { href: "/portal/profili", label: t.nav.profile, icon: User, exact: false }].map((item) => {

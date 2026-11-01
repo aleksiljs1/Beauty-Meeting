@@ -133,6 +133,15 @@ describe("bulk delete from the lessons list", () => {
     expect(await deleteFilteredLessons({ when: "upcoming" }, "all", admin)).toEqual({ count: 1, skipped: 0 });
     expect(await prisma.lesson.count()).toBe(1); // the past one stays
   });
+
+  it("never deletes a lesson with recordings in bulk", async () => {
+    const past = await createLesson({ title: "Me regjistrim", ...schedule(-2 * DAY) }, false, admin);
+    await prisma.recording.create({ data: { lessonId: past.id, source: "UPLOAD", status: "READY", displayName: "Klasa.mp4" } });
+    await createLesson({ title: "Pa regjistrim", ...schedule(-2 * DAY) }, false, admin);
+
+    expect(await deleteFilteredLessons({}, "all", admin)).toEqual({ count: 1, skipped: 1 });
+    expect(await prisma.lesson.findMany({ select: { id: true } })).toEqual([{ id: past.id }]);
+  });
 });
 
 describe("repeating lessons", () => {
@@ -180,6 +189,10 @@ describe("enrolment administration", () => {
     await expect(requireLessonCapability(student, lesson.id, "VIEW_CONTENT")).rejects.toThrow();
     await setEnrollmentDeadline(id, null, admin);
     await expect(requireLessonCapability(student, lesson.id, "VIEW_CONTENT")).resolves.toBeTruthy();
+
+    // Saving the lesson's own deadline unchanged sets no personal one: the student keeps following the lesson.
+    await setEnrollmentDeadline(id, lesson.accessExpiresAt, admin);
+    expect((await prisma.lessonEnrollment.findUniqueOrThrow({ where: { id } })).accessExpiresAt).toBeNull();
 
     const actions = (await prisma.auditLog.findMany({ where: { targetId: lesson.id }, select: { action: true } })).map((a) => a.action);
     expect(actions).toEqual(

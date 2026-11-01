@@ -15,7 +15,7 @@ export const zoomText = {
     finished: "Takimi ka një gabim dhe nuk mund të niset nga kjo faqe.",
     ended: "Mësimi ka përfunduar. Mund ta rinisni deri në fund të orarit të tij.",
     restart: "Rinis klasën",
-    notLive: "Zoom nuk është aktivizuar (ZOOM_MODE=demo). Takimet reale krijohen vetëm në modalitetin live.",
+    notLive: "Zoom nuk është lidhur ende me llogarinë e akademisë, ndaj takimet e vërteta nuk mund të krijohen. Kontaktoni zhvilluesin e faqes.",
     start: "Nis klasën live",
     rejoin: "Rihyr si host",
     connecting: "Po lidhemi me Zoom…",

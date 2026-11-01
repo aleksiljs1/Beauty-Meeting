@@ -87,6 +87,9 @@ export async function restoreEnrollment(enrollmentId: string, admin: AppUser) {
 export async function setEnrollmentDeadline(enrollmentId: string, deadline: Date | null, admin: AppUser) {
   const enrollment = await findEnrollment(enrollmentId);
   assertDeadlineShortens(deadline, enrollment.lesson.accessExpiresAt);
+  // The lesson's own deadline, saved unchanged, is no personal deadline: store none, so the student
+  // keeps following the lesson if its deadline is moved later.
+  if (deadline?.getTime() === enrollment.lesson.accessExpiresAt.getTime()) deadline = null;
   await prisma.lessonEnrollment.update({ where: { id: enrollmentId }, data: { accessExpiresAt: deadline } });
   await audit(admin.id, deadline ? "enrollment.deadline_set" : "enrollment.deadline_clear", "lesson", enrollment.lessonId, {
     enrollmentId,

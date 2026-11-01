@@ -205,6 +205,18 @@ function ClassroomStageImpl(props: StageProps) {
   const zoom = useZoomFrame(portalText.states.errorBody);
   const startZoom = zoom.start;
   const autoJoinTried = useRef(false);
+  const classRef = useRef<HTMLDivElement>(null);
+
+  // Joining: bring the class into view and, on a phone, hide the bottom bar that would cover
+  // Zoom's own controls (portal-shell hides it while the root carries data-in-class).
+  useEffect(() => {
+    if (!zoom.open) return;
+    classRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.documentElement.dataset.inClass = "";
+    return () => {
+      delete document.documentElement.dataset.inClass;
+    };
+  }, [zoom.open]);
 
   const requestJoin = useCallback(async () => {
     setJoin({ kind: "joining" });
@@ -268,8 +280,14 @@ function ClassroomStageImpl(props: StageProps) {
     content = <DemoStage lessonTitle={props.lessonTitle} onLeave={() => setJoin({ kind: "idle" })} />;
   } else if (zoom.open) {
     content = (
-      <div className="flex min-h-[22rem] flex-1 flex-col bg-black lg:min-h-[32rem]">
-        <ZoomFrame frameRef={zoom.frameRef} frameKey={zoom.frameKey} title={zoomText.admin.frameTitle} className="h-[65vh] min-h-[28rem] flex-1" />
+      <div ref={classRef} className="flex min-h-[22rem] flex-1 scroll-mt-16 flex-col bg-black lg:min-h-[32rem]">
+        {/* On a phone the class takes the screen below the header (the bottom bar hides meanwhile). */}
+        <ZoomFrame
+          frameRef={zoom.frameRef}
+          frameKey={zoom.frameKey}
+          title={zoomText.admin.frameTitle}
+          className="h-[calc(100dvh-7.5rem)] min-h-[24rem] flex-1 md:h-[65vh] md:min-h-[28rem]"
+        />
         <div className="flex justify-end p-2">
           <ZoomFullscreenButton frameRef={zoom.frameRef} className="border-white/30 bg-transparent text-white hover:bg-white/10" />
         </div>

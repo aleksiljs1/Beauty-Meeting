@@ -1,7 +1,7 @@
 "use client";
 
 import { Download, Eye, FileText, Film, Image as ImageIcon, Loader2, Presentation, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { portalText } from "@/i18n/portal";
@@ -26,6 +26,12 @@ function iconFor(mime: string) {
   if (mime.includes("presentation")) return Presentation;
   return FileText;
 }
+
+/**
+ * Phones and tablets: their browsers don't show a PDF inside the page (Android shows nothing), so
+ * there a PDF opens in a new tab, in the phone's own PDF viewer.
+ */
+const pdfOpensInTab = () => window.matchMedia("(max-width: 767px), (pointer: coarse)").matches;
 
 function viewerKind(mime: string): Viewer["kind"] | null {
   if (mime === "application/pdf") return "pdf";
@@ -57,6 +63,7 @@ export function MaterialsPanel({
 }) {
   const [opened, setViewer] = useState<Viewer | null>(null);
   const [pending, setPending] = useState<string | null>(null);
+  const viewerRef = useRef<HTMLDivElement>(null);
   // A material the admin removed (the list refreshes live) closes for the student too.
   const viewer = opened && materials.some((m) => m.id === opened.id) ? opened : null;
   const lostViewer = !!opened && !viewer;
@@ -80,6 +87,20 @@ export function MaterialsPanel({
   const open = async (material: MaterialItem) => {
     const kind = viewerKind(material.mimeType);
     if (!kind) return;
+    if (kind === "pdf" && pdfOpensInTab()) {
+      // Opened before the request, while the tap still counts, or the browser blocks the pop-up.
+      const tab = window.open("", "_blank");
+      const granted = await grant(material, "view");
+      if (!tab) {
+        if (granted) window.location.assign(granted.url);
+        return;
+      }
+      if (granted) {
+        tab.opener = null;
+        tab.location.href = granted.url;
+      } else tab.close();
+      return;
+    }
     const granted = await grant(material, "view");
     if (!granted) return;
     setViewer({ id: material.id, name: material.displayName, kind, grant: granted });
@@ -97,12 +118,20 @@ export function MaterialsPanel({
     if (granted) window.location.assign(granted.url);
   };
 
+  // The viewer opens above the list: bring it into view (on a phone it is otherwise off-screen).
+  const viewerId = viewer?.id;
+  useEffect(() => {
+    if (!viewerId) return;
+    viewerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    viewerRef.current?.focus({ preventScroll: true });
+  }, [viewerId]);
+
   if (!materials.length) return <EmptyState icon={FileText} title={t.empty} />;
 
   return (
     <div className="grid gap-4">
       {viewer ? (
-        <div className="grid gap-2">
+        <div ref={viewerRef} tabIndex={-1} className="grid scroll-mt-28 gap-2 outline-none">
           <div className="flex items-center justify-between gap-2">
             <p className="min-w-0 truncate text-sm font-medium">{viewer.name}</p>
             <Button variant="ghost" size="icon-sm" aria-label={t.closeViewer} onClick={close}>

@@ -1,7 +1,7 @@
 "use client";
 
 import { Maximize } from "lucide-react";
-import type { RefObject } from "react";
+import { useSyncExternalStore, type RefObject } from "react";
 import { Button } from "@/components/ui/button";
 import { zoomText } from "@/i18n/zoom";
 import { cn } from "@/lib/utils";
@@ -32,11 +32,16 @@ export function ZoomFrame({
   );
 }
 
+const noSubscription = () => () => undefined;
+
 /**
  * Puts the whole meeting frame in browser full screen. Zoom's own full-screen control is not
  * reliable inside an embedded frame; Esc (or the browser's own control) leaves full screen.
  */
 export function ZoomFullscreenButton({ frameRef, className }: { frameRef: RefObject<HTMLIFrameElement | null>; className?: string }) {
+  // iPhone Safari has no full screen for page elements: the button would silently do nothing.
+  const supported = useSyncExternalStore(noSubscription, () => document.fullscreenEnabled, () => false);
+  if (!supported) return null;
   return (
     <Button
       type="button"
