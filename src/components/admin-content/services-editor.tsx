@@ -5,9 +5,11 @@ import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { InfoTip } from "@/components/info-tip";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { adminContent } from "@/i18n/admin-content";
+import { fieldInfo } from "@/i18n/field-info";
 import { common } from "@/i18n/common";
 import { apiSend } from "@/lib/api/client";
 import { serviceSchema, type ServiceInput } from "@/lib/content-schemas";
@@ -45,23 +47,26 @@ function ServiceForm({ item, onSaved, onCancel }: ItemFormProps<AdminService>) {
 
   return (
     <form onSubmit={onSubmit} noValidate className="grid gap-5">
-      <Field id="service-title" label={t.titleLabel} error={err.title?.message}>
+      <Field id="service-title" label={t.titleLabel} info={fieldInfo.service.title} error={err.title?.message}>
         {(aria) => <Input autoFocus {...aria} {...register("title")} />}
       </Field>
-      <Field id="service-description" label={t.description} error={err.description?.message}>
+      <Field id="service-description" label={t.description} info={fieldInfo.service.description} error={err.description?.message}>
         {(aria) => <Textarea rows={4} {...aria} {...register("description")} />}
       </Field>
-      <Field id="service-price" label={t.priceText} hint={t.priceHint} error={err.priceText?.message}>
+      <Field id="service-price" label={t.priceText} hint={t.priceHint} info={fieldInfo.service.priceText} error={err.priceText?.message}>
         {(aria) => <Input {...aria} {...register("priceText")} />}
       </Field>
       <Controller
         control={control}
         name="isPublished"
         render={({ field }) => (
-          <label className="flex items-center gap-3 text-sm">
-            <Switch checked={field.value} onCheckedChange={field.onChange} />
-            {t.isPublished}
-          </label>
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-3 text-sm">
+              <Switch checked={field.value} onCheckedChange={field.onChange} />
+              {t.isPublished}
+            </label>
+            <InfoTip label={t.isPublished}>{fieldInfo.toggles.servicePublic}</InfoTip>
+          </div>
         )}
       />
       <div className="flex flex-wrap items-center gap-3 border-t pt-5">

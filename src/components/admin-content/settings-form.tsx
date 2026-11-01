@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { adminContent } from "@/i18n/admin-content";
+import { fieldInfo } from "@/i18n/field-info";
 import { common } from "@/i18n/common";
 import { apiSend } from "@/lib/api/client";
 import { settingsSchema, type SettingsInput } from "@/lib/content-schemas";
@@ -35,7 +36,7 @@ export function SettingsForm({ initial }: { initial: SettingsInput }) {
   });
 
   const text = (name: Exclude<keyof SettingsInput, "openingHours">, label: string, hint?: string, type = "text") => (
-    <Field id={`settings-${name}`} label={label} hint={hint} error={err[name]?.message}>
+    <Field id={`settings-${name}`} label={label} hint={hint} info={fieldInfo.settings[name]} error={err[name]?.message}>
       {(aria) => <Input type={type} {...aria} {...register(name)} />}
     </Field>
   );
@@ -45,7 +46,7 @@ export function SettingsForm({ initial }: { initial: SettingsInput }) {
       <fieldset className="grid gap-5">
         {text("name", t.name)}
         {text("tagline", t.tagline, t.taglineHint)}
-        <Field id="settings-about" label={t.about} hint={t.aboutHint} error={err.about?.message}>
+        <Field id="settings-about" label={t.about} hint={t.aboutHint} info={fieldInfo.settings.about} error={err.about?.message}>
           {(aria) => <Textarea rows={8} {...aria} {...register("about")} />}
         </Field>
       </fieldset>
@@ -74,10 +75,10 @@ export function SettingsForm({ initial }: { initial: SettingsInput }) {
         {hours.fields.length === 0 && <p className="text-sm text-muted-foreground">{t.noHours}</p>}
         {hours.fields.map((row, index) => (
           <div key={row.id} className="grid items-end gap-3 rounded-md border p-4 sm:grid-cols-[1fr_1fr_auto] sm:border-0 sm:p-0">
-            <Field id={`hours-${index}-days`} label={t.hoursDays} error={err.openingHours?.[index]?.days?.message}>
+            <Field id={`hours-${index}-days`} label={t.hoursDays} info={fieldInfo.settings.hoursDays} error={err.openingHours?.[index]?.days?.message}>
               {(aria) => <Input placeholder={t.hoursDaysPlaceholder} {...aria} {...register(`openingHours.${index}.days`)} />}
             </Field>
-            <Field id={`hours-${index}-hours`} label={t.hoursHours} error={err.openingHours?.[index]?.hours?.message}>
+            <Field id={`hours-${index}-hours`} label={t.hoursHours} info={fieldInfo.settings.hoursHours} error={err.openingHours?.[index]?.hours?.message}>
               {(aria) => <Input placeholder={t.hoursHoursPlaceholder} {...aria} {...register(`openingHours.${index}.hours`)} />}
             </Field>
             <Button type="button" variant="ghost" size="icon-lg" onClick={() => hours.remove(index)} aria-label={`${t.removeHoursRow} ${index + 1}`}>

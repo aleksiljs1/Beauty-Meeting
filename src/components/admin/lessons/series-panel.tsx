@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { apiSend } from "@/lib/api/client";
 import { toZonedInputValue } from "@/lib/datetime";
 import { admin } from "@/i18n/admin";
+import { fieldInfo } from "@/i18n/field-info";
 import { common } from "@/i18n/common";
 
 const t = admin.series;
@@ -64,16 +65,16 @@ export function SeriesEditForm({ seriesId, next, courses }: { seriesId: string; 
 
   return (
     <form onSubmit={save} className="grid gap-4">
-      <FormField label={f.title}>
+      <FormField label={f.title} info={fieldInfo.lesson.title}>
         <Input value={values.title} onChange={(e) => set("title")(e.target.value)} required minLength={2} maxLength={200} />
       </FormField>
-      <FormField label={f.summary} hint={f.summaryHint}>
+      <FormField label={f.summary} hint={f.summaryHint} info={fieldInfo.lesson.summary}>
         <Textarea value={values.summary} onChange={(e) => set("summary")(e.target.value)} rows={2} maxLength={1_000} />
       </FormField>
-      <FormField label={f.details} hint={f.detailsHint}>
+      <FormField label={f.details} hint={f.detailsHint} info={fieldInfo.lesson.details}>
         <Textarea value={values.details} onChange={(e) => set("details")(e.target.value)} rows={4} maxLength={20_000} />
       </FormField>
-      <FormField label={f.course}>
+      <FormField label={f.course} info={fieldInfo.lesson.course}>
         <Select value={values.courseId} onValueChange={set("courseId")}>
           <SelectTrigger className="w-full">
             <SelectValue />
@@ -95,10 +96,10 @@ export function SeriesEditForm({ seriesId, next, courses }: { seriesId: string; 
         </label>
         {changeTime && (
           <div className="grid gap-4 sm:grid-cols-2">
-            <FormField label={t.startTime}>
+            <FormField label={t.startTime} info={fieldInfo.series.startTime}>
               <TimeInput value={values.start} onChange={set("start")} required />
             </FormField>
-            <FormField label={t.duration}>
+            <FormField label={t.duration} info={fieldInfo.series.duration}>
               <Input type="number" min={15} max={720} step={5} value={values.duration} onChange={(e) => set("duration")(e.target.value)} required />
             </FormField>
           </div>

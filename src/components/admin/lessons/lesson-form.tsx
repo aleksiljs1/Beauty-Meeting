@@ -43,6 +43,7 @@ import { academyDay, ACADEMY_TIMEZONE_LABEL, addMonths, formatDate, fromZonedInp
 import { cn } from "@/lib/utils";
 import { admin } from "@/i18n/admin";
 import { common } from "@/i18n/common";
+import { fieldInfo } from "@/i18n/field-info";
 
 const t = admin.lessonForm;
 const NO_COURSE = "__none";
@@ -216,13 +217,13 @@ export function LessonForm({
   return (
     <form onSubmit={submit} className="space-y-6" noValidate>
       <div className="grid gap-4">
-        <FormField label={t.title} error={errors.title?.message}>
+        <FormField label={t.title} info={fieldInfo.lesson.title} error={errors.title?.message}>
           <Input autoComplete="off" {...form.register("title")} />
         </FormField>
-        <FormField label={t.summary} hint={t.summaryHint} error={errors.summary?.message}>
+        <FormField label={t.summary} hint={t.summaryHint} info={fieldInfo.lesson.summary} error={errors.summary?.message}>
           <Textarea rows={2} {...form.register("summary")} />
         </FormField>
-        <FormField label={t.details} hint={t.detailsHint} error={errors.details?.message}>
+        <FormField label={t.details} hint={t.detailsHint} info={fieldInfo.lesson.details} error={errors.details?.message}>
           <Textarea rows={5} {...form.register("details")} />
         </FormField>
         {courses.length > 0 && (
@@ -230,7 +231,7 @@ export function LessonForm({
             control={form.control}
             name="courseId"
             render={({ field }) => (
-              <FormField label={t.course}>
+              <FormField label={t.course} info={fieldInfo.lesson.course}>
                 <SelectTriggerWrapper value={field.value} onChange={field.onChange} courses={courses} />
               </FormField>
             )}
@@ -247,18 +248,18 @@ export function LessonForm({
         <div className="grid gap-4 sm:grid-cols-2">
           {(
             [
-              ["scheduledStartAt", t.start, undefined, onStartChange],
-              ["scheduledEndAt", t.end, undefined, onEndChange],
-              ["joinOpensAt", t.joinOpens, t.joinOpensHint, undefined],
-              ["accessExpiresAt", t.deadline, t.deadlineHint, undefined],
+              ["scheduledStartAt", t.start, undefined, fieldInfo.lesson.start, onStartChange],
+              ["scheduledEndAt", t.end, undefined, fieldInfo.lesson.end, onEndChange],
+              ["joinOpensAt", t.joinOpens, t.joinOpensHint, fieldInfo.lesson.joinOpens, undefined],
+              ["accessExpiresAt", t.deadline, t.deadlineHint, fieldInfo.lesson.deadline, undefined],
             ] as const
-          ).map(([name, label, hint, follow]) => (
+          ).map(([name, label, hint, info, follow]) => (
             <Controller
               key={name}
               control={form.control}
               name={name}
               render={({ field }) => (
-                <FormField label={label} hint={hint} error={errors[name]?.message}>
+                <FormField label={label} hint={hint} info={info} error={errors[name]?.message}>
                   <DateTimeInput
                     {...field}
                     onChange={(value) => {
@@ -404,7 +405,7 @@ function RepeatField({
               ))}
             </div>
           </fieldset>
-          <FormField label={r.until}>
+          <FormField label={r.until} info={fieldInfo.lesson.repeatUntil}>
             <DateInput value={rule.until} onChange={(until) => isCalendarDay(until) && onChange({ ...rule, until })} />
           </FormField>
           <p className={cn("text-sm sm:col-span-2", problem ? "text-destructive" : "text-muted-foreground")} aria-live="polite">

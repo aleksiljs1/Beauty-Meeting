@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { admin } from "@/i18n/admin";
+import { fieldInfo } from "@/i18n/field-info";
 import { GENDERS, PHONE_MAX_LENGTH, type StudentProfileInput } from "@/lib/student-profile";
 import { todayInAcademy } from "@/lib/datetime";
 
@@ -25,14 +26,14 @@ export function StudentProfileFields<T extends WithProfile>({ form: typed }: { f
     <fieldset className="grid gap-4 rounded-md border p-3">
       <legend className="px-1 text-sm font-medium">{t.heading}</legend>
       <div className="grid gap-4 sm:grid-cols-2">
-        <FormField label={t.phone} error={errors?.phone?.message}>
+        <FormField label={t.phone} info={fieldInfo.student.phone} error={errors?.phone?.message}>
           <Input type="tel" inputMode="tel" autoComplete="off" maxLength={PHONE_MAX_LENGTH} {...form.register("profile.phone")} />
         </FormField>
         <Controller
           control={form.control}
           name="profile.birthDate"
           render={({ field }) => (
-            <FormField label={t.birthDate} error={errors?.birthDate?.message}>
+            <FormField label={t.birthDate} info={fieldInfo.student.birthDate} error={errors?.birthDate?.message}>
               <DateInput min="1900-01-01" max={todayInAcademy()} {...field} />
             </FormField>
           )}
@@ -41,7 +42,7 @@ export function StudentProfileFields<T extends WithProfile>({ form: typed }: { f
           control={form.control}
           name="profile.gender"
           render={({ field }) => (
-            <FormField label={t.gender}>
+            <FormField label={t.gender} info={fieldInfo.student.gender}>
               <Select value={field.value || NO_GENDER} onValueChange={(value) => field.onChange(value === NO_GENDER ? "" : value)}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
@@ -58,11 +59,11 @@ export function StudentProfileFields<T extends WithProfile>({ form: typed }: { f
             </FormField>
           )}
         />
-        <FormField label={t.city} error={errors?.city?.message}>
+        <FormField label={t.city} info={fieldInfo.student.city} error={errors?.city?.message}>
           <Input autoComplete="off" {...form.register("profile.city")} />
         </FormField>
       </div>
-      <FormField label={t.notes} hint={t.notesHint} error={errors?.notes?.message}>
+      <FormField label={t.notes} hint={t.notesHint} info={fieldInfo.student.notes} error={errors?.notes?.message}>
         <Textarea rows={2} {...form.register("profile.notes")} />
       </FormField>
     </fieldset>

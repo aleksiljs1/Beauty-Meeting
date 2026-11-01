@@ -6,9 +6,11 @@ import { Controller, useForm } from "react-hook-form";
 import { DateInput } from "@/components/admin/date-inputs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { InfoTip } from "@/components/info-tip";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { adminContent } from "@/i18n/admin-content";
+import { fieldInfo } from "@/i18n/field-info";
 import { common } from "@/i18n/common";
 import { ApiClientError, apiSend } from "@/lib/api/client";
 import { centsToEuroInput } from "@/lib/billing";
@@ -69,23 +71,23 @@ function CourseForm({ item, onSaved, onCancel }: ItemFormProps<AdminCourse>) {
 
   return (
     <form onSubmit={onSubmit} noValidate className="grid gap-5">
-      <Field id="course-title" label={t.titleLabel} error={err.title?.message}>
+      <Field id="course-title" label={t.titleLabel} info={fieldInfo.course.title} error={err.title?.message}>
         {(aria) => <Input autoFocus {...aria} {...titleField} />}
       </Field>
-      <Field id="course-slug" label={t.slug} hint={t.slugHint} error={err.slug?.message}>
+      <Field id="course-slug" label={t.slug} hint={t.slugHint} info={fieldInfo.course.slug} error={err.slug?.message}>
         {(aria) => <Input spellCheck={false} autoCapitalize="none" {...aria} {...slugField} />}
       </Field>
-      <Field id="course-summary" label={t.summary} hint={t.summaryHint} error={err.summary?.message}>
+      <Field id="course-summary" label={t.summary} hint={t.summaryHint} info={fieldInfo.course.summary} error={err.summary?.message}>
         {(aria) => <Textarea rows={2} {...aria} {...register("summary")} />}
       </Field>
-      <Field id="course-description" label={t.description} hint={adminContent.settings.aboutHint} error={err.description?.message}>
+      <Field id="course-description" label={t.description} hint={adminContent.settings.aboutHint} info={fieldInfo.course.description} error={err.description?.message}>
         {(aria) => <Textarea rows={8} {...aria} {...register("description")} />}
       </Field>
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field id="course-duration" label={t.durationText} hint={t.durationHint} error={err.durationText?.message}>
+        <Field id="course-duration" label={t.durationText} hint={t.durationHint} info={fieldInfo.course.durationText} error={err.durationText?.message}>
           {(aria) => <Input {...aria} {...register("durationText")} />}
         </Field>
-        <Field id="course-price" label={t.priceText} error={err.priceText?.message}>
+        <Field id="course-price" label={t.priceText} info={fieldInfo.course.priceText} error={err.priceText?.message}>
           {(aria) => <Input {...aria} {...register("priceText")} />}
         </Field>
       </div>
@@ -93,16 +95,16 @@ function CourseForm({ item, onSaved, onCancel }: ItemFormProps<AdminCourse>) {
         <legend className="px-1 text-sm font-medium">{t.billingHeading}</legend>
         <p className="text-sm text-muted-foreground">{t.billingHint}</p>
         <div className="grid gap-4 sm:grid-cols-4">
-          <Field id="course-starts-on" label={t.startsOn} error={err.startsOn?.message}>
+          <Field id="course-starts-on" label={t.startsOn} info={fieldInfo.course.startsOn} error={err.startsOn?.message}>
             {(aria) => <Controller control={control} name="startsOn" render={({ field }) => <DateInput {...aria} {...field} />} />}
           </Field>
-          <Field id="course-years" label={t.durationYears} error={err.duration?.years?.message}>
+          <Field id="course-years" label={t.durationYears} info={fieldInfo.course.durationYears} error={err.duration?.years?.message}>
             {(aria) => <Input inputMode="numeric" {...aria} {...register("duration.years")} />}
           </Field>
-          <Field id="course-months" label={t.durationMonths} error={err.duration?.months?.message}>
+          <Field id="course-months" label={t.durationMonths} info={fieldInfo.course.durationMonths} error={err.duration?.months?.message}>
             {(aria) => <Input inputMode="numeric" {...aria} {...register("duration.months")} />}
           </Field>
-          <Field id="course-monthly-price" label={t.monthlyPrice} error={err.monthlyPrice?.message}>
+          <Field id="course-monthly-price" label={t.monthlyPrice} info={fieldInfo.course.monthlyPrice} error={err.monthlyPrice?.message}>
             {(aria) => <Input inputMode="decimal" {...aria} {...register("monthlyPrice")} />}
           </Field>
         </div>
@@ -111,10 +113,13 @@ function CourseForm({ item, onSaved, onCancel }: ItemFormProps<AdminCourse>) {
         control={control}
         name="isPublic"
         render={({ field }) => (
-          <label className="flex items-center gap-3 text-sm">
-            <Switch checked={field.value} onCheckedChange={field.onChange} />
-            {t.isPublic}
-          </label>
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-3 text-sm">
+              <Switch checked={field.value} onCheckedChange={field.onChange} />
+              {t.isPublic}
+            </label>
+            <InfoTip label={t.isPublic}>{fieldInfo.toggles.coursePublic}</InfoTip>
+          </div>
         )}
       />
       <div className="flex flex-wrap items-center gap-3 border-t pt-5">

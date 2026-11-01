@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { apiSend } from "@/lib/api/client";
 import { studentProfileSchema, type StudentProfileInput } from "@/lib/student-profile";
 import { admin } from "@/i18n/admin";
+import { fieldInfo } from "@/i18n/field-info";
 import { common } from "@/i18n/common";
 
 const t = admin.students;
@@ -89,7 +90,7 @@ export function StudentActions({ student, courses }: { student: Student; courses
             <DialogDescription>{student.email}</DialogDescription>
           </DialogHeader>
           <form onSubmit={saveDetails} className="space-y-4" noValidate>
-            <FormField label={t.edit.name} error={form.formState.errors.name?.message}>
+            <FormField label={t.edit.name} info={fieldInfo.student.name} error={form.formState.errors.name?.message}>
               <Input autoComplete="off" {...form.register("name")} />
             </FormField>
             <StudentProfileFields form={form} />
@@ -173,7 +174,7 @@ function EmailEditDialog({ open, student, onClose }: { open: boolean; student: S
           <DialogDescription>{t.email.description(student.name)}</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4" noValidate>
-          <FormField label={t.email.label} error={form.formState.errors.email?.message}>
+          <FormField label={t.email.label} info={fieldInfo.student.newEmail} error={form.formState.errors.email?.message}>
             <Input type="email" autoComplete="off" inputMode="email" {...form.register("email")} />
           </FormField>
           <DialogFooter>

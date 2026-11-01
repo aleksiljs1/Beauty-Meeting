@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { authText } from "@/i18n/auth";
+import { fieldInfo } from "@/i18n/field-info";
 import { portalText } from "@/i18n/portal";
 import { changePassword } from "@/lib/api/auth";
 import { FormField } from "./form-field";
@@ -47,16 +48,17 @@ export function ChangePasswordForm() {
 
   return (
     <form onSubmit={onSubmit} noValidate className="grid max-w-md gap-4">
-      <FormField label={t.fields.currentPassword} type="password" autoComplete="current-password" error={errors.current?.message} {...register("current")} />
+      <FormField label={t.fields.currentPassword} info={fieldInfo.auth.currentPassword} type="password" autoComplete="current-password" error={errors.current?.message} {...register("current")} />
       <FormField
         label={t.fields.newPassword}
+        info={fieldInfo.auth.newPassword}
         type="password"
         autoComplete="new-password"
         hint={t.fields.passwordHint}
         error={errors.password?.message}
         {...register("password")}
       />
-      <FormField label={t.fields.confirmPassword} type="password" autoComplete="new-password" error={errors.confirm?.message} {...register("confirm")} />
+      <FormField label={t.fields.confirmPassword} info={fieldInfo.auth.confirmPassword} type="password" autoComplete="new-password" error={errors.confirm?.message} {...register("confirm")} />
       <div aria-live="polite">
         {message ? (
           <p

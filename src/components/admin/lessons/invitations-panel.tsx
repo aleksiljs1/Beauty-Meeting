@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { apiSend } from "@/lib/api/client";
 import { ACADEMY_TIMEZONE_LABEL, formatDateTime, fromZonedInputValue, timezoneAbbreviation, toZonedInputValue } from "@/lib/datetime";
 import { admin } from "@/i18n/admin";
+import { fieldInfo } from "@/i18n/field-info";
 import { common } from "@/i18n/common";
 
 const t = admin.invitations;
@@ -206,13 +207,13 @@ function CreateInvitationDialog({ lesson }: { lesson: { id: string; scheduledEnd
               <DialogDescription>{t.intro}</DialogDescription>
             </DialogHeader>
             <form onSubmit={submit} className="space-y-4" noValidate>
-              <FormField label={t.maxRedemptions} hint={t.maxRedemptionsHint} error={errors.max}>
+              <FormField label={t.maxRedemptions} hint={t.maxRedemptionsHint} info={fieldInfo.invitation.maxRedemptions} error={errors.max}>
                 <Input type="number" min={1} max={1000} inputMode="numeric" value={max} onChange={(e) => setMax(e.target.value)} />
               </FormField>
-              <FormField label={t.redeemUntil} hint={`${t.redeemUntilHint} ${zone(lesson.accessExpiresAt)}`} error={errors.redeemUntil}>
+              <FormField label={t.redeemUntil} info={fieldInfo.invitation.redeemUntil} hint={`${t.redeemUntilHint} ${zone(lesson.accessExpiresAt)}`} error={errors.redeemUntil}>
                 <DateTimeInput value={redeemUntil} max={lessonMax} onChange={setRedeemUntil} />
               </FormField>
-              <FormField label={t.accessExpiresAt} hint={t.accessExpiresAtHint} error={errors.accessUntil}>
+              <FormField label={t.accessExpiresAt} hint={t.accessExpiresAtHint} info={fieldInfo.invitation.accessUntil} error={errors.accessUntil}>
                 <DateTimeInput value={accessUntil} max={lessonMax} onChange={setAccessUntil} />
               </FormField>
               <DialogFooter>

@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { apiSend } from "@/lib/api/client";
 import { admin } from "@/i18n/admin";
+import { fieldInfo } from "@/i18n/field-info";
 import { common } from "@/i18n/common";
 import { ProtectedVideo, type VideoGrant } from "@/components/portal/protected-video";
 
@@ -168,7 +169,7 @@ export function RenameFileButton({ file }: { file: FileInfo }) {
             <DialogTitle>{t.renameTitle}</DialogTitle>
           </DialogHeader>
           <form onSubmit={rename} className="space-y-4">
-            <FormField label={t.renameField} hint={t.renameHint}>
+            <FormField label={t.renameField} hint={t.renameHint} info={fieldInfo.material.rename}>
               <Input value={name} maxLength={150} onChange={(e) => setName(e.target.value)} />
             </FormField>
             <DialogFooter>

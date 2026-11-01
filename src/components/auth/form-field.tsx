@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, type ComponentProps } from "react";
+import { LabelRow } from "@/components/info-tip";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -8,10 +9,12 @@ type FormFieldProps = ComponentProps<typeof Input> & {
   label: string;
   error?: string;
   hint?: string;
+  /** Longer explanation behind the "i" beside the label. */
+  info?: string;
 };
 
 /** Labelled input with hint and error text wired to aria-describedby / aria-invalid. */
-export function FormField({ label, error, hint, id, ...inputProps }: FormFieldProps) {
+export function FormField({ label, error, hint, info, id, ...inputProps }: FormFieldProps) {
   const generatedId = useId();
   const inputId = id ?? generatedId;
   const hintId = hint ? `${inputId}-hint` : undefined;
@@ -20,7 +23,9 @@ export function FormField({ label, error, hint, id, ...inputProps }: FormFieldPr
 
   return (
     <div className="grid gap-1.5">
-      <Label htmlFor={inputId}>{label}</Label>
+      <LabelRow info={info} infoLabel={label}>
+        <Label htmlFor={inputId}>{label}</Label>
+      </LabelRow>
       <Input id={inputId} aria-invalid={error ? true : undefined} aria-describedby={describedBy} className="h-10" {...inputProps} />
       {hint && !error ? (
         <p id={hintId} className="text-xs text-muted-foreground">

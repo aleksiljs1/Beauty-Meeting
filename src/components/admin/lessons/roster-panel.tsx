@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { apiGet, apiSend } from "@/lib/api/client";
 import { ACADEMY_TIMEZONE_LABEL, formatDateTime, fromZonedInputValue, timezoneAbbreviation, toZonedInputValue } from "@/lib/datetime";
 import { admin } from "@/i18n/admin";
+import { fieldInfo } from "@/i18n/field-info";
 import { common } from "@/i18n/common";
 
 const t = admin.roster;
@@ -152,6 +153,7 @@ function DeadlineDialog({ row, lessonDeadline, onClose }: { row: RosterRow; less
         </DialogHeader>
         <FormField
           label={t.deadline.field}
+          info={fieldInfo.roster.personalDeadline}
           hint={`${t.lessonDeadline}: ${formatDateTime(lessonDeadline)} (${zoneLabel(lessonDeadline)})`}
           error={error}
         >
@@ -249,7 +251,7 @@ export function AddStudent({ lessonId, addTo }: { lessonId: string; addTo?: { ur
   return (
     <div className="space-y-3 rounded-md border p-4">
       <h3 className="font-sans text-sm font-medium">{t.add.title}</h3>
-      <FormField label={t.add.searchLabel}>
+      <FormField label={t.add.searchLabel} info={fieldInfo.roster.search}>
         <Input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.add.searchPlaceholder} autoComplete="off" />
       </FormField>
       <SearchResults state={query.trim().length < 2 ? { status: "idle", results: [] } : state} pending={pending} onAdd={add} />

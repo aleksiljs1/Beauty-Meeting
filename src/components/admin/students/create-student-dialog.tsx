@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { CheckList } from "@/components/admin/check-list";
 import { FormField } from "@/components/admin/form-field";
+import { InfoTip } from "@/components/info-tip";
 import { ImportStudentsPanel } from "@/components/admin/students/import-students-panel";
 import { StudentProfileFields } from "@/components/admin/students/student-profile-fields";
 import { useApiAction } from "@/components/admin/use-api-action";
@@ -19,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { apiSend } from "@/lib/api/client";
 import { emptyStudentProfile, studentProfileSchema } from "@/lib/student-profile";
 import { admin } from "@/i18n/admin";
+import { fieldInfo } from "@/i18n/field-info";
 import { common } from "@/i18n/common";
 
 const t = admin.students;
@@ -95,10 +97,10 @@ export function CreateStudentDialog({ defaultOpen = false, courses }: { defaultO
           />
         ) : (
         <form onSubmit={submit} className="space-y-4" noValidate>
-          <FormField label={t.create.name} error={form.formState.errors.name?.message}>
+          <FormField label={t.create.name} info={fieldInfo.student.name} error={form.formState.errors.name?.message}>
             <Input autoComplete="off" {...form.register("name")} />
           </FormField>
-          <FormField label={t.create.email} error={form.formState.errors.email?.message}>
+          <FormField label={t.create.email} info={fieldInfo.student.email} error={form.formState.errors.email?.message}>
             <Input type="email" autoComplete="off" inputMode="email" {...form.register("email")} />
           </FormField>
           <StudentProfileFields form={form} />
@@ -112,10 +114,13 @@ export function CreateStudentDialog({ defaultOpen = false, courses }: { defaultO
                 <>
                   <p className="text-xs text-muted-foreground">{t.courses.hint}</p>
                   {courseIds.size > 0 && (
-                    <label className="flex items-start gap-2 pt-1 text-sm">
-                      <Checkbox className="mt-0.5" checked={addToUpcoming} onCheckedChange={(checked) => setAddToUpcoming(checked === true)} />
-                      <span>{t.courses.addToUpcoming}</span>
-                    </label>
+                    <div className="flex items-start gap-2 pt-1">
+                      <label className="flex items-start gap-2 text-sm">
+                        <Checkbox className="mt-0.5" checked={addToUpcoming} onCheckedChange={(checked) => setAddToUpcoming(checked === true)} />
+                        <span>{t.courses.addToUpcoming}</span>
+                      </label>
+                      <InfoTip label={t.courses.addToUpcoming} className="mt-0.5">{fieldInfo.toggles.addToUpcoming}</InfoTip>
+                    </div>
                   )}
                 </>
               }

@@ -1,6 +1,7 @@
 "use client";
 
 import { cloneElement, isValidElement, useId, type ReactElement, type ReactNode } from "react";
+import { LabelRow } from "@/components/info-tip";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
@@ -11,12 +12,15 @@ import { cn } from "@/lib/utils";
 export function FormField({
   label,
   hint,
+  info,
   error,
   children,
   className,
 }: {
   label: ReactNode;
   hint?: ReactNode;
+  /** Longer explanation behind the "i" beside the label. */
+  info?: ReactNode;
   error?: string;
   children: ReactElement<{ id?: string; "aria-describedby"?: string; "aria-invalid"?: boolean }>;
   className?: string;
@@ -29,7 +33,9 @@ export function FormField({
 
   return (
     <div className={cn("space-y-1.5", className)}>
-      <Label htmlFor={id}>{label}</Label>
+      <LabelRow info={info} infoLabel={typeof label === "string" ? label : ""}>
+        <Label htmlFor={id}>{label}</Label>
+      </LabelRow>
       {control}
       {hint && (
         <p id={hintId} className="text-xs text-muted-foreground">

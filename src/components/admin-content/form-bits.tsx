@@ -3,6 +3,7 @@
 import { ArrowDownIcon, ArrowUpIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import type { FieldValues, Path, UseFormSetError } from "react-hook-form";
+import { LabelRow } from "@/components/info-tip";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { adminContent } from "@/i18n/admin-content";
@@ -15,6 +16,7 @@ export function Field({
   id,
   label,
   hint,
+  info,
   error,
   className,
   children,
@@ -22,6 +24,8 @@ export function Field({
   id: string;
   label: string;
   hint?: string;
+  /** Longer explanation behind the "i" beside the label. */
+  info?: string;
   error?: string;
   className?: string;
   children: (aria: { id: string; "aria-describedby"?: string; "aria-invalid"?: boolean }) => ReactNode;
@@ -30,8 +34,10 @@ export function Field({
   const errorId = error ? `${id}-error` : undefined;
   const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
   return (
-    <div className={cn("grid gap-1.5", className)}>
-      <Label htmlFor={id}>{label}</Label>
+    <div className={cn("grid content-start gap-1.5", className)}>
+      <LabelRow info={info} infoLabel={label}>
+        <Label htmlFor={id}>{label}</Label>
+      </LabelRow>
       {children({ id, "aria-describedby": describedBy, "aria-invalid": error ? true : undefined })}
       {hint && (
         <p id={hintId} className="text-xs text-muted-foreground">

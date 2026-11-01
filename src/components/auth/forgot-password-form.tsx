@@ -8,6 +8,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { authText } from "@/i18n/auth";
+import { fieldInfo } from "@/i18n/field-info";
 import { requestPasswordReset, type AuthFailure } from "@/lib/api/auth";
 import { FormField } from "./form-field";
 
@@ -53,7 +54,7 @@ export function ForgotPasswordForm() {
 
   return (
     <form onSubmit={onSubmit} noValidate className="grid gap-4">
-      <FormField label={t.fields.email} type="email" autoComplete="email" inputMode="email" error={errors.email?.message} {...register("email")} />
+      <FormField label={t.fields.email} info={fieldInfo.auth.resetEmail} type="email" autoComplete="email" inputMode="email" error={errors.email?.message} {...register("email")} />
       <div aria-live="polite">
         {failure ? (
           <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">

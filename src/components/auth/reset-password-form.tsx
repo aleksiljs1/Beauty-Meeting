@@ -8,6 +8,7 @@ import { useForm } from "react-hook-form";
 import type { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { authText } from "@/i18n/auth";
+import { fieldInfo } from "@/i18n/field-info";
 import { resetPassword, type AuthFailure } from "@/lib/api/auth";
 import { FormField } from "./form-field";
 import { newPasswordSchema } from "./password-schema";
@@ -65,6 +66,7 @@ export function ResetPasswordForm({ token, setup }: { token: string; setup: bool
     <form onSubmit={onSubmit} noValidate className="grid gap-4">
       <FormField
         label={t.fields.newPassword}
+        info={fieldInfo.auth.newPassword}
         type="password"
         autoComplete="new-password"
         hint={t.fields.passwordHint}
@@ -73,6 +75,7 @@ export function ResetPasswordForm({ token, setup }: { token: string; setup: bool
       />
       <FormField
         label={t.fields.confirmPassword}
+        info={fieldInfo.auth.confirmPassword}
         type="password"
         autoComplete="new-password"
         error={errors.confirm?.message}

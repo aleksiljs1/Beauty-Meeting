@@ -16,8 +16,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { InfoTip } from "@/components/info-tip";
 import { Switch } from "@/components/ui/switch";
 import { adminContent } from "@/i18n/admin-content";
+import { fieldInfo } from "@/i18n/field-info";
 import { common } from "@/i18n/common";
 import { apiSend } from "@/lib/api/client";
 import { galleryItemSchema, galleryVisibilityFields, type GalleryItemInput } from "@/lib/content-schemas";
@@ -113,7 +115,7 @@ function UploadForm({ onUploaded }: { onUploaded: (item: AdminGalleryItem) => vo
   return (
     <form onSubmit={onSubmit} noValidate className="grid gap-5 rounded-md border bg-card p-5 sm:p-6">
       <h2 className="text-2xl">{t.uploadHeading}</h2>
-      <Field id="gallery-file" label={t.file} hint={t.fileHint} error={fileError}>
+      <Field id="gallery-file" label={t.file} hint={t.fileHint} info={fieldInfo.gallery.file} error={fileError}>
         {(aria) => (
           <Input
             key={inputKey}
@@ -128,10 +130,10 @@ function UploadForm({ onUploaded }: { onUploaded: (item: AdminGalleryItem) => vo
           />
         )}
       </Field>
-      <Field id="gallery-alt" label={t.alt} hint={t.altHint} error={formState.errors.alt?.message}>
+      <Field id="gallery-alt" label={t.alt} hint={t.altHint} info={fieldInfo.gallery.alt} error={formState.errors.alt?.message}>
         {(aria) => <Input {...aria} {...register("alt")} />}
       </Field>
-      <Field id="gallery-caption" label={t.caption} error={formState.errors.caption?.message}>
+      <Field id="gallery-caption" label={t.caption} info={fieldInfo.gallery.caption} error={formState.errors.caption?.message}>
         {(aria) => <Input {...aria} {...register("caption")} />}
       </Field>
       <VisibilityOptions control={control} idPrefix="gallery-new" />
@@ -139,10 +141,13 @@ function UploadForm({ onUploaded }: { onUploaded: (item: AdminGalleryItem) => vo
         control={control}
         name="isPublished"
         render={({ field }) => (
-          <label className="flex items-center gap-3 text-sm">
-            <Switch checked={field.value} onCheckedChange={field.onChange} />
-            {t.isPublished}
-          </label>
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-3 text-sm">
+              <Switch checked={field.value} onCheckedChange={field.onChange} />
+              {t.isPublished}
+            </label>
+            <InfoTip label={t.isPublished}>{fieldInfo.toggles.photoPublic}</InfoTip>
+          </div>
         )}
       />
       <div className="flex flex-wrap items-center gap-4">
@@ -235,10 +240,10 @@ function ItemCard({
             </span>
           )}
         </div>
-        <Field id={`alt-${item.id}`} label={t.alt} error={formState.errors.alt?.message}>
+        <Field id={`alt-${item.id}`} label={t.alt} info={fieldInfo.gallery.alt} error={formState.errors.alt?.message}>
           {(aria) => <Input {...aria} {...register("alt")} />}
         </Field>
-        <Field id={`caption-${item.id}`} label={t.caption} error={formState.errors.caption?.message}>
+        <Field id={`caption-${item.id}`} label={t.caption} info={fieldInfo.gallery.caption} error={formState.errors.caption?.message}>
           {(aria) => <Input {...aria} {...register("caption")} />}
         </Field>
         <VisibilityOptions control={control} idPrefix={`gallery-${item.id}`} />

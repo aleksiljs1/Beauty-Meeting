@@ -14,6 +14,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { admin } from "@/i18n/admin";
+import { fieldInfo } from "@/i18n/field-info";
 import { common } from "@/i18n/common";
 import { apiGet, apiSend } from "@/lib/api/client";
 import { centsToEuroInput, courseMonthLabel, formatEuro, parseEuroCents } from "@/lib/billing";
@@ -127,7 +128,7 @@ function RecordPaymentDialog({ account, onClose }: { account: PaymentActionsAcco
     <AccountDialog title={t.record.title} account={account} onClose={onClose}>
       <form onSubmit={submit} className="space-y-4" noValidate>
         <div className="grid grid-cols-2 gap-4">
-          <FormField label={t.record.months} error={form.formState.errors.months?.message}>
+          <FormField label={t.record.months} info={fieldInfo.payment.months} error={form.formState.errors.months?.message}>
             <Input
               type="number"
               min={1}
@@ -138,7 +139,7 @@ function RecordPaymentDialog({ account, onClose }: { account: PaymentActionsAcco
               })}
             />
           </FormField>
-          <FormField label={t.record.amount} error={form.formState.errors.amount?.message}>
+          <FormField label={t.record.amount} info={fieldInfo.payment.amount} error={form.formState.errors.amount?.message}>
             <Input inputMode="decimal" {...form.register("amount")} />
           </FormField>
         </div>
@@ -151,7 +152,7 @@ function RecordPaymentDialog({ account, onClose }: { account: PaymentActionsAcco
             control={form.control}
             name="paidOn"
             render={({ field }) => (
-              <FormField label={t.record.paidOn} error={form.formState.errors.paidOn?.message}>
+              <FormField label={t.record.paidOn} info={fieldInfo.payment.paidOn} error={form.formState.errors.paidOn?.message}>
                 <DateInput max={todayInAcademy()} {...field} />
               </FormField>
             )}
@@ -160,7 +161,7 @@ function RecordPaymentDialog({ account, onClose }: { account: PaymentActionsAcco
             control={form.control}
             name="method"
             render={({ field }) => (
-              <FormField label={t.record.method}>
+              <FormField label={t.record.method} info={fieldInfo.payment.method}>
                 <Select value={field.value} onValueChange={field.onChange}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
@@ -177,7 +178,7 @@ function RecordPaymentDialog({ account, onClose }: { account: PaymentActionsAcco
             )}
           />
         </div>
-        <FormField label={t.record.note}>
+        <FormField label={t.record.note} info={fieldInfo.payment.note}>
           <Input {...form.register("note")} />
         </FormField>
         <DialogFooter>
@@ -278,7 +279,7 @@ function FirstMonthDialog({ account, onClose }: { account: PaymentActionsAccount
   return (
     <AccountDialog title={t.firstMonth.title} account={account} onClose={onClose}>
       <p className="text-sm text-muted-foreground">{t.firstMonth.description}</p>
-      <FormField label={t.firstMonth.label} hint={valid ? monthLabel(value) : undefined}>
+      <FormField label={t.firstMonth.label} info={fieldInfo.payment.firstMonth} hint={valid ? monthLabel(value) : undefined}>
         <Input type="number" min={1} max={account.durationMonths} value={firstMonth} onChange={(e) => setFirstMonth(e.target.value)} />
       </FormField>
       <DialogFooter>

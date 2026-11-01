@@ -5,10 +5,12 @@ import { Download, FileSpreadsheet, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { InfoTip } from "@/components/info-tip";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { api, apiSend } from "@/lib/api/client";
 import { errorMessage } from "@/components/admin/use-api-action";
+import { fieldInfo } from "@/i18n/field-info";
 
 type ImportRow = {
   emri: string;
@@ -183,10 +185,13 @@ export function ImportStudentsPanel({
           {unmatched.length > 0 && (
             <Alert variant="destructive"><AlertDescription>Abonimet nuk përputhen me kurset: {unmatched.join(", ")}.</AlertDescription></Alert>
           )}
-          <label className="flex items-start gap-2 text-sm">
-            <Checkbox className="mt-0.5" checked={addToUpcoming} onCheckedChange={(checked) => setAddToUpcoming(checked === true)} />
-            <span>Shtoji edhe në mësimet e ardhshme të kurseve të tyre</span>
-          </label>
+          <div className="flex items-start gap-2">
+            <label className="flex items-start gap-2 text-sm">
+              <Checkbox className="mt-0.5" checked={addToUpcoming} onCheckedChange={(checked) => setAddToUpcoming(checked === true)} />
+              <span>Shtoji edhe në mësimet e ardhshme të kurseve të tyre</span>
+            </label>
+            <InfoTip label="Mësimet e ardhshme" className="mt-0.5">{fieldInfo.toggles.addToUpcoming}</InfoTip>
+          </div>
         </>
       )}
 

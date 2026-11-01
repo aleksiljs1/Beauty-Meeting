@@ -9,6 +9,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { refreshLiveFeed } from "@/hooks/use-live-feed";
 import { authText } from "@/i18n/auth";
+import { fieldInfo } from "@/i18n/field-info";
 import { signIn, signOut, type AuthFailure } from "@/lib/api/auth";
 import { apiGet } from "@/lib/api/client";
 import { setSessionHint } from "@/lib/api/session-hint";
@@ -60,9 +61,10 @@ export function LoginForm({ next }: { next: string | null }) {
 
   return (
     <form onSubmit={onSubmit} noValidate className="grid gap-4" aria-describedby={failure ? "login-failure" : undefined}>
-      <FormField label={t.fields.email} type="email" autoComplete="email" inputMode="email" error={errors.email?.message} {...register("email")} />
+      <FormField label={t.fields.email} info={fieldInfo.auth.email} type="email" autoComplete="email" inputMode="email" error={errors.email?.message} {...register("email")} />
       <FormField
         label={t.fields.password}
+        info={fieldInfo.auth.password}
         type="password"
         autoComplete="current-password"
         error={errors.password?.message}
