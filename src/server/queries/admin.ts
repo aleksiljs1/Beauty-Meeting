@@ -565,3 +565,44 @@ export async function getIntegrationStatus() {
     checkedAt: new Date(),
   };
 }
+
+export type ClassAlert = {
+  id: string;
+  title: string;
+  scheduledStartAt: string;
+  live: boolean;
+  publication: PublicationStatus;
+  isDemo: boolean;
+};
+
+/**
+ * The admin's "class about to start" banner: classes running now, and classes starting within the
+ * admin's reminder time (Cilësimet; 60 minutes until set), soonest first. Drafts are included so
+ * one nobody published still stands out.
+ */
+export async function getClassAlerts(adminId: string, now = new Date()) {
+  const prefs = await prisma.adminPreferences.findUnique({ where: { userId: adminId }, select: { lessonReminderMinutes: true } });
+  const leadMinutes = prefs?.lessonReminderMinutes ?? 60;
+  const lessons = await prisma.lesson.findMany({
+    where: {
+      publication: { in: ["PUBLISHED", "DRAFT"] },
+      OR: [
+        { meetingStatus: "LIVE", scheduledEndAt: { gt: new Date(now.getTime() - END_GRACE_MS) } },
+        { meetingStatus: { notIn: ["LIVE", "ENDED"] }, scheduledStartAt: { gt: now, lte: new Date(now.getTime() + leadMinutes * 60_000) } },
+      ],
+    },
+    orderBy: { scheduledStartAt: "asc" },
+    take: 5,
+    select: { id: true, title: true, scheduledStartAt: true, meetingStatus: true, publication: true, isDemo: true },
+  });
+  const alerts: ClassAlert[] = lessons.map((l) => ({
+    id: l.id,
+    title: l.title,
+    scheduledStartAt: l.scheduledStartAt.toISOString(),
+    live: l.meetingStatus === "LIVE",
+    publication: l.publication,
+    isDemo: l.isDemo,
+  }));
+  // Running classes first, then the soonest to start.
+  return { leadMinutes, zoomLive: env.ZOOM_MODE === "live", alerts: alerts.sort((a, b) => Number(b.live) - Number(a.live)) };
+}

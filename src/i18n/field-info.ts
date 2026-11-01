@@ -102,7 +102,7 @@ export const fieldInfo = {
   reminder: {
     toggle:
       "Kur është aktive, ju vjen një email para çdo mësimi të publikuar, me orën e fillimit dhe lidhjen te mësimi. Draftet, mësimet e anuluara dhe ato që kanë nisur nuk kujtohen.",
-    lead: "Sa kohë para fillimit të mësimit vjen emaili: nga 5 minuta deri në 24 orë. Nëse e ndryshoni kur një mësim është afër, kujtesa vjen menjëherë.",
+    lead: "Sa kohë para fillimit të mësimit vjen emaili, nga 5 minuta deri në 24 orë. Po aq kohë para, në krye të çdo faqeje të panelit shfaqet edhe klasa që po fillon, me butonin \"Nis klasën\" (edhe kur emaili është i çaktivizuar). Nëse e ndryshoni kur një mësim është afër, kujtesa vjen menjëherë.",
     email: "Adresa ku vijnë kujtesat. Lëreni bosh që të vijnë në emailin me të cilin hyni në panel.",
   },
   auth: {

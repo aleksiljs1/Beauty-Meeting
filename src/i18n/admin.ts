@@ -248,12 +248,24 @@ export const admin = {
     },
   },
 
+  classAlert: {
+    region: "Klasa që po fillon",
+    live: "Live tani",
+    startsNow: "Fillon tani",
+    startsIn: (time: string, left: string) => `Fillon në ${time} · edhe ${left}`,
+    start: "Nis klasën",
+    rejoin: "Kthehu në klasë",
+    open: "Hap mësimin",
+    draft: "Draft: studentët nuk e shohin. Publikojeni nga faqja e mësimit.",
+    demo: "Klasë demo",
+  },
+
   preferences: {
     title: "Cilësimet",
     intro: "Cilësimet tuaja si administrator.",
     reminder: {
       title: "Kujtesë para mësimeve",
-      description: "Merrni një email pak para se të fillojë çdo mësim i publikuar, që të mos ju shpëtojë asnjë klasë.",
+      description: "Merrni një email pak para se të fillojë çdo mësim i publikuar, që të mos ju shpëtojë asnjë klasë. Po aq kohë para, klasa shfaqet edhe në krye të panelit me butonin \"Nis klasën\".",
       toggle: "Më dërgo kujtesë me email",
       lead: "Sa kohë para fillimit",
       unit: "Njësia",

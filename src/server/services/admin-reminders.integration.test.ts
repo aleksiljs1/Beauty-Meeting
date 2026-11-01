@@ -66,3 +66,20 @@ describe("admin reminder before lessons", () => {
     expect(await sendDueLessonReminders()).toBe(0);
   });
 });
+
+describe("class about to start (admin banner)", () => {
+  it("lists the running class and those starting within the admin's reminder time, live first", async () => {
+    const { getClassAlerts } = await import("@/server/queries/admin");
+    await saveReminderSettings(admin, { enabled: false, minutes: 30, email: "" });
+    const soon = await createLesson(admin.id, { title: "Pas 20 minutash", ...at(20) });
+    const draft = await createLesson(admin.id, { title: "Draft", publication: "DRAFT", ...at(25) });
+    const live = await createLesson(admin.id, { title: "Live", meetingStatus: "LIVE", ...at(-10) });
+    await createLesson(admin.id, { title: "Më vonë", ...at(90) });
+    await createLesson(admin.id, { title: "Anuluar", publication: "CANCELLED", ...at(5) });
+
+    const { leadMinutes, alerts } = await getClassAlerts(admin.id);
+    expect(leadMinutes).toBe(30);
+    expect(alerts.map((a) => a.id)).toEqual([live.id, soon.id, draft.id]);
+    expect(alerts[0]).toMatchObject({ live: true });
+  });
+});

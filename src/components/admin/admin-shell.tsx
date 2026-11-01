@@ -18,6 +18,7 @@ import { signOut } from "@/lib/api/auth";
 import { onSignedOut } from "@/lib/api/auth-events";
 import { admin } from "@/i18n/admin";
 import { common } from "@/i18n/common";
+import { ClassAlertBanner } from "./class-alert-banner";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -142,6 +143,7 @@ export function AdminShell({ user, children }: { user: { name: string; email: st
           {userMenu}
         </header>
         <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
+          <ClassAlertBanner />
           {children}
         </main>
       </div>
