@@ -99,14 +99,19 @@ export function OpenFileButton({ file }: { file: FileInfo }) {
         {pending ? <Loader2 aria-hidden className="animate-spin" /> : <Eye aria-hidden />} {t.open}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="w-full min-w-0 sm:max-w-5xl">
+        <DialogContent className="max-h-[calc(100dvh-2rem)] w-full min-w-0 overflow-y-auto sm:max-w-5xl">
           <DialogHeader className="min-w-0 pr-8">
             <DialogTitle className="truncate">{file.displayName}</DialogTitle>
             <DialogDescription>{t.previewDescription}</DialogDescription>
           </DialogHeader>
           {pending ? <div className="flex min-h-48 items-center justify-center"><Loader2 aria-label={common.actions.loading} className="size-8 animate-spin" /></div> : null}
           {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-          {grant && previewKind(file.mimeType) === "video" ? <AdminMaterialVideo file={file} grant={grant} /> : null}
+          {grant && previewKind(file.mimeType) === "video" ? (
+            // At most 70% of the screen tall, like pictures, so the close button and "Shkarko" stay in view.
+            <div className="mx-auto w-full max-w-[calc(70dvh*16/9)]">
+              <AdminMaterialVideo file={file} grant={grant} />
+            </div>
+          ) : null}
           {grant && previewKind(file.mimeType) === "image" ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={grant.url} alt={file.displayName} className="max-h-[70vh] w-full rounded-md border bg-muted object-contain" />
