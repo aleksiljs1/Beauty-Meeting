@@ -93,6 +93,11 @@
        the screen, also inside flex and grid items. */
     overflow-wrap: anywhere;
   }
+  /* Text boxes grow with their text (field-sizing: content); without this a long word would widen
+     the box, and the form with it, instead of wrapping. */
+  textarea {
+    overflow-wrap: anywhere;
+  }
   /* Tables keep whole words: their columns size to the text and scroll inside their wrapper. */
   table {
     overflow-wrap: break-word;
