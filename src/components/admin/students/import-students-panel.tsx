@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FileSpreadsheet, Upload } from "lucide-react";
+import { Download, FileSpreadsheet, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -124,6 +124,11 @@ export function ImportStudentsPanel({
         Ngarkoni .xlsx me kolonat <strong>Emrat</strong>, <strong>Email</strong> dhe <strong>Abonimet</strong>. Optional: Telefoni, Datelindja (DD/MM/YYYY), Gjinia, Qyteti, Shenime (max 100 chars).
         Ndani disa abonime me presje ose pikëpresje. Skedari lexohet vetëm në memorie.
       </p>
+      <Button asChild variant="outline" size="sm">
+        <a href="/api/v1/admin/students/import/template" download>
+          <Download aria-hidden /> Shkarko shabllonin Excel
+        </a>
+      </Button>
       <label className="flex w-full min-w-0 max-w-full cursor-pointer items-center gap-3 rounded-lg border border-dashed p-4 text-sm hover:bg-muted/40">
         <FileSpreadsheet aria-hidden className="size-5 shrink-0" />
         <span className="min-w-0 flex-1 truncate">{fileName || "Zgjidhni skedarin Excel (.xlsx)"}</span>

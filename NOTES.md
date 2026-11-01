@@ -150,6 +150,10 @@ Original brief: `c:\Users\aleksiljs\Downloads\Beauty_Academy_Zoom_Claude_Megapro
 - The `.xlsx` workbook must have `Emrat`, `Email`, and `Abonimet` headers in its first worksheet's first row.
   `Emri` is accepted as an alias for `Emrat`; other non-empty headers are rejected. Multiple subscription
   names in a cell can be separated by commas or semicolons. An empty `Abonimet` cell is allowed.
+  Optional profile columns: `Telefoni`, `Datëlindja` (DD/MM/YYYY), `Gjinia`, `Qyteti`, `Shënime`.
+- **Shkarko shabllonin Excel** in the import panel downloads a ready sheet with those columns (birth date
+  formatted as text so Excel can't swap day and month, a gender dropdown) and an "Udhëzime" sheet explaining
+  each column and listing the current course names to copy into `Abonimet`.
 - Preview and import are separate admin-authenticated API requests. Preview checks the file (5 MB maximum),
   rows (100 students maximum), required values, and email format. It returns only the three fields needed for
   onboarding; the workbook is read in memory and is never written to disk or retained by the API.

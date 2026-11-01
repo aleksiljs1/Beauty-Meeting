@@ -144,3 +144,45 @@ export async function parseStudentWorkbook(buffer: Uint8Array): Promise<StudentI
   if (!students.length) throw new Error("Dokumenti nuk përmban rreshta studentësh.");
   return students;
 }
+
+/** An empty import sheet with the expected columns, plus a sheet explaining them and listing the courses. */
+export async function buildStudentImportTemplate(courseTitles: string[]) {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Studentët", { views: [{ state: "frozen", ySplit: 1 }] });
+  sheet.columns = [
+    { header: "Emrat", width: 26 },
+    { header: "Email", width: 30 },
+    { header: "Abonimet", width: 30 },
+    { header: "Telefoni", width: 18 },
+    { header: "Datëlindja", width: 14, style: { numFmt: "@" } },
+    { header: "Gjinia", width: 12 },
+    { header: "Qyteti", width: 16 },
+    { header: "Shënime", width: 40 },
+  ];
+  sheet.getRow(1).font = { bold: true };
+  for (let row = 2; row <= MAX_IMPORT_STUDENTS + 1; row += 1) {
+    sheet.getCell(`F${row}`).dataValidation = { type: "list", allowBlank: true, formulae: ['"Femër,Mashkull,Tjetër"'] };
+  }
+
+  const guide = workbook.addWorksheet("Udhëzime");
+  guide.columns = [{ width: 16 }, { width: 80 }];
+  guide.addRows([
+    ["Kolona", "Si plotësohet"],
+    ["Emrat", "E detyrueshme. Emri dhe mbiemri i studentit."],
+    ["Email", "E detyrueshme. Çdo student me email të ndryshëm; studentit i vjen emaili për të vendosur fjalëkalimin."],
+    ["Abonimet", "Emri i kursit, saktësisht si te lista më poshtë. Disa kurse ndahen me presje. Mund të lihet bosh."],
+    ["Telefoni", "Opsionale, p.sh. +355 69 123 4567."],
+    ["Datëlindja", "Opsionale, DD/MM/YYYY, p.sh. 28/03/1998."],
+    ["Gjinia", "Opsionale: Femër, Mashkull ose Tjetër."],
+    ["Qyteti", "Opsionale."],
+    ["Shënime", `Opsionale, deri në ${MAX_IMPORT_NOTE_LENGTH} karaktere. I shohin vetëm administratorët.`],
+    [],
+    ["", `Deri në ${MAX_IMPORT_STUDENTS} studentë për skedar. Mos e ndryshoni rreshtin e parë të fletës "Studentët".`],
+    [],
+  ]);
+  guide.getRow(1).font = { bold: true };
+  guide.addRow(["Kurset", courseTitles[0] ?? "Nuk ka ende kurse."]).getCell(1).font = { bold: true };
+  guide.addRows(courseTitles.slice(1).map((title) => ["", title]));
+
+  return workbook.xlsx.writeBuffer();
+}
