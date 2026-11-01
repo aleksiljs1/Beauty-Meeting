@@ -17,5 +17,7 @@ export type MailMessage = {
 };
 
 export async function sendMail(message: MailMessage): Promise<void> {
-  await transport.sendMail({ from: env.MAIL_FROM, ...message });
+  const result = await transport.sendMail({ from: env.MAIL_FROM, ...message });
+  // Proof of hand-off for "I got no email" reports: the mail server accepted it, delivery is theirs.
+  console.info(`[mail] "${message.subject}" → ${message.to}: ${result.response}`);
 }
