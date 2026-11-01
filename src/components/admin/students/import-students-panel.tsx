@@ -13,12 +13,15 @@ import { errorMessage } from "@/components/admin/use-api-action";
 import { fieldInfo } from "@/i18n/field-info";
 
 type ImportRow = {
+  rowNumber: number;
   emri: string;
   email: string;
   abonimi: string[];
   profile: { phone: string; birthDate: string; gender: string; city: string; notes: string };
+  issues: { field: string; message: string }[];
 };
 type Course = { id: string; title: string };
+type ImportResult = { row: number; email: string; status: "created" | "failed" | "skipped"; fields?: string[]; reason?: string; mailSent?: boolean; lessonsAdded?: number };
 
 function MarqueeText({ text }: { text: string }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -65,6 +68,7 @@ export function ImportStudentsPanel({
   const [importing, setImporting] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState("");
+  const [rowResults, setRowResults] = useState<ImportResult[]>([]);
   const courseMap = useMemo(() => new Map(courses.map((course) => [courseKey(course.title), course])), [courses]);
 
   const unmatched = [...new Set(students.flatMap((student) => student.abonimi))]
@@ -72,10 +76,27 @@ export function ImportStudentsPanel({
   const repeatedEmails = new Set(
     students.map((student) => student.email).filter((email, index, values) => values.indexOf(email) !== index),
   );
+  const repeatedEmailRows = new Set(students.flatMap((student, index) => students.findIndex((row) => row.email === student.email) < index ? [index] : []));
+
+  function fieldIssue(student: ImportRow, field: string) {
+    const result = rowResults.find((item) => item.row === student.rowNumber);
+    if (result?.fields?.includes(field)) return result.reason ?? "Ka një problem në këtë fushë.";
+    const previewIssue = student.issues.find((issue) => issue.field === field);
+    if (previewIssue) return previewIssue.message;
+    const index = students.indexOf(student);
+    if (field === "email" && repeatedEmailRows.has(index)) return "Emaili përsëritet në skedar dhe do të anashkalohet.";
+    if (field === "abonimi" && student.abonimi.some((name) => !courseMap.has(courseKey(name)))) return "Kursi nuk u gjet.";
+    return undefined;
+  }
+
+  function cellClass(student: ImportRow, field: string) {
+    return fieldIssue(student, field) ? "bg-destructive/10 ring-1 ring-inset ring-destructive" : "";
+  }
 
   async function previewFile(file?: File) {
     setError("");
     setStudents([]);
+    setRowResults([]);
     setFileName("");
     if (!file) return;
     if (!file.name.toLowerCase().endsWith(".xlsx")) {
@@ -117,20 +138,18 @@ export function ImportStudentsPanel({
 
   async function importStudents() {
     setError("");
+    setRowResults([]);
     setImporting(true);
     try {
       const result = await apiSend<{
         created: number;
-        results: { email: string; mailSent: boolean; lessonsAdded: number }[];
+        results: ImportResult[];
       }>("post", "/admin/students/import", { students, addToUpcoming });
-      const failedEmails = result.results.filter((student) => !student.mailSent).map((student) => student.email);
-      const lessonsAdded = result.results.reduce((total, student) => total + student.lessonsAdded, 0);
-      const summary = `${result.created} llogari studenti u krijuan.${lessonsAdded ? ` U shtuan ${lessonsAdded} regjistrime në mësimet e ardhshme.` : ""}`;
-      if (failedEmails.length) {
-        toast.warning(`${summary} Emaili nuk u dërgua për: ${failedEmails.join(", ")}.`);
-      } else {
-        toast.success(`${summary} Emaili për vendosjen e fjalëkalimit u dërgua për të gjithë.`);
-      }
+      setRowResults(result.results);
+      const failed = result.results.filter((student) => student.status === "failed");
+      const skipped = result.results.filter((student) => student.status === "skipped");
+      const mailFailed = result.results.filter((student) => student.status === "created" && !student.mailSent);
+      toast[failed.length ? "warning" : "success"](`${result.created} u krijuan; ${skipped.length} u anashkaluan; ${failed.length} dështuan.${mailFailed.length ? ` Emaili nuk u dërgua për: ${mailFailed.map(({ email }) => email).join(", ")}.` : ""}`);
       onImported();
     } catch (cause) {
       setError(errorMessage(cause));
@@ -180,27 +199,40 @@ export function ImportStudentsPanel({
                 </tr>
               </thead>
               <tbody>
-                {students.map((student, index) => (
-                  <tr key={`${student.email}-${index}`} className="border-t align-top">
-                    <td className="p-2"><MarqueeText text={student.emri} /></td>
-                    <td className="p-2"><MarqueeText text={student.email} /></td>
-                    <td className="p-2"><MarqueeText text={student.profile.phone || "?"} /></td>
-                    <td className="p-2"><MarqueeText text={student.profile.birthDate || "?"} /></td>
-                    <td className="p-2"><MarqueeText text={student.profile.gender || "?"} /></td>
-                    <td className="p-2"><MarqueeText text={student.profile.city || "?"} /></td>
-                    <td className="p-2"><MarqueeText text={student.profile.notes || "?"} /></td>
-                    <td className="p-2"><MarqueeText text={student.abonimi.join(", ") || "?"} /></td>
+                {students.map((student) => {
+                  const result = rowResults.find((item) => item.row === student.rowNumber);
+                  const rowIssue = result?.status === "failed" && !result.fields?.length;
+                  return <tr key={`${student.rowNumber}-${student.email}`} className={`border-t align-top ${rowIssue ? "bg-destructive/10" : ""}`}>
+                    <td className={`p-2 ${cellClass(student, "emri")}`} title={fieldIssue(student, "emri")}><MarqueeText text={student.emri || "?"} /></td>
+                    <td className={`p-2 ${cellClass(student, "email")}`} title={fieldIssue(student, "email")}><MarqueeText text={student.email || "?"} /></td>
+                    <td className={`p-2 ${cellClass(student, "phone")}`} title={fieldIssue(student, "phone")}><MarqueeText text={student.profile.phone || "?"} /></td>
+                    <td className={`p-2 ${cellClass(student, "birthDate")}`} title={fieldIssue(student, "birthDate")}><MarqueeText text={student.profile.birthDate || "?"} /></td>
+                    <td className={`p-2 ${cellClass(student, "gender")}`} title={fieldIssue(student, "gender")}><MarqueeText text={student.profile.gender || "?"} /></td>
+                    <td className={`p-2 ${cellClass(student, "city")}`} title={fieldIssue(student, "city")}><MarqueeText text={student.profile.city || "?"} /></td>
+                    <td className={`p-2 ${cellClass(student, "notes")}`} title={fieldIssue(student, "notes")}><MarqueeText text={student.profile.notes || "?"} /></td>
+                    <td className={`p-2 ${cellClass(student, "abonimi")}`} title={fieldIssue(student, "abonimi")}><MarqueeText text={student.abonimi.join(", ") || "?"} /></td>
                   </tr>
-                ))}
+                })}
               </tbody>
             </table>
           </div>
+          {students.some((student) => student.issues.length > 0) && (
+            <Alert variant="destructive">
+              <AlertDescription>
+                <ul className="max-h-36 overflow-y-auto list-inside list-disc space-y-1 pr-2">
+                  {students.flatMap((student) => student.issues.map((issue, index) => (
+                    <li key={`${student.rowNumber}-${issue.field}-${index}`}>Rreshti {student.rowNumber}, {issue.field}: {issue.message}</li>
+                  )))}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
           <p className="text-sm">U gjetën {students.length} studentë.</p>
           {repeatedEmails.size > 0 && (
-            <Alert variant="destructive"><AlertDescription>Emaili përsëritet në skedar: {[...repeatedEmails].join(", ")}.</AlertDescription></Alert>
+            <Alert><AlertDescription className="max-h-24 overflow-y-auto break-words">Emaili përsëritet në skedar; pas rreshtit të parë do të anashkalohet: {[...repeatedEmails].join(", ")}.</AlertDescription></Alert>
           )}
           {unmatched.length > 0 && (
-            <Alert variant="destructive"><AlertDescription>Abonimet nuk përputhen me kurset: {unmatched.join(", ")}.</AlertDescription></Alert>
+            <Alert variant="destructive"><AlertDescription className="max-h-24 overflow-y-auto break-words">Abonimet nuk përputhen me kurset: {unmatched.join(", ")}.</AlertDescription></Alert>
           )}
           <div className="flex items-start gap-2">
             <label className="flex items-start gap-2 text-sm">
@@ -209,6 +241,15 @@ export function ImportStudentsPanel({
             </label>
             <InfoTip label="Mësimet e ardhshme" className="mt-0.5">{fieldInfo.toggles.addToUpcoming}</InfoTip>
           </div>
+          {rowResults.length > 0 && (
+            <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border p-2 text-sm" role="status" aria-live="polite">
+              {rowResults.map((result) => (
+                <p key={`${result.row}-${result.email}`} className={result.status === "failed" ? "rounded bg-destructive/10 p-2 text-destructive" : "text-muted-foreground"}>
+                  Rreshti {result.row} ({result.email || "email i pavlefshëm"}): {result.status === "created" ? "u krijua" : result.status === "skipped" ? "u anashkalua" : "dështoi"}{result.reason ? ` — ${result.reason}` : ""}
+                </p>
+              ))}
+            </div>
+          )}
         </>
       )}
 
@@ -217,7 +258,7 @@ export function ImportStudentsPanel({
         <Button
           type="button"
           onClick={() => void importStudents()}
-          disabled={!students.length || !!error || unmatched.length > 0 || repeatedEmails.size > 0 || previewing || importing}
+          disabled={!students.length || !!error || previewing || importing}
         >
           {importing ? "Duke krijuar llogaritë…" : `Krijo ${students.length || "studentët"}`}
         </Button>

@@ -73,7 +73,7 @@ export function CreateStudentDialog({ defaultOpen = false, courses }: { defaultO
           <Plus aria-hidden /> {t.create.open}
         </Button>
       </DialogTrigger>
-      <DialogContent className={mode === "import" ? "sm:max-w-2xl" : "max-h-[90vh] overflow-y-auto sm:max-w-lg"}>
+      <DialogContent className={`max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] overflow-y-auto ${mode === "import" ? "sm:max-w-4xl" : "sm:max-w-lg"}`}>
         <DialogHeader>
           <DialogTitle>{t.create.title}</DialogTitle>
           <DialogDescription>{t.create.description}</DialogDescription>
@@ -91,7 +91,6 @@ export function CreateStudentDialog({ defaultOpen = false, courses }: { defaultO
             courses={courses}
             onCancel={() => setMode("single")}
             onImported={() => {
-              changeOpen(false);
               router.refresh();
             }}
           />

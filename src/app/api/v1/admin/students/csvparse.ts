@@ -1,16 +1,18 @@
 import "server-only";
 import ExcelJS from "exceljs";
-import { studentProfileSchema, type StudentProfileInput } from "@/lib/student-profile";
+import { studentProfileSchema } from "@/lib/student-profile";
 
 export const MAX_IMPORT_STUDENTS = 100;
-export const MAX_IMPORT_FILE_BYTES = 5 * 1024 * 1024;
+export const MAX_IMPORT_FILE_BYTES = 50 * 1024 * 1024;
 export const MAX_IMPORT_NOTE_LENGTH = 100;
 
 export type StudentImportRow = {
+  rowNumber: number;
   emri: string;
   email: string;
   abonimi: string[];
-  profile: StudentProfileInput;
+  profile: { phone: string; birthDate: string; gender: string; city: string; notes: string };
+  issues: { field: string; message: string }[];
 };
 
 function normalizeHeader(value: unknown) {
@@ -113,28 +115,28 @@ export async function parseStudentWorkbook(buffer: Uint8Array): Promise<StudentI
     };
     if (!emri && !email && !abonimetText && !Object.values(profile).some(Boolean)) return;
 
-    if (emri.length < 2 || emri.length > 100) {
-      throw new Error(`Rreshti ${rowNumber}: Emrat duhet të kenë 2 deri në 100 karaktere.`);
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 200) {
-      throw new Error(`Rreshti ${rowNumber}: Email mungon ose nuk është i vlefshëm.`);
-    }
-
+    const issues: StudentImportRow["issues"] = [];
+    if (emri.length < 2 || emri.length > 100) issues.push({ field: "emri", message: "Emrat duhet të kenë 2 deri në 100 karaktere." });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 200) issues.push({ field: "email", message: "Email mungon ose nuk është i vlefshëm." });
     const parsedProfile = studentProfileSchema.safeParse(profile);
     if (!parsedProfile.success) {
-      const firstIssue = parsedProfile.error.issues[0];
       const fieldNames: Record<string, string> = { phone: "Telefoni", birthDate: "Datëlindja", gender: "Gjinia", city: "Qyteti", notes: "Shënime" };
-      throw new Error(`Rreshti ${rowNumber}: ${fieldNames[String(firstIssue.path[0])] ?? "Profili"}: ${firstIssue.message}`);
+      for (const issue of parsedProfile.error.issues) {
+        const field = String(issue.path[0] ?? "profile");
+        issues.push({ field, message: `${fieldNames[field] ?? "Profili"}: ${issue.message}` });
+      }
     }
-    if (parsedProfile.data.notes.length > MAX_IMPORT_NOTE_LENGTH) {
-      throw new Error(`Rreshti ${rowNumber}: Shënimet mund të kenë maksimumi ${MAX_IMPORT_NOTE_LENGTH} karaktere.`);
+    if (profile.notes.length > MAX_IMPORT_NOTE_LENGTH) {
+      issues.push({ field: "notes", message: `Shënimet mund të kenë maksimumi ${MAX_IMPORT_NOTE_LENGTH} karaktere.` });
     }
 
     students.push({
+      rowNumber,
       emri,
       email,
       abonimi: abonimetText ? abonimetText.split(/[;,]/).map((value) => value.trim()).filter(Boolean) : [],
-      profile: parsedProfile.data,
+      profile: { ...profile, ...(parsedProfile.success ? parsedProfile.data : {}) },
+      issues,
     });
     if (students.length > MAX_IMPORT_STUDENTS) {
       throw new Error(`Dokumenti mund të përmbajë maksimumi ${MAX_IMPORT_STUDENTS} studentë.`);

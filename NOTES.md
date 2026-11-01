@@ -143,7 +143,7 @@ Original brief: `c:\Users\aleksiljs\Downloads\Beauty_Academy_Zoom_Claude_Megapro
   re-added automatically: in the roster they're listed unticked ("Aksesi u hoq më parë").
 - Deactivated accounts are never offered. Tests: `course-members.integration.test.ts`.
 
-## Excel student onboarding (2026-10-28)
+## Excel student onboarding (updated 2026-11-01)
 
 - Admin opens `/admin/studentet` → **Student i ri** → **Importo nga Excel**. The existing single-student
   creation form remains available in the same dialog.
@@ -154,19 +154,28 @@ Original brief: `c:\Users\aleksiljs\Downloads\Beauty_Academy_Zoom_Claude_Megapro
 - **Shkarko shabllonin Excel** in the import panel downloads a ready sheet with those columns (birth date
   formatted as text so Excel can't swap day and month, a gender dropdown) and an "Udhëzime" sheet explaining
   each column and listing the current course names to copy into `Abonimet`.
-- Preview and import are separate admin-authenticated API requests. Preview checks the file (5 MB maximum),
-  rows (100 students maximum), required values, and email format. It returns only the three fields needed for
-  onboarding; the workbook is read in memory and is never written to disk or retained by the API.
-- On confirmation, subscription names are normalized and matched case-insensitively to existing course titles.
-  Unmatched names block the import. The admin may also choose to add each student to upcoming lessons for
-  their matched courses. Each account receives the same password-setup email as manual student creation.
-- Implementation: `src/components/admin/students/import-students-panel.tsx`, the integration in
+- Preview and import are separate admin-authenticated API requests. The `.xlsx` file limit is 50 MB and each
+  workbook can contain at most 100 student rows. Preview reads the workbook in memory; the uploaded workbook
+  is not retained by the API.
+- Import processes rows sequentially and returns each row's number, email, and outcome: created, failed, or
+  skipped. A failure on one row does not stop later rows. Existing account emails and repeated emails later in
+  the same workbook are skipped. After an interrupted request, retrying the same workbook skips accounts that
+  were already created. Invalid values are reported per row, with every affected field highlighted in the
+  preview. The import panel stays open after processing so admins can review failed rows and their reasons.
+  Existing/repeated emails and unmatched course names are also marked in their corresponding cells.
+- Subscription names are normalized and matched case-insensitively to course titles. An unknown course fails
+  its row while the other rows continue. The admin may choose to add successfully imported students to upcoming
+  lessons for their courses. Each created account receives the usual password-setup email.
+- Test workbooks: `student-import-test.xlsx` covers successful, repeated/existing email, invalid name/email,
+  profile-field, and course cases, with 100 student rows to check that row failures do not stop the batch.
+  It can create up to four synthetic accounts if the earlier sample emails have never been imported; the
+  `.invalid` domain is not deliverable. `student-import-test-invalid-headers.xlsx` checks malformed headers;
+  `student-import-test-over-100-rows.xlsx` checks the row-count limit; `student-import-test-empty.xlsx` checks
+  an empty sheet; and `student-import-test-corrupt.xlsx` checks an unreadable workbook.
+  `student-import-test-over-50mb.xlsx` is a 51 MiB upload-limit fixture; upload it directly rather than opening it.
+- Implementation: `src/components/admin/students/import-students-panel.tsx`, the dialog integration in
   `src/components/admin/students/create-student-dialog.tsx`, parser `src/app/api/v1/admin/students/csvparse.ts`,
-  and API routes under `src/app/api/v1/admin/students/import/`. Existing account and course services are reused.
-- Browser acceptance: user confirmed the Excel import and review workflow works. The batch is prevalidated
-  before writes, but account creation/course assignment is sequential rather than a single transaction; an
-  unexpected server/database failure mid-batch can leave earlier rows imported. Check the students list before
-  retrying after such a failure.
+  and API routes under `src/app/api/v1/admin/students/import/`.
 
 ## Lessons never get stuck in the wrong state (2026-10-27, from the business-logic review)
 
@@ -251,8 +260,7 @@ or "live" for up to 30 days. Now:
   whatever the browser's language; the icon opens the browser's calendar. Values stay ISO underneath.
 - Numbered pagination (`lib/pagination.ts`), phone numbers checked for 7–15 digits with an optional + / 00
   prefix, dark scroll bars (`color-scheme: dark`).
-- **Not done yet**: the Excel import doesn't take the new student fields (phone, birth date, gender, city,
-  notes) nor has a template; the video "Watch" behaviour on laptops is still to be decided; automatic clean-up
+- **Not done yet**: the video "Watch" behaviour on laptops is still to be decided; automatic clean-up
   of old materials (retention period to be decided) is planned.
 
 ## Materials library, repeating lessons, student details (user request, 2026-10-28)

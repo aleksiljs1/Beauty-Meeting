@@ -7,7 +7,7 @@ export const POST = route(async (request) => {
 
   const contentLength = Number(request.headers.get("content-length") ?? 0);
   if (contentLength > MAX_IMPORT_FILE_BYTES + 128_000) {
-    throw new ApiError("VALIDATION_FAILED", "Skedari nuk duhet të jetë më i madh se 5 MB.");
+    throw new ApiError("VALIDATION_FAILED", "Skedari nuk duhet të jetë më i madh se 50 MB.");
   }
 
   let form: FormData;
@@ -22,7 +22,7 @@ export const POST = route(async (request) => {
     throw new ApiError("VALIDATION_FAILED", "Zgjidhni skedarin Excel.");
   }
   if (file.size > MAX_IMPORT_FILE_BYTES) {
-    throw new ApiError("VALIDATION_FAILED", "Skedari nuk duhet të jetë më i madh se 5 MB.");
+    throw new ApiError("VALIDATION_FAILED", "Skedari nuk duhet të jetë më i madh se 50 MB.");
   }
   if (!/\.xlsx$/i.test(file.name)) {
     throw new ApiError("VALIDATION_FAILED", "Përdorni një skedar .xlsx.");
