@@ -43,6 +43,8 @@ model User {
   profile            StudentProfile?
   payments           Payment[]              @relation("PaymentStudent")
   paymentsRecorded   Payment[]              @relation("PaymentRecorder")
+  adminPreferences   AdminPreferences?
+  lessonReminders    AdminLessonReminder[]
 
   @@unique([email])
   @@map("user")
@@ -259,6 +261,7 @@ model Lesson {
   materials     LessonMaterial[]
   recordings    Recording[]
   notifications Notification[]
+  adminReminders AdminLessonReminder[]
 
   @@index([publication, scheduledStartAt])
   @@index([meetingStatus])
@@ -617,4 +620,34 @@ model StudentProfile {
   /// Private admin notes; never shown to the student.
   notes     String?
   updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+}
+
+// =============================================================================
+// Admin preferences
+// =============================================================================
+
+/// One admin's own settings (today: the email reminder before lessons).
+model AdminPreferences {
+  userId                String   @id
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonReminderEnabled Boolean  @default(false)
+  /// How long before a lesson starts the reminder goes out.
+  lessonReminderMinutes Int      @default(60)
+  /// Where reminders go; null = the admin's account email.
+  reminderEmail         String?
+  updatedAt             DateTime @updatedAt @db.Timestamptz(3)
+}
+
+/// A reminder already sent: one per admin, lesson and start time, so a moved lesson is reminded
+/// again at its new time and a restart never sends the same reminder twice.
+model AdminLessonReminder {
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId String   @db.Uuid
+  lesson   Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  startsAt DateTime @db.Timestamptz(3)
+  sentAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  @@id([userId, lessonId, startsAt])
+  @@index([lessonId])
 }

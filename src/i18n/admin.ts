@@ -17,6 +17,7 @@ export const admin = {
       integrations: "Integrimet",
       history: "Historiku",
       help: "Ndihmë",
+      settings: "Cilësimet",
     },
   },
 
@@ -242,6 +243,26 @@ export const admin = {
       description: "Për studentët që filluan kursin më vonë. Muajt para këtij nuk llogariten si borxh.",
       label: "Muaji i kursit",
       success: "Muaji i fillimit u ruajt.",
+    },
+  },
+
+  preferences: {
+    title: "Cilësimet",
+    intro: "Cilësimet tuaja si administrator.",
+    reminder: {
+      title: "Kujtesë para mësimeve",
+      description: "Merrni një email pak para se të fillojë çdo mësim i publikuar, që të mos ju shpëtojë asnjë klasë.",
+      toggle: "Më dërgo kujtesë me email",
+      lead: "Sa kohë para fillimit",
+      unit: "Njësia",
+      units: { minutes: "minuta", hours: "orë" },
+      presets: "Zgjedhje të shpejta",
+      email: "Dërgoje te",
+      emailHint: (account: string) => `Lëreni bosh për emailin e llogarisë: ${account}`,
+      summaryOn: (lead: string) => `Do të merrni një email ${lead} para çdo mësimi të publikuar.`,
+      summaryOff: "Kujtesat janë të çaktivizuara.",
+      save: "Ruaj",
+      saved: "Cilësimet u ruajtën.",
     },
   },
 

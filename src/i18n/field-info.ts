@@ -99,6 +99,12 @@ export const fieldInfo = {
     addToUpcoming:
       "Studenti regjistrohet menjëherë edhe në mësimet e ardhshme që janë krijuar tashmë për kurset e tij. Pa këtë, futet vetëm në mësimet që krijohen nga tani e tutje.",
   },
+  reminder: {
+    toggle:
+      "Kur është aktive, ju vjen një email para çdo mësimi të publikuar, me orën e fillimit dhe lidhjen te mësimi. Draftet, mësimet e anuluara dhe ato që kanë nisur nuk kujtohen.",
+    lead: "Sa kohë para fillimit të mësimit vjen emaili: nga 5 minuta deri në 24 orë. Nëse e ndryshoni kur një mësim është afër, kujtesa vjen menjëherë.",
+    email: "Adresa ku vijnë kujtesat. Lëreni bosh që të vijnë në emailin me të cilin hyni në panel.",
+  },
   auth: {
     email: "Emaili me të cilin akademia ju regjistroi.",
     password: "Fjalëkalimi që vendosët nga emaili i akademisë. Nëse e keni harruar, përdorni lidhjen më poshtë.",

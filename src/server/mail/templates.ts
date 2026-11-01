@@ -98,3 +98,20 @@ export function passwordResetEmail(params: { to: string; name: string; url: stri
     html: layout(heading, paragraphs, { label: "Vendos fjalëkalim të ri", url: params.url }, footnote),
   };
 }
+
+/** To the admin, some time before a lesson starts (their reminder setting). */
+export function lessonReminderEmail(params: { to: string; name: string; lessonTitle: string; when: string; left: string; url: string; academyName: string }): MailMessage {
+  const heading = `Kujtesë: ${params.lessonTitle}`;
+  const paragraphs = [
+    `Përshëndetje ${params.name},`,
+    `Mësimi "${params.lessonTitle}" në ${params.academyName} fillon ${params.when} (edhe ${params.left}).`,
+    "Klasën live e nisni nga faqja e mësimit në panel.",
+  ];
+  const footnote = "Kujtesat i ndryshoni ose i çaktivizoni te Paneli → Cilësimet.";
+  return {
+    to: params.to,
+    subject: `${heading} (edhe ${params.left})`,
+    text: `${paragraphs.join("\n\n")}\n\n${params.url}\n\n${footnote}`,
+    html: layout(heading, paragraphs, { label: "Hap mësimin", url: params.url }, footnote),
+  };
+}

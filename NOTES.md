@@ -386,3 +386,17 @@ completed on branch `zoom-integration` (2026-10-22): see "Review fixes" below.
 - Web Meeting SDK Client View: https://developers.zoom.us/docs/meeting-sdk/web/client-view/
 - Webhooks (validation, signature): https://developers.zoom.us/docs/api/webhooks/
 - Meetings API: https://developers.zoom.us/docs/api/meetings/
+
+## Admin reminder before lessons (2026-11-01)
+
+- **Cilësimet** (sidebar) → "Kujtesë para mësimeve": a switch, how long before (5 minutes – 24 hours, typed in
+  minutes or hours, with quick presets) and an optional address (empty = the admin's account email). Per admin
+  (`AdminPreferences`).
+- Every minute the web server (`src/instrumentation.ts` → `server/jobs/lesson-reminders.ts`) emails each admin who
+  asked about every **published** lesson starting within their lead time that hasn't started yet. Drafts,
+  cancelled and live/ended lessons are skipped.
+- `AdminLessonReminder` (admin, lesson, start time) is claimed before sending, so a reminder never goes out twice
+  (restarts, several instances); a moved lesson is reminded again at its new time; a failed send is retried the
+  next minute until the lesson starts. Turning it on, or lengthening the time, sends at once for lessons already
+  inside the window.
+- Migration `20261101120000_admin_lesson_reminders` — run `npx prisma migrate deploy` after pulling.
