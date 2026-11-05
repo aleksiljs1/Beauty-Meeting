@@ -80,7 +80,10 @@ export async function handleZoomWebhook(rawBody: string, headers: Headers): Prom
   let envelope: z.infer<typeof envelopeSchema>;
   try {
     envelope = envelopeSchema.parse(JSON.parse(rawBody));
-  } catch {
+  } catch (error) {
+    // Field paths only (no values): enough to see which part of Zoom's payload we don't expect.
+    const fields = error instanceof z.ZodError ? error.issues.map((issue) => issue.path.join(".")).join(", ") : "not JSON";
+    console.warn(`[zoom] webhook payload rejected (${fields})`);
     return { status: 400, body: { error: "invalid_payload" } };
   }
 

@@ -22,7 +22,7 @@ vi.hoisted(() => {
 // --- Fake Zoom: OAuth, the recordings list, and file downloads (storage stays the real local one) ---
 /** A small "MP4": the ftyp box the import checks for, then filler. */
 const VIDEO = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from("ftypmp42"), Buffer.alloc(200_000, 1)]);
-const zoom = { failDownloads: 0, downloads: 0, listed: [] as unknown[] };
+const zoom = { failDownloads: 0, downloads: 0, linkLookups: 0, listed: [] as unknown[] };
 
 vi.stubGlobal("fetch", async (input: string | URL) => {
   const url = new URL(String(input));
@@ -36,6 +36,13 @@ vi.stubGlobal("fetch", async (input: string | URL) => {
     return new Response(VIDEO, { status: 200, headers: { "content-type": "video/mp4" } });
   }
   if (url.pathname.endsWith("/recordings") && url.pathname.startsWith("/v2/users/")) return Response.json({ meetings: zoom.listed });
+  // A meeting's files with their current links (the event's own links need the event's token).
+  if (url.pathname.endsWith("/recordings") && url.pathname.startsWith("/v2/meetings/")) {
+    zoom.linkLookups++;
+    return Response.json({
+      recording_files: ["f-screen", "f-gallery", "f-late"].map((id) => ({ id, download_url: `https://us06web.zoom.us/rec/download/${id}` })),
+    });
+  }
   return Response.json({ message: "unexpected call" }, { status: 500 });
 });
 
@@ -56,7 +63,7 @@ let absent: Awaited<ReturnType<typeof createUser>>;
 beforeEach(async () => {
   await resetDatabase();
   await prisma.webhookEvent.deleteMany();
-  Object.assign(zoom, { failDownloads: 0, downloads: 0, listed: [] });
+  Object.assign(zoom, { failDownloads: 0, downloads: 0, linkLookups: 0, listed: [] });
   const admin = await createUser("admin");
   [klea, arta, absent] = [await createUser("student"), await createUser("student"), await createUser("student")];
   await prisma.user.update({ where: { id: arta.id }, data: { name: "Arta Krasniqi" } });
@@ -123,7 +130,7 @@ const recordingFile = (id: string, layout: string, start: string, end: string) =
   recording_end: end,
   file_size: VIDEO.length,
   status: "completed",
-  download_url: `https://us06web.zoom.us/rec/download/${id}`,
+  download_url: `https://us06web.zoom.us/rec/webhook_download/${id}`, // only valid with the event token
 });
 const recordingCompleted = () => ({
   event: "recording.completed",
@@ -150,6 +157,7 @@ describe("Zoom cloud recordings into Regjistrimet", () => {
     expect(queued.map((r) => [r.providerFileId, r.status, r.layout])).toEqual([["f-screen", "WAITING", "shared_screen_with_speaker_view"]]);
 
     expect(await importNextZoomRecording()).toBe(true);
+    expect(zoom.linkLookups).toBe(1); // the event's own link is never used
     const ready = await prisma.recording.findUniqueOrThrow({ where: { id: queued[0].id } });
     expect(ready).toMatchObject({ status: "READY", sizeBytes: BigInt(VIDEO.length), providerDownloadUrl: null, mimeType: "video/mp4" });
     expect(ready.objectKey).toMatch(/^recordings\//);

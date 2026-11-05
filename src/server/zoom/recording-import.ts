@@ -80,7 +80,7 @@ export async function importNextZoomRecording(now = new Date()): Promise<boolean
   const objectKey = newObjectKey("recordings", recording.lessonId);
   let uploadId: string | null = null;
   try {
-    const response = await zoomDownload(recording.providerDownloadUrl!);
+    const response = await zoomDownload(await currentDownloadUrl(recording));
     uploadId = await startMultipart(objectKey, "video/mp4");
     const size = await streamIntoStorage(response.body!, objectKey, uploadId);
     uploadId = null;
@@ -123,6 +123,26 @@ export async function importNextZoomRecording(now = new Date()): Promise<boolean
 }
 
 class ImportError extends Error {}
+
+const meetingRecordingsSchema = z.object({
+  recording_files: z.array(z.object({ id: z.string().optional(), download_url: z.string().optional() })).default([]),
+});
+
+/**
+ * The download link to use now. The link in Zoom's event only works with that event's own short-lived
+ * token, so the file's current link is asked from Zoom's API (it accepts our server token); the stored
+ * link is the fallback for a recording queued without a meeting UUID.
+ */
+async function currentDownloadUrl(recording: { providerMeetingUuid: string | null; providerFileId: string | null; providerDownloadUrl: string | null }) {
+  if (!recording.providerMeetingUuid || !recording.providerFileId) return recording.providerDownloadUrl!;
+  const meeting = await zoomRequest(`/meetings/${meetingUuidPath(recording.providerMeetingUuid)}/recordings`, {
+    schema: meetingRecordingsSchema,
+    acceptStatus: [404],
+  });
+  const url = meeting?.recording_files.find((file) => file.id === recording.providerFileId)?.download_url;
+  if (!url) throw new ImportError("Regjistrimi nuk gjendet më në Zoom (mund të jetë fshirë atje).");
+  return url;
+}
 
 /** Copies the download into storage in multipart parts; returns the total size. */
 async function streamIntoStorage(body: ReadableStream<Uint8Array>, key: string, uploadId: string): Promise<number> {
