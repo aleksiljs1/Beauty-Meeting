@@ -9,16 +9,19 @@ import { ApiError } from "@/server/http";
 import { audit } from "@/server/services/audit";
 import { applyMeetingEnded, applyMeetingStarted, type EventOutcome } from "@/server/services/live";
 import { toApiError } from "./client";
+import { recordParticipantJoined, recordParticipantLeft } from "@/server/services/attendance";
 import { fetchZoomMeetingStatus } from "./meetings";
+import type { ZoomRecordingFile } from "./recording-files";
+import { queueZoomRecordings } from "./recording-import";
 import { urlValidationResponse, verifyZoomSignature } from "./webhook-signature";
 
 /**
  * Zoom event subscription endpoint logic: verify → store durably → apply → acknowledge.
- * Meeting state changes are quick DB updates, so they run inline; anything long (recording
- * import, Phase 3) will be queued for the worker instead.
+ * Everything here is a quick DB update; a finished cloud recording is only queued — the
+ * background job copies the file (recording-import.ts).
  */
 
-const HANDLED_EVENTS = ["meeting.started", "meeting.ended"] as const;
+const HANDLED_EVENTS = ["meeting.started", "meeting.ended", "recording.completed", "meeting.participant_joined", "meeting.participant_left"] as const;
 type HandledEvent = (typeof HANDLED_EVENTS)[number];
 /** A RECEIVED row older than this was abandoned mid-processing and may be retried. */
 const STUCK_AFTER_MS = 60_000;
@@ -33,8 +36,22 @@ const envelopeSchema = z.object({
       object: z
         .object({
           id: z.union([z.string(), z.number()]).transform(String).optional(),
+          uuid: z.string().optional(),
+          host_id: z.string().optional(),
           start_time: z.string().optional(),
           end_time: z.string().optional(),
+          recording_files: z.array(z.record(z.string(), z.unknown())).optional(),
+          participant: z
+            .object({
+              id: z.string().optional(),
+              user_id: z.union([z.string(), z.number()]).transform(String).optional(),
+              participant_uuid: z.string().optional(),
+              user_name: z.string().default(""),
+              customer_key: z.string().optional(),
+              join_time: z.string().optional(),
+              leave_time: z.string().optional(),
+            })
+            .optional(),
         })
         .optional(),
     })
@@ -77,7 +94,8 @@ export async function handleZoomWebhook(rawBody: string, headers: Headers): Prom
   if (fromOtherAccount || !HANDLED_EVENTS.includes(envelope.event as HandledEvent)) return { status: 200, body: { ok: true } };
 
   const meetingNumber = envelope.payload.object?.id ?? null;
-  const event = await recordEvent(envelope.event, meetingNumber, envelope.event_ts);
+  // Several people can join in the same millisecond: their events must not look like duplicates.
+  const event = await recordEvent(envelope.event, meetingNumber, envelope.event_ts, participantKey(envelope));
   if (!event) return { status: 200, body: { ok: true, duplicate: true } };
 
   try {
@@ -96,8 +114,8 @@ export async function handleZoomWebhook(rawBody: string, headers: Headers): Prom
  * Stores the event; returns null for duplicates that were already handled. A FAILED or
  * stuck event with the same key is re-claimed so Zoom's retry can complete it.
  */
-async function recordEvent(eventType: string, meetingNumber: string | null, eventTs: number) {
-  const dedupeKey = `zoom:${eventType}:${meetingNumber ?? "-"}:${eventTs}`;
+async function recordEvent(eventType: string, meetingNumber: string | null, eventTs: number, discriminator: string | null) {
+  const dedupeKey = `zoom:${eventType}:${meetingNumber ?? "-"}:${eventTs}${discriminator ? `:${discriminator}` : ""}`.slice(0, 500);
   try {
     return await prisma.webhookEvent.create({
       data: { provider: "zoom", dedupeKey, eventType, meetingNumber, eventTs: BigInt(eventTs) },
@@ -126,11 +144,35 @@ async function applyEvent(
   if (!lesson) return { status: "IGNORED", note: "meeting not linked to a lesson" };
 
   const object = envelope.payload.object;
+  if (event === "recording.completed") {
+    const queued = await queueZoomRecordings(lesson.id, object?.uuid ?? null, (object?.recording_files ?? []) as ZoomRecordingFile[]);
+    return queued ? { status: "PROCESSED", note: null } : { status: "IGNORED", note: "no new video files" };
+  }
+  if (event === "meeting.participant_joined" || event === "meeting.participant_left") {
+    const participant = object?.participant;
+    const key = participantKey(envelope);
+    if (!participant || !key) return { status: "IGNORED", note: "no participant" };
+    // The teacher's own presence isn't attendance.
+    if (object?.host_id && (participant.id === object.host_id || participant.user_id === object.host_id)) return { status: "IGNORED", note: "host" };
+    const joined = event === "meeting.participant_joined";
+    const at = parseTime(joined ? participant.join_time : participant.leave_time, envelope.event_ts);
+    const details = { key, name: participant.user_name || "Pa emër", customerKey: participant.customer_key ?? null, at };
+    if (joined) await recordParticipantJoined(lesson.id, details);
+    else await recordParticipantLeft(lesson.id, { ...details, joinedAt: participant.join_time ? parseTime(participant.join_time, envelope.event_ts) : null });
+    return { status: "PROCESSED", note: null };
+  }
   const outcome: EventOutcome =
     event === "meeting.started"
       ? await applyMeetingStarted(lesson.id, parseTime(object?.start_time, envelope.event_ts))
       : await applyMeetingEnded(lesson.id, parseTime(object?.end_time, envelope.event_ts));
   return outcome === "applied" ? { status: "PROCESSED", note: null } : { status: "IGNORED", note: "stale or duplicate state" };
+}
+
+/** Zoom's id for the person in a participant event (stable across rejoins in one meeting). */
+function participantKey(envelope: z.infer<typeof envelopeSchema>): string | null {
+  const participant = envelope.payload.object?.participant;
+  if (!participant) return null;
+  return participant.participant_uuid || participant.user_id || participant.id || (participant.user_name ? `name:${participant.user_name}` : null);
 }
 
 type ZoomMeetingStatus = Awaited<ReturnType<typeof fetchZoomMeetingStatus>>;

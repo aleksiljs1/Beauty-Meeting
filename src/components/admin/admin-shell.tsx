@@ -18,6 +18,7 @@ import { signOut } from "@/lib/api/auth";
 import { onSignedOut } from "@/lib/api/auth-events";
 import { admin } from "@/i18n/admin";
 import { common } from "@/i18n/common";
+import { SHOW_BRAND_NAME } from "@/lib/brand";
 import { ClassAlertBanner } from "./class-alert-banner";
 import { cn } from "@/lib/utils";
 
@@ -66,7 +67,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 function Brand() {
   return (
     <Link href="/admin" className="block px-3 font-heading text-2xl leading-tight text-foreground">
-      {common.brandFallback}
+      {SHOW_BRAND_NAME && common.brandFallback}
       <span className="block font-sans text-xs tracking-wide text-muted-foreground uppercase">{admin.shell.title}</span>
     </Link>
   );
@@ -139,7 +140,7 @@ export function AdminShell({ user, children }: { user: { name: string; email: st
               </nav>
             </SheetContent>
           </Sheet>
-          <span className="font-heading text-lg">{common.brandFallback}</span>
+          {SHOW_BRAND_NAME && <span className="font-heading text-lg">{common.brandFallback}</span>}
           {userMenu}
         </header>
         <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-10">

@@ -9,6 +9,7 @@ import type { MailMessage } from "@/server/mail";
 import { lessonCancelledEmail, lessonLiveEmail, lessonRescheduledEmail } from "@/server/mail/templates";
 import { formatTimeRange, formatWeekdayDate, timezoneAbbreviation } from "@/lib/datetime";
 import { publishFeedChanged, publishLessonChanged } from "@/server/realtime/publish";
+import { closeOpenAttendance } from "./attendance";
 import { audit } from "./audit";
 
 /**
@@ -52,6 +53,7 @@ export async function markLessonEnded(lessonId: string, source: EndSource, actor
     where: { lessonId, type: "LESSON_LIVE", OR: [{ validUntil: null }, { validUntil: { gt: endedAt } }] },
     data: { validUntil: endedAt },
   });
+  await closeOpenAttendance(lessonId, endedAt);
   await publishLessonChanged(lessonId);
   await audit(actorId, END_AUDIT_ACTION[source], "lesson", lessonId);
 }
@@ -97,6 +99,7 @@ export async function applyMeetingEnded(lessonId: string, endedAt: Date): Promis
     where: { lessonId, type: "LESSON_LIVE", OR: [{ validUntil: null }, { validUntil: { gt: endedAt } }] },
     data: { validUntil: endedAt },
   });
+  await closeOpenAttendance(lessonId, endedAt);
   await publishLessonChanged(lessonId);
   await audit(null, "lesson.end", "lesson", lessonId, { source: "zoom" });
   return "applied";

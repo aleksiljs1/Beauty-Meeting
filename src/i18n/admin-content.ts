@@ -66,6 +66,8 @@ export const adminContent = {
     createTitle: "Kurs i ri",
     editTitle: "Ndrysho kursin",
     titleLabel: "Titulli i kursit",
+    image: "Fotoja e kursit",
+    imageEmpty: "Pa foto: shfaqet kopertina e paracaktuar",
     slug: "Adresa (slug)",
     slugHint: "Krijohet nga titulli. Vetëm shkronja të vogla, numra dhe viza: /akademia/…",
     summary: "Përmbledhje",

@@ -10,6 +10,8 @@ import { z } from "zod";
 import { CheckList } from "@/components/admin/check-list";
 import { DateInput, DateTimeInput } from "@/components/admin/date-inputs";
 import { FormField } from "@/components/admin/form-field";
+import { ImagePicker } from "@/components/admin/image-picker";
+import { LabelRow } from "@/components/info-tip";
 import { errorMessage } from "@/components/admin/use-api-action";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -55,6 +57,7 @@ const schema = z.object({
   summary: z.string().max(1_000, t.validation.long),
   details: z.string().max(20_000, t.validation.long),
   courseId: z.string(),
+  imageId: z.string().nullable(),
   isDemo: z.boolean(),
   scheduledStartAt: dateField,
   scheduledEndAt: dateField,
@@ -69,17 +72,19 @@ export type LessonFormLesson = {
   summary: string | null;
   details: string | null;
   courseId: string | null;
+  imageId: string | null;
   isDemo: boolean;
   publication: "DRAFT" | "PUBLISHED" | "ARCHIVED" | "CANCELLED";
   meetingStatus: string;
 } & LessonSchedule;
 
-function toValues(source: LessonSchedule & { title?: string; summary?: string | null; details?: string | null; courseId?: string | null; isDemo?: boolean }): Values {
+function toValues(source: LessonSchedule & { title?: string; summary?: string | null; details?: string | null; courseId?: string | null; imageId?: string | null; isDemo?: boolean }): Values {
   return {
     title: source.title ?? "",
     summary: source.summary ?? "",
     details: source.details ?? "",
     courseId: source.courseId ?? NO_COURSE,
+    imageId: source.imageId ?? null,
     isDemo: source.isDemo ?? false,
     scheduledStartAt: toZonedInputValue(source.scheduledStartAt),
     scheduledEndAt: toZonedInputValue(source.scheduledEndAt),
@@ -167,6 +172,7 @@ export function LessonForm({
       summary: values.summary,
       details: values.details,
       courseId: values.courseId === NO_COURSE ? null : values.courseId,
+      imageId: values.imageId,
       ...(demoAllowed || isEdit ? { isDemo: values.isDemo } : {}),
       scheduledStartAt: schedule.scheduledStartAt.toISOString(),
       scheduledEndAt: schedule.scheduledEndAt.toISOString(),
@@ -238,6 +244,23 @@ export function LessonForm({
           />
         )}
         {courseStudents.status !== "idle" && <CourseStudentsField state={courseStudents} />}
+        <div className="grid gap-1.5">
+          <LabelRow info={fieldInfo.lesson.image} infoLabel={t.image}>
+            <span className="text-sm font-medium">{t.image}</span>
+          </LabelRow>
+          <Controller
+            control={form.control}
+            name="imageId"
+            render={({ field }) => (
+              <ImagePicker
+                value={field.value}
+                onChange={(id) => field.onChange(id)}
+                altText={form.getValues("title")}
+                emptyHint={courseId === NO_COURSE ? t.imageEmpty : t.imageFromCourse}
+              />
+            )}
+          />
+        </div>
       </div>
 
       <fieldset className="space-y-4 rounded-md border p-4">

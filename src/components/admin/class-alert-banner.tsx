@@ -3,6 +3,7 @@
 import { ArrowRight, Video } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { CoverImage } from "@/components/cover-image";
 import { Button } from "@/components/ui/button";
 import { admin } from "@/i18n/admin";
 import { formatLead } from "@/lib/admin-reminders";
@@ -82,8 +83,9 @@ function ClassAlertCard({ alert, zoomLive, now, compact = false }: { alert: Clas
         compact && "py-3",
       )}
     >
-      <div className="flex min-w-0 items-start gap-3">
-        <span aria-hidden className="relative mt-1.5 flex size-3 shrink-0">
+      <div className="flex min-w-0 items-center gap-4">
+        {!compact && <CoverImage src={alert.coverSrc} alt="" title={alert.title} sizes="128px" className="hidden h-16 w-28 shrink-0 rounded-md border sm:block" />}
+        <span aria-hidden className="relative flex size-3 shrink-0 self-start sm:self-center">
           <span className={cn("absolute inline-flex size-full rounded-full opacity-60 motion-safe:animate-ping", alert.live ? "bg-live" : "bg-rose")} />
           <span className={cn("relative inline-flex size-3 rounded-full", alert.live ? "bg-live" : "bg-rose")} />
         </span>

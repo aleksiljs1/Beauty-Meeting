@@ -47,7 +47,7 @@ export function ChangePasswordForm() {
   });
 
   return (
-    <form onSubmit={onSubmit} noValidate className="grid max-w-md gap-4">
+    <form onSubmit={onSubmit} method="post" noValidate className="grid max-w-md gap-4">
       <FormField label={t.fields.currentPassword} info={fieldInfo.auth.currentPassword} type="password" autoComplete="current-password" error={errors.current?.message} {...register("current")} />
       <FormField
         label={t.fields.newPassword}

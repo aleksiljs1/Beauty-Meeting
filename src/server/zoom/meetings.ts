@@ -158,6 +158,19 @@ export async function deleteZoomMeeting(lessonId: string, meetingNumber: string 
  * token: callers hand it to the admin immediately and never store or log it. Links that
  * aren't Zoom https URLs come back as null.
  */
+/**
+ * A meeting made before cloud recording was switched on (ZOOM_AUTO_RECORDING) records too:
+ * checked each time the teacher starts it. Best effort — never blocks starting the class.
+ */
+export async function ensureCloudRecording(meetingNumber: string) {
+  if (env.ZOOM_AUTO_RECORDING !== "cloud") return;
+  try {
+    await zoomRequest(`/meetings/${meetingNumber}`, { method: "PATCH", body: { settings: { auto_recording: "cloud" } } });
+  } catch (error) {
+    console.warn("[zoom] could not switch cloud recording on", (error as Error).message);
+  }
+}
+
 export async function fetchZoomMeetingLinks(meetingNumber: string): Promise<{ joinUrl: string | null; startUrl: string | null }> {
   const meeting = await zoomRequest(`/meetings/${meetingNumber}`, {
     schema: z.object({ join_url: z.string().nullish(), start_url: z.string().nullish() }),

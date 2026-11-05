@@ -428,3 +428,31 @@ From a full read-only review (student journey, admin workflows, structure, secur
 - **Security hardening**: Better Auth `/update-user`, `/change-email`, `/delete-user` disabled (names/emails are
   admin-managed; a student could rename themselves "Mësuesja" in Zoom); the reset email is sent without waiting
   (no timing hint about which emails exist); SMTP requires TLS with a login and has timeouts; logs mask addresses.
+
+## Zoom cloud recordings and attendance (2026-11-05)
+
+- **Recordings → Regjistrimet automatically.** With `ZOOM_AUTO_RECORDING=cloud`, meetings record to Zoom's cloud
+  (older meetings are switched to cloud recording when the teacher starts them). Zoom's `recording.completed`
+  event queues one `Recording` (source ZOOM, WAITING) per recorded segment, in the best view
+  (`shared_screen_with_speaker_view` first; audio, chat and transcript files are skipped; the Zoom file id is unique,
+  so repeated events queue nothing twice). The background job (`server/jobs/recording-imports.ts`, every minute)
+  downloads each file with our OAuth token and streams it into storage in 64 MB multipart parts, checks it is MP4,
+  marks it READY and notifies the students. A failure is retried after 10 minutes, at most 3 times; the admin sees
+  the status and reason in Regjistrimet (and on the dashboard). Once an hour it also asks Zoom for recordings of
+  classes that ended in the last week without one (the event was missed, e.g. the site was offline).
+- `ZOOM_RECORDINGS_AFTER_IMPORT=keep|trash`: `trash` moves the cloud file to Zoom's trash after the copy
+  (recoverable there for 30 days) so the plan's cloud storage doesn't fill up. Default `keep`.
+- **Attendance.** Zoom's `meeting.participant_joined/left` events become `LessonAttendance` rows (one per stay).
+  Students who join from our site carry their user id as Zoom's `customerKey`; Zoom-app joiners are matched by an
+  exact (accent/case-insensitive) name among the lesson's students, otherwise listed as "Të tjerë". The teacher is
+  skipped. Ending the class closes open stays. Admin → lesson → **Pjesëmarrja**: who came, time in class (overlaps
+  counted once), joins, who didn't come.
+- **Zoom app setup (one time, in the Server-to-Server app on marketplace.zoom.us):**
+  - Event subscriptions — add **Recording → "All Recordings have completed"** (`recording.completed`),
+    **Meeting → "Participant/Host joined meeting"** and **"Participant/Host left meeting"**, next to the existing
+    Meeting Started / Ended.
+  - Scopes — add cloud recording read scopes (list the user's recordings and read recording files, e.g.
+    `cloud_recording:read:list_user_recordings:admin`, `cloud_recording:read:list_recording_files:admin`), and the
+    recording-file delete scope only if `ZOOM_RECORDINGS_AFTER_IMPORT=trash`. Names as listed in Zoom's scope picker.
+- Migration `20261105150000_zoom_recordings_attendance`. Tests: `zoom/recording-files.test.ts`,
+  `lib/attendance.test.ts`, `zoom/zoom-recordings.integration.test.ts` (fake Zoom, real storage).

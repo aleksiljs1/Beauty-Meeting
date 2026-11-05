@@ -9,6 +9,7 @@ import { prisma } from "@/server/db";
 import { env, ZOOM_LIVE_VARIABLES } from "@/server/env";
 import { ApiError } from "@/server/http";
 import { s3 } from "@/server/storage/storage";
+import { coverSelect, lessonCoverSrc } from "./cover";
 import { invitationStatus, rosterEntryState } from "./invitation-status";
 
 /**
@@ -43,6 +44,8 @@ const dashboardLessonSelect = {
   meetingStatus: true,
   liveStartedAt: true,
   isDemo: true,
+  image: coverSelect,
+  course: { select: { image: coverSelect } },
   _count: { select: { enrollments: { where: { revokedAt: null } } } },
 } as const;
 
@@ -125,7 +128,7 @@ export async function getAdminDashboard(now = new Date()) {
     ...draftsSoon.map((l) => ({ kind: "DRAFT_STARTING" as const, id: l.id, lessonId: l.id, lessonTitle: l.title, name: null, message: null, at: l.scheduledStartAt })),
   ].sort((a, b) => b.at.getTime() - a.at.getTime());
 
-  const toCard = ({ _count, ...lesson }: (typeof live)[number]) => ({ ...lesson, students: _count.enrollments });
+  const toCard = ({ _count, image, course, ...lesson }: (typeof live)[number]) => ({ ...lesson, students: _count.enrollments, coverSrc: lessonCoverSrc({ image, course }) });
   return { activeStudents, upcomingCount, live: live.map(toCard), upcoming: upcoming.map(toCard), issues };
 }
 
@@ -231,14 +234,16 @@ const lessonRowSelect = {
   meetingStatus: true,
   isDemo: true,
   seriesId: true,
-  course: { select: { title: true } },
+  image: coverSelect,
+  course: { select: { title: true, image: coverSelect } },
   _count: { select: { enrollments: { where: { revokedAt: null } } as const, materials: { where: { file: { status: "READY" as const } } } } },
 } satisfies Prisma.LessonSelect;
 
-const toLessonRow = ({ _count, course, ...lesson }: Prisma.LessonGetPayload<{ select: typeof lessonRowSelect }>, now: Date) => ({
+const toLessonRow = ({ _count, course, image, ...lesson }: Prisma.LessonGetPayload<{ select: typeof lessonRowSelect }>, now: Date) => ({
   ...lesson,
   meetingStatus: effectiveMeetingStatus(lesson, now),
   courseTitle: course?.title ?? null,
+  coverSrc: lessonCoverSrc({ image, course }),
   students: _count.enrollments,
   materials: _count.materials,
 });
@@ -250,6 +255,7 @@ export type SeriesEntry = {
   title: string;
   courseTitle: string | null;
   isDemo: boolean;
+  coverSrc: string | null;
   lessons: LessonRow[];
   /** Distinct weekdays of those dates, 0 = Monday. */
   weekdays: number[];
@@ -320,6 +326,7 @@ function toSeriesEntry(id: string, lessons: LessonRow[], now: Date): SeriesEntry
     title: shown.title,
     courseTitle: shown.courseTitle,
     isDemo: shown.isDemo,
+    coverSrc: shown.coverSrc,
     lessons,
     weekdays: [...new Set(lessons.map((l) => weekdayIndex(academyDay(l.scheduledStartAt))))].sort(),
     next,
@@ -399,6 +406,8 @@ export async function getAdminLesson(lessonId: string, now = new Date()) {
       summary: true,
       details: true,
       courseId: true,
+      imageId: true,
+      image: coverSelect,
       scheduledStartAt: true,
       scheduledEndAt: true,
       joinOpensAt: true,
@@ -411,15 +420,16 @@ export async function getAdminLesson(lessonId: string, now = new Date()) {
       zoomMeetingNumber: true,
       createdAt: true,
       updatedAt: true,
-      course: { select: { title: true } },
+      course: { select: { title: true, image: coverSelect } },
       series: { select: { id: true, _count: { select: { lessons: true } } } },
       _count: { select: { enrollments: { where: { revokedAt: null } } } },
     },
   });
   if (!lesson) return null;
-  const { _count, course, series, ...rest } = lesson;
+  const { _count, course, series, image, ...rest } = lesson;
   return {
     ...rest,
+    coverSrc: lessonCoverSrc({ image, course }),
     meetingStatus: effectiveMeetingStatus(lesson, now),
     courseTitle: course?.title ?? null,
     enrollmentCount: _count.enrollments,
@@ -573,6 +583,7 @@ export type ClassAlert = {
   live: boolean;
   publication: PublicationStatus;
   isDemo: boolean;
+  coverSrc: string | null;
 };
 
 /**
@@ -593,7 +604,7 @@ export async function getClassAlerts(adminId: string, now = new Date()) {
     },
     orderBy: { scheduledStartAt: "asc" },
     take: 5,
-    select: { id: true, title: true, scheduledStartAt: true, meetingStatus: true, publication: true, isDemo: true },
+    select: { id: true, title: true, scheduledStartAt: true, meetingStatus: true, publication: true, isDemo: true, image: coverSelect, course: { select: { title: true, image: coverSelect } } },
   });
   const alerts: ClassAlert[] = lessons.map((l) => ({
     id: l.id,
@@ -602,6 +613,7 @@ export async function getClassAlerts(adminId: string, now = new Date()) {
     live: l.meetingStatus === "LIVE",
     publication: l.publication,
     isDemo: l.isDemo,
+    coverSrc: lessonCoverSrc(l),
   }));
   // Running classes first, then the soonest to start.
   return { leadMinutes, zoomLive: env.ZOOM_MODE === "live", alerts: alerts.sort((a, b) => Number(b.live) - Number(a.live)) };

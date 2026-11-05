@@ -1,6 +1,7 @@
 import { ArrowLeft, CalendarDays, Hourglass } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { CoverImage } from "@/components/cover-image";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { Classroom, type PanelTab } from "@/components/portal/classroom";
@@ -47,6 +48,14 @@ export default async function LessonPage({ params, searchParams }: PageProps<"/p
         <ArrowLeft aria-hidden="true" className="size-4" />
         {t.back}
       </Link>
+      <CoverImage
+        src={lesson.coverSrc}
+        alt=""
+        title={lesson.courseTitle ?? lesson.title}
+        sizes="(min-width: 1024px) 1024px, 100vw"
+        preload
+        className="h-32 rounded-lg border sm:h-48"
+      />
       <div className="flex flex-wrap items-center gap-2">
         <PhaseBadge phase={lesson.phase} />
         {lesson.courseTitle ? <span className="text-xs text-muted-foreground">{lesson.courseTitle}</span> : null}

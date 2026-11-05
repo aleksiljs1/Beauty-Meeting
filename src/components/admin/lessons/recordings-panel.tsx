@@ -192,7 +192,10 @@ function RecordingItem({ recording, uploading }: { recording: RecordingRow; uplo
               {recording.readyAt && <span>{formatDateTime(recording.readyAt)}</span>}
             </div>
             {recording.status === "FAILED" && recording.errorMessage && <p className="text-xs text-destructive">{recording.errorMessage}</p>}
-            {recording.status === "IMPORTING" && !uploading && <p className="text-xs text-muted-foreground">{t.importingHint}</p>}
+            {recording.source === "ZOOM" && (recording.status === "WAITING" || recording.status === "IMPORTING") && (
+              <p className="text-xs text-muted-foreground">{t.zoomImportingHint}</p>
+            )}
+            {recording.source === "UPLOAD" && recording.status === "IMPORTING" && !uploading && <p className="text-xs text-muted-foreground">{t.importingHint}</p>}
           </div>
         </div>
         <div className="flex flex-wrap gap-1 self-start sm:self-center">

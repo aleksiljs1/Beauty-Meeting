@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { AttendancePanel } from "@/components/admin/lessons/attendance-panel";
+import { CoverImage } from "@/components/cover-image";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { ChevronLeft, Repeat } from "lucide-react";
@@ -16,6 +18,7 @@ import { DemoBadge, PageHeader, Pagination, SectionCard } from "@/components/adm
 import { admin } from "@/i18n/admin";
 import { formatDateTime, formatTimeRange, formatWeekdayDate, ACADEMY_TIMEZONE_LABEL, timezoneAbbreviation } from "@/lib/datetime";
 import { requirePageUser } from "@/server/auth/session";
+import { getLessonAttendance } from "@/server/services/attendance";
 import { env } from "@/server/env";
 import { getAdminLesson, getLessonRoster, listCourses, listLessonInvitations } from "@/server/queries/admin";
 import { listCourseCandidates } from "@/server/services/course-members";
@@ -42,13 +45,14 @@ export default async function LessonDetailPage({ params, searchParams }: PagePro
 
   const lesson = await getAdminLesson(id);
   if (!lesson) notFound();
-  const [courses, roster, courseCandidates, invitations, materials, recordings] = await Promise.all([
+  const [courses, roster, courseCandidates, invitations, materials, recordings, attendance] = await Promise.all([
     listCourses(),
     getLessonRoster(id, rosterPage),
     listCourseCandidates(id),
     listLessonInvitations(id),
     listMaterials(user, id),
     listRecordings(user, id),
+    getLessonAttendance(id),
   ]);
 
   return (
@@ -66,6 +70,7 @@ export default async function LessonDetailPage({ params, searchParams }: PagePro
           </Link>
         </div>
       )}
+      <CoverImage src={lesson.coverSrc} alt="" title={lesson.courseTitle ?? lesson.title} sizes="(min-width: 1024px) 1024px, 100vw" className="h-28 rounded-lg border sm:h-40" />
       <div className="space-y-2">
         <PageHeader title={lesson.title} />
         <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -103,6 +108,11 @@ export default async function LessonDetailPage({ params, searchParams }: PagePro
             <SectionCard title={admin.roster.title}>
               <RosterPanel lessonId={lesson.id} lessonDeadline={lesson.accessExpiresAt} rows={roster.items} course={courseCandidates} />
               <Pagination page={roster.page} pageCount={roster.pageCount} href={(p) => `/admin/mesimet/${lesson.id}?tab=studentet&faqe=${p}`} />
+            </SectionCard>
+          ),
+          pjesemarrja: (
+            <SectionCard title={admin.attendance.title}>
+              <AttendancePanel attendance={attendance} />
             </SectionCard>
           ),
           ftesat: (

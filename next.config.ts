@@ -94,6 +94,8 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Dev mode only: the site's own public address (e.g. a tunnel) may load dev scripts, not just localhost.
+  allowedDevOrigins: process.env.APP_URL ? [new URL(process.env.APP_URL).hostname] : [],
 
   async headers() {
     return [

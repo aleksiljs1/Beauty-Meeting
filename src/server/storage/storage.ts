@@ -109,6 +109,13 @@ export async function presignPart(key: string, uploadId: string, partNumber: num
   return getSignedUrl(s3, command, { expiresIn: UPLOAD_URL_TTL_SECONDS });
 }
 
+/** Server-side part upload (recording imports stream from Zoom straight into storage). */
+export async function uploadPart(key: string, uploadId: string, partNumber: number, body: Uint8Array): Promise<string> {
+  const result = await s3.send(new UploadPartCommand({ Bucket, Key: key, UploadId: uploadId, PartNumber: partNumber, Body: body }));
+  if (!result.ETag) throw new Error("Storage did not return a part ETag");
+  return result.ETag;
+}
+
 export async function completeMultipart(key: string, uploadId: string, parts: { partNumber: number; etag: string }[]) {
   await s3.send(
     new CompleteMultipartUploadCommand({

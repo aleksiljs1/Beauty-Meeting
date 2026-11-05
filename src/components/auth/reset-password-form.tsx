@@ -63,7 +63,7 @@ export function ResetPasswordForm({ token, setup }: { token: string; setup: bool
   }
 
   return (
-    <form onSubmit={onSubmit} noValidate className="grid gap-4">
+    <form onSubmit={onSubmit} method="post" noValidate className="grid gap-4">
       <FormField
         label={t.fields.newPassword}
         info={fieldInfo.auth.newPassword}

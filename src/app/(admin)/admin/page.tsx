@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { AlertTriangle, Plus, Wallet } from "lucide-react";
 import { DemoBadge, EmptyState, MeetingBadge, PageHeader, PublicationBadge, SectionCard } from "@/components/admin/page-parts";
+import { LessonThumb } from "@/components/admin/lessons/lesson-list-item";
 import { Button } from "@/components/ui/button";
 import { admin } from "@/i18n/admin";
 import { formatEuro } from "@/lib/billing";
@@ -136,20 +137,23 @@ function LessonList({ lessons }: { lessons: Awaited<ReturnType<typeof getAdminDa
     <ul className="divide-y">
       {lessons.map((lesson) => (
         <li key={lesson.id} className="py-3">
-          <Link href={`/admin/mesimet/${lesson.id}`} className="group block space-y-1 rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium group-hover:underline">{lesson.title}</span>
-              {lesson.isDemo && <DemoBadge />}
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {formatWeekdayDate(lesson.scheduledStartAt)} · {formatTimeRange(lesson.scheduledStartAt, lesson.scheduledEndAt)}
-            </p>
-            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <PublicationBadge publication={lesson.publication} />
-              <MeetingBadge status={lesson.meetingStatus} />
-              <span>
-                {lesson.students} {admin.shell.nav.students.toLowerCase()}
-              </span>
+          <Link href={`/admin/mesimet/${lesson.id}`} className="group flex items-center gap-4 rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+            <LessonThumb src={lesson.coverSrc} title={lesson.title} />
+            <div className="min-w-0 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-medium group-hover:underline">{lesson.title}</span>
+                {lesson.isDemo && <DemoBadge />}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {formatWeekdayDate(lesson.scheduledStartAt)} · {formatTimeRange(lesson.scheduledStartAt, lesson.scheduledEndAt)}
+              </p>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <PublicationBadge publication={lesson.publication} />
+                <MeetingBadge status={lesson.meetingStatus} />
+                <span>
+                  {lesson.students} {admin.shell.nav.students.toLowerCase()}
+                </span>
+              </div>
             </div>
           </Link>
         </li>

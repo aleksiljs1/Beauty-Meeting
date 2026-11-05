@@ -2,11 +2,12 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { DateInput } from "@/components/admin/date-inputs";
+import { ImagePicker } from "@/components/admin/image-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { InfoTip } from "@/components/info-tip";
+import { InfoTip, LabelRow } from "@/components/info-tip";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { adminContent } from "@/i18n/admin-content";
@@ -36,6 +37,7 @@ function CourseForm({ item, onSaved, onCancel }: ItemFormProps<AdminCourse>) {
       durationText: item?.durationText ?? "",
       priceText: item?.priceText ?? "",
       isPublic: item?.isPublic ?? false,
+      imageId: item?.imageId ?? null,
       startsOn: item?.startsOn ?? "",
       duration: {
         years: item?.durationMonths ? String(Math.floor(item.durationMonths / 12)) : "",
@@ -45,6 +47,7 @@ function CourseForm({ item, onSaved, onCancel }: ItemFormProps<AdminCourse>) {
     },
   });
   const err = formState.errors;
+  const title = useWatch({ control, name: "title" });
 
   const titleField = register("title", {
     onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -80,6 +83,16 @@ function CourseForm({ item, onSaved, onCancel }: ItemFormProps<AdminCourse>) {
       <Field id="course-summary" label={t.summary} hint={t.summaryHint} info={fieldInfo.course.summary} error={err.summary?.message}>
         {(aria) => <Textarea rows={2} {...aria} {...register("summary")} />}
       </Field>
+      <div className="grid gap-1.5">
+        <LabelRow info={fieldInfo.course.image} infoLabel={t.image}>
+          <span className="text-sm font-medium">{t.image}</span>
+        </LabelRow>
+        <Controller
+          control={control}
+          name="imageId"
+          render={({ field }) => <ImagePicker value={field.value} onChange={field.onChange} altText={title} emptyHint={t.imageEmpty} />}
+        />
+      </div>
       <Field id="course-description" label={t.description} hint={adminContent.settings.aboutHint} info={fieldInfo.course.description} error={err.description?.message}>
         {(aria) => <Textarea rows={8} {...aria} {...register("description")} />}
       </Field>

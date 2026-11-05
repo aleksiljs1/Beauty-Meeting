@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { Plus, Repeat } from "lucide-react";
 import { BulkDeleteLessons } from "@/components/admin/lessons/bulk-delete-lessons";
-import { LessonItem, lessonRowClass } from "@/components/admin/lessons/lesson-list-item";
+import { LessonItem, LessonThumb, lessonRowClass } from "@/components/admin/lessons/lesson-list-item";
 import { DemoBadge, EmptyState, PageHeader, Pagination, PublicationBadge } from "@/components/admin/page-parts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -121,19 +121,22 @@ function SeriesItem({ series }: { series: SeriesEntry }) {
   const counts = PUBLICATIONS.map((p) => [p, series.lessons.filter((l) => l.publication === p).length] as const).filter(([, n]) => n > 0);
   return (
     <Link href={`/admin/mesimet/seri/${series.id}`} className={lessonRowClass}>
-      <div className="min-w-0 space-y-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <Repeat className="size-4 text-muted-foreground" aria-hidden />
-          <span className="font-medium group-hover:underline">{series.title}</span>
-          <Badge variant="secondary">{admin.series.badge(series.lessons.length)}</Badge>
-          {series.isDemo && <DemoBadge />}
+      <div className="flex min-w-0 items-center gap-4">
+        <LessonThumb src={series.coverSrc} title={series.courseTitle ?? series.title} />
+        <div className="min-w-0 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <Repeat className="size-4 text-muted-foreground" aria-hidden />
+            <span className="font-medium group-hover:underline">{series.title}</span>
+            <Badge variant="secondary">{admin.series.badge(series.lessons.length)}</Badge>
+            {series.isDemo && <DemoBadge />}
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {admin.series.rhythm(series.weekdays.map((d) => admin.calendar.weekdays[d]))} · {formatTimeRange(first.scheduledStartAt, first.scheduledEndAt)} ·{" "}
+            {formatDate(first.scheduledStartAt)} – {formatDate(last.scheduledStartAt)}
+            {series.courseTitle ? ` · ${series.courseTitle}` : ""}
+          </p>
+          {series.next && <p className="text-xs text-muted-foreground">{admin.series.next(formatWeekdayDate(series.next.scheduledStartAt))}</p>}
         </div>
-        <p className="text-sm text-muted-foreground">
-          {admin.series.rhythm(series.weekdays.map((d) => admin.calendar.weekdays[d]))} · {formatTimeRange(first.scheduledStartAt, first.scheduledEndAt)} ·{" "}
-          {formatDate(first.scheduledStartAt)} – {formatDate(last.scheduledStartAt)}
-          {series.courseTitle ? ` · ${series.courseTitle}` : ""}
-        </p>
-        {series.next && <p className="text-xs text-muted-foreground">{admin.series.next(formatWeekdayDate(series.next.scheduledStartAt))}</p>}
       </div>
       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground md:justify-end">
         {counts.map(([p, n]) => (

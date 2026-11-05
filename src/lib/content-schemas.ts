@@ -51,6 +51,8 @@ export const courseSchema = z.object({
   durationText: text(80),
   priceText: text(80),
   isPublic: z.boolean(),
+  /** Gallery photo shown with the course (and its lessons without their own); null for none. */
+  imageId: z.uuid().nullable(),
   /** Billing: empty fields mean "not set"; payments need a start date and a length. */
   startsOn: calendarDate,
   duration: z.object({ years: wholeNumber(Math.floor(MAX_COURSE_MONTHS / 12)), months: wholeNumber(11) }),

@@ -22,6 +22,7 @@ import { getAccessToken } from "@/lib/api/access-token";
 import { onSignedOut } from "@/lib/api/auth-events";
 import { clearSessionHint, setSessionHint } from "@/lib/api/session-hint";
 import { cn } from "@/lib/utils";
+import { SHOW_BRAND_NAME } from "@/lib/brand";
 import { LiveClassAlert } from "./live-class-alert";
 
 const t = portalText.shell;
@@ -104,12 +105,14 @@ export function PortalShell({ user, academyName, children }: { user: { name: str
 
       <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur-sm supports-[backdrop-filter]:bg-background/85">
         <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-4 px-4">
-          <Link
-            href="/portal"
-            className="min-w-0 truncate rounded-sm font-heading text-xl tracking-tight transition-colors duration-300 outline-none hover:text-rose-deep focus-visible:ring-3 focus-visible:ring-ring/50"
-          >
-            {academyName}
-          </Link>
+          {SHOW_BRAND_NAME && (
+            <Link
+              href="/portal"
+              className="min-w-0 truncate rounded-sm font-heading text-xl tracking-tight transition-colors duration-300 outline-none hover:text-rose-deep focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              {academyName}
+            </Link>
+          )}
 
           <nav aria-label={t.mainNavLabel} className="ml-6 hidden items-center gap-1 md:flex">
             {NAV.map((item) => {

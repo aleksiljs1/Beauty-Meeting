@@ -8,6 +8,7 @@ import { audit } from "@/server/services/audit";
 import { toApiError } from "./client";
 import type { ZoomJoinConfig } from "./host";
 import { createMeetingSdkParticipantSignature } from "./meeting-sdk-signature";
+import { ZOOM_CUSTOMER_KEY_MAX } from "./recording-files";
 import { fetchZoomMeetingLinks, openJoinUrl, openPasscode, sealJoinUrl } from "./meetings";
 import { catchUpMeetingStart } from "./webhooks";
 
@@ -41,6 +42,7 @@ export async function authorizeLessonJoin(user: AppUser, lessonId: string): Prom
     meetingNumber: meeting.zoomMeetingNumber,
     password: openPasscode(meeting.zoomPasscodeEncrypted),
     userName: user.name,
+    customerKey: user.id.slice(0, ZOOM_CUSTOMER_KEY_MAX),
   };
 }
 

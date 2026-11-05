@@ -3,7 +3,9 @@ import { unstable_cache } from "next/cache";
 import { common } from "@/i18n/common";
 import { parseOpeningHours, type OpeningHoursRow } from "@/lib/public-content";
 import type { GalleryVisibilityField } from "@/lib/content-schemas";
+import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/server/db";
+import { coverSelect, coverSrc } from "./cover";
 
 /**
  * Read-only queries for the public website.
@@ -75,26 +77,31 @@ export type PublicCourse = {
   description: string | null;
   durationText: string | null;
   priceText: string | null;
+  /** The course photo, or null for the default cover. */
+  imageSrc: string | null;
 };
 
-const courseSelect = { slug: true, title: true, summary: true, description: true, durationText: true, priceText: true } as const;
+const courseSelect = { slug: true, title: true, summary: true, description: true, durationText: true, priceText: true, image: coverSelect } as const;
+
+const toPublicCourse = ({ image, ...course }: Prisma.CourseGetPayload<{ select: typeof courseSelect }>): PublicCourse => ({ ...course, imageSrc: coverSrc(image) });
 
 export const getPublicCourses = cached(
   async (): Promise<PublicCourse[]> =>
-    prisma.course.findMany({
-      where: { isPublic: true },
-      orderBy: [{ position: "asc" }, { createdAt: "asc" }],
-      select: courseSelect,
-      take: 100,
-    }),
+    (
+      await prisma.course.findMany({
+        where: { isPublic: true },
+        orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+        select: courseSelect,
+        take: 100,
+      })
+    ).map(toPublicCourse),
   "courses",
 );
 
-export const getPublicCourse = cached(
-  async (slug: string): Promise<PublicCourse | null> =>
-    prisma.course.findFirst({ where: { slug, isPublic: true }, select: courseSelect }),
-  "course",
-);
+export const getPublicCourse = cached(async (slug: string): Promise<PublicCourse | null> => {
+  const course = await prisma.course.findFirst({ where: { slug, isPublic: true }, select: courseSelect });
+  return course && toPublicCourse(course);
+}, "course");
 
 export type PublicGalleryItem = { id: string; src: string; alt: string; caption: string | null; width: number | null; height: number | null };
 

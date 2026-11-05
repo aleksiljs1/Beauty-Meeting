@@ -25,13 +25,17 @@ describe("student import template", () => {
 
     expect(students).toEqual([
       {
+        rowNumber: 2,
+        issues: [],
         emri: "Ana Hoxha",
         email: "ana@example.com",
         abonimi: ["Manikyr", "Pedikyr"],
         profile: { phone: "+355 69 123 4567", birthDate: "1998-03-28", gender: "FEMALE", city: "Tiranë", notes: "Paguan me këste" },
       },
-      { emri: "Bora Kola", email: "bora@example.com", abonimi: [], profile: { phone: "", birthDate: "", gender: "", city: "", notes: "" } },
+      { rowNumber: 3, issues: [], emri: "Bora Kola", email: "bora@example.com", abonimi: [], profile: { phone: "", birthDate: "", gender: "", city: "", notes: "" } },
       {
+        rowNumber: 4,
+        issues: [],
         emri: "Dea Leka",
         email: "dea@example.com",
         abonimi: ["Pedikyr"],

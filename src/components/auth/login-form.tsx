@@ -60,7 +60,7 @@ export function LoginForm({ next }: { next: string | null }) {
   const busy = isSubmitting || redirecting;
 
   return (
-    <form onSubmit={onSubmit} noValidate className="grid gap-4" aria-describedby={failure ? "login-failure" : undefined}>
+    <form onSubmit={onSubmit} method="post" noValidate className="grid gap-4" aria-describedby={failure ? "login-failure" : undefined}>
       <FormField label={t.fields.email} info={fieldInfo.auth.email} type="email" autoComplete="email" inputMode="email" error={errors.email?.message} {...register("email")} />
       <FormField
         label={t.fields.password}

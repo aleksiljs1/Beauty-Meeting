@@ -9,6 +9,7 @@ import { LESSON_TABS, type LessonTab } from "./lesson-tab-ids";
 const LABELS: Record<LessonTab, string> = {
   detaje: admin.lessons.tabs.details,
   studentet: admin.lessons.tabs.students,
+  pjesemarrja: admin.lessons.tabs.attendance,
   ftesat: admin.lessons.tabs.invitations,
   materialet: admin.lessons.tabs.materials,
   regjistrimet: admin.lessons.tabs.recordings,

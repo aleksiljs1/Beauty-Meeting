@@ -10,6 +10,8 @@ export const fieldInfo = {
       "Informacion më i plotë për mësimin (çfarë të sjellin, si përgatiten etj.). E shohin vetëm studentët që kanë akses aktiv në këtë mësim.",
     course:
       "Kursi të cilit i përket mësimi. Studentët e kursit mund të shtohen në mësim me një klikim, dhe mësimi shfaqet te kursi i tyre.",
+    image:
+      "Fotoja që shohin studentët në kartën dhe faqen e mësimit. Pa foto, mësimi merr fotonë e kursit të tij, ose një kopertinë të dizajnuar në ngjyrat e akademisë.",
     start: "Data dhe ora kur fillon mësimi, sipas orës së Tiranës.",
     end: "Data dhe ora kur mbaron mësimi. Ndihmon për kalendarin dhe kufirin e 3 mësimeve në të njëjtën kohë.",
     joinOpens: "Nga ky moment studentët e regjistruar mund të hyjnë në klasën live. Zakonisht 15 minuta para fillimit.",
@@ -58,6 +60,8 @@ export const fieldInfo = {
   },
   course: {
     title: "Emri i kursit në faqen publike dhe në panel. Në importin nga Excel, kolona Abonimet duhet ta ketë emrin saktësisht kështu.",
+    image:
+      "Fotoja e kursit në faqen Akademia dhe te mësimet e tij që nuk kanë foto të vetën. Zgjidhni një nga galeria ose ngarkoni një të re. Pa foto, shfaqet një kopertinë e dizajnuar në ngjyrat e akademisë.",
     slug: "Pjesa e fundit e adresës së faqes së kursit, p.sh. /akademia/kursi-i-grimit. Ndryshimi i saj prish lidhjet e vjetra që keni ndarë.",
     summary: "Një ose dy fjali që shfaqen në kartën e kursit te faqja Akademia.",
     description: "Teksti i plotë në faqen e kursit. Lini një rresht bosh për të filluar paragraf të ri.",

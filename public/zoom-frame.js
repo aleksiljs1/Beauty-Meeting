@@ -74,6 +74,7 @@
       password,
       userName,
       zak,
+      customerKey,
     } = config;
 
     const isHost = mode === "host";
@@ -88,6 +89,7 @@
       !userName.trim() ||
       userName.length > 100 ||
       (password != null && typeof password !== "string") ||
+      (customerKey != null && (typeof customerKey !== "string" || customerKey.length > 36)) ||
       (isHost && (typeof zak !== "string" || !zak))
     ) {
       showError("Klasa nuk u hap dot. Rifreskoni faqen dhe provoni përsëri.");
@@ -122,6 +124,8 @@
             meetingNumber: String(meetingNumber),
             passWord: password || "",
             userName: userName.trim(),
+            // Lets Zoom's participant events say which student this is (attendance).
+            ...(customerKey ? { customerKey } : {}),
 
             ...(isHost ? { zak } : {}),
 

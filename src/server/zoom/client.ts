@@ -125,6 +125,40 @@ export async function zoomRequest<T = void>(path: string, options: RequestOption
   throw new ZoomRequestError(401, false);
 }
 
+/** Large cloud recordings can take a while to come down. */
+const DOWNLOAD_TIMEOUT_MS = 2 * 60 * 60_000;
+
+/**
+ * Streams a cloud recording file with our OAuth token (Zoom redirects to its storage; the
+ * redirect carries its own signature). The caller reads the body.
+ */
+export async function zoomDownload(url: string): Promise<Response> {
+  const parsed = new URL(url);
+  if (parsed.protocol !== "https:" || !(parsed.hostname === "zoom.us" || parsed.hostname.endsWith(".zoom.us"))) {
+    throw new ZoomRequestError(null, false); // only ever download from Zoom itself
+  }
+  const credentials = requireZoomCredentials();
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const token = await accessToken(credentials);
+    let response: Response;
+    try {
+      response = await fetch(parsed, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store", signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
+    } catch {
+      throw new ZoomRequestError(null, false);
+    }
+    if (response.status === 401 && attempt === 0) {
+      cachedToken = null;
+      continue;
+    }
+    if (!response.ok || !response.body) {
+      console.error("[zoom] recording download failed", { status: response.status });
+      throw new ZoomRequestError(response.status, false);
+    }
+    return response;
+  }
+  throw new ZoomRequestError(401, false);
+}
+
 /** Maps a Zoom failure to a user-safe API error. */
 export function toApiError(error: unknown, message: string): never {
   if (error instanceof ApiError) throw error;

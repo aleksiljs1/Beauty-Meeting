@@ -45,6 +45,7 @@ model User {
   paymentsRecorded   Payment[]              @relation("PaymentRecorder")
   adminPreferences   AdminPreferences?
   lessonReminders    AdminLessonReminder[]
+  attendance         LessonAttendance[]
 
   @@unique([email])
   @@map("user")
@@ -193,6 +194,9 @@ model Course {
   priceText    String?
   isPublic     Boolean  @default(false)
   position     Int      @default(0)
+  /// Cover photo, chosen from the gallery (or uploaded into it). Lessons of the course use it too.
+  imageId      String?      @db.Uuid
+  image        GalleryItem? @relation("CourseImage", fields: [imageId], references: [id], onDelete: SetNull)
   createdAt    DateTime @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime @updatedAt @db.Timestamptz(3)
 
@@ -208,6 +212,7 @@ model Course {
   payments      Payment[]
 
   @@index([isPublic, position])
+  @@index([imageId])
 }
 
 model Lesson {
@@ -236,6 +241,9 @@ model Lesson {
   liveEndedAt   DateTime?         @db.Timestamptz(3)
   /// True when the meeting is the clearly labelled demo classroom (ZOOM_MODE=demo).
   isDemo        Boolean           @default(false)
+  /// The lesson's own photo from the gallery; without one it shows its course's photo.
+  imageId       String?           @db.Uuid
+  image         GalleryItem?      @relation("LessonImage", fields: [imageId], references: [id], onDelete: SetNull)
 
   /// Zoom meeting number (Zoom API `id`), stored as text (exceeds JS safe integers).
   /// Webhooks are matched on this: a scheduled meeting gets a NEW uuid every time it starts.
@@ -262,11 +270,13 @@ model Lesson {
   recordings    Recording[]
   notifications Notification[]
   adminReminders AdminLessonReminder[]
+  attendance     LessonAttendance[]
 
   @@index([publication, scheduledStartAt])
   @@index([meetingStatus])
   @@index([courseId])
   @@index([seriesId])
+  @@index([imageId])
 }
 
 /// A repeating lesson: its dates are ordinary lessons (each with its own meeting, students and
@@ -419,6 +429,12 @@ model Recording {
   part            Int     @default(1)
   /// Zoom recording file id — idempotency key for imports.
   providerFileId  String? @unique
+  /// Zoom meeting instance (UUID) the file belongs to; used to move it to Zoom's trash after import.
+  providerMeetingUuid String?
+  /// Where the importer downloads the file (needs our OAuth token); cleared once imported.
+  providerDownloadUrl String?
+  /// Failed import attempts; the importer gives up after a few.
+  importAttempts  Int     @default(0)
   /// Safe, non-secret description of the last failure.
   errorMessage    String?
   /// Multipart upload in progress (manual uploads); cleared when completed or aborted.
@@ -551,6 +567,9 @@ model GalleryItem {
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime @updatedAt @db.Timestamptz(3)
 
+  coverOfCourses Course[] @relation("CourseImage")
+  coverOfLessons Lesson[] @relation("LessonImage")
+
   @@index([isPublished, position])
   @@index([isPublished, showInGallery, position])
   @@index([isPublished, showOnHomeHero, position])
@@ -650,4 +669,29 @@ model AdminLessonReminder {
 
   @@id([userId, lessonId, startsAt])
   @@index([lessonId])
+}
+
+// =============================================================================
+// Attendance (from Zoom's participant events)
+// =============================================================================
+
+/** One stay of one person in a lesson's Zoom class, from joining to leaving. */
+model LessonAttendance {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  lessonId       String    @db.Uuid
+  lesson         Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  /// Our student when the participant could be matched (their id passed to Zoom by our site, or the name).
+  userId         String?
+  user           User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  /// Zoom's id for this person in the meeting (the same across rejoins in one session).
+  participantKey String
+  /// The name shown in Zoom.
+  displayName    String
+  joinedAt       DateTime  @db.Timestamptz(3)
+  /// Null while still in the class (closed when they leave or the meeting ends).
+  leftAt         DateTime? @db.Timestamptz(3)
+
+  @@unique([lessonId, participantKey, joinedAt])
+  @@index([lessonId, userId])
+  @@index([userId])
 }

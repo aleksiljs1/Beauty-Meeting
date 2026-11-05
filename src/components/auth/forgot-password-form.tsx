@@ -53,7 +53,7 @@ export function ForgotPasswordForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} noValidate className="grid gap-4">
+    <form onSubmit={onSubmit} method="post" noValidate className="grid gap-4">
       <FormField label={t.fields.email} info={fieldInfo.auth.resetEmail} type="email" autoComplete="email" inputMode="email" error={errors.email?.message} {...register("email")} />
       <div aria-live="polite">
         {failure ? (

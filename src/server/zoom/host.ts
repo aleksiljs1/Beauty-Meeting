@@ -7,7 +7,7 @@ import { ApiError } from "@/server/http";
 import { audit } from "@/server/services/audit";
 import { requireZoomCredentials, toApiError, zoomRequest } from "./client";
 import { createMeetingSdkHostSignature } from "./meeting-sdk-signature";
-import { createZoomMeetingForLesson, fetchZoomMeetingLinks, openPasscode } from "./meetings";
+import { createZoomMeetingForLesson, ensureCloudRecording, fetchZoomMeetingLinks, openPasscode } from "./meetings";
 
 /** ZAK lifetime requested from Zoom — only needed to start the meeting. */
 const ZAK_TTL_SECONDS = 300;
@@ -20,6 +20,8 @@ export type ZoomJoinConfig = {
   password: string;
   userName: string;
   zak?: string;
+  /** Student joins: our user id, sent to Zoom so attendance knows who they are. */
+  customerKey?: string;
 };
 
 /** Admin-only checks shared by both ways of starting a meeting (in the browser / Zoom app). */
@@ -42,6 +44,7 @@ async function loadHostableLesson(lessonId: string, admin: AppUser, now: number)
     await createZoomMeetingForLesson(lesson.id, admin);
     return loadHostableLesson(lessonId, admin, now);
   }
+  await ensureCloudRecording(lesson.zoomMeetingNumber);
   return { ...lesson, zoomMeetingNumber: lesson.zoomMeetingNumber }; // keeps the narrowed (non-null) type
 }
 

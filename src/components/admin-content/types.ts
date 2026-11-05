@@ -18,6 +18,8 @@ export type AdminCourse = {
   durationText: string | null;
   priceText: string | null;
   isPublic: boolean;
+  /** Gallery photo of the course, or null for the default cover. */
+  imageId: string | null;
   position: number;
   /** "YYYY-MM-DD" */
   startsOn: string | null;

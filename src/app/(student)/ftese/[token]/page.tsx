@@ -1,6 +1,7 @@
 import { CalendarDays, Clock, MailOpen } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SHOW_BRAND_NAME } from "@/lib/brand";
 import { redirect } from "next/navigation";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { InvitationJoin } from "@/components/portal/invitation-join";
@@ -25,11 +26,13 @@ function Frame({ academyName, children }: { academyName: string; children: React
   return (
     <div className="flex min-h-dvh flex-1 flex-col items-center justify-center px-4 py-10">
       <div className="w-full max-w-md">
-        <header className="mb-8 text-center">
-          <Link href="/" className="font-heading text-3xl tracking-tight">
-            {academyName}
-          </Link>
-        </header>
+        {SHOW_BRAND_NAME && (
+          <header className="mb-8 text-center">
+            <Link href="/" className="font-heading text-3xl tracking-tight">
+              {academyName}
+            </Link>
+          </header>
+        )}
         <main className="rounded-xl border bg-card p-6 shadow-sm sm:p-8">{children}</main>
       </div>
       <Toaster position="top-center" />

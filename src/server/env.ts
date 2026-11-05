@@ -70,6 +70,9 @@ const schema = z
     ZOOM_WEBHOOK_SECRET_TOKEN: optionalSecret,
     // "cloud" needs a Zoom plan with cloud recording; "none" records nothing automatically.
     ZOOM_AUTO_RECORDING: z.enum(["none", "cloud"]).default("none"),
+    // After a cloud recording is copied into our storage: leave it in Zoom, or move it to Zoom's
+    // trash (recoverable there for 30 days) so the plan's cloud storage doesn't fill up.
+    ZOOM_RECORDINGS_AFTER_IMPORT: z.enum(["keep", "trash"]).default("keep"),
     // 32 random bytes, base64url — encrypts stored meeting passcodes (AES-256-GCM).
     APP_ENCRYPTION_KEY: z
       .string()

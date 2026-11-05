@@ -248,6 +248,20 @@ export const admin = {
     },
   },
 
+  imagePicker: {
+    fromGallery: "Zgjidh nga galeria",
+    upload: "Ngarko foto",
+    uploadNew: "Ngarko foto të re",
+    remove: "Hiq foton",
+    dialogTitle: "Zgjidhni një foto",
+    dialogBody: "Fotot e galerisë. Një foto e re ruhet edhe te galeria, pa u shfaqur te faqja Galeria.",
+    emptyGallery: "Galeria është bosh. Ngarkoni një foto të re.",
+    badType: "Zgjidhni një foto JPG, PNG ose WebP.",
+    tooLarge: "Fotoja duhet të jetë deri në 10 MB.",
+    uploadFailed: "Ngarkimi dështoi. Provoni përsëri.",
+    defaultAlt: "Foto e akademisë",
+  },
+
   classAlert: {
     region: "Klasa që po fillon",
     live: "Live tani",
@@ -321,7 +335,7 @@ export const admin = {
       done: (count: number, skipped: number) =>
         `U fshinë ${count} mësime.${skipped ? ` ${skipped} nuk u fshinë sepse janë live ose kanë regjistrime.` : ""}`,
     },
-    tabs: { details: "Detaje", students: "Studentët", invitations: "Ftesat", materials: "Materialet", recordings: "Regjistrimet" },
+    tabs: { details: "Detaje", students: "Studentët", attendance: "Pjesëmarrja", invitations: "Ftesat", materials: "Materialet", recordings: "Regjistrimet" },
   },
 
   series: {
@@ -366,6 +380,9 @@ export const admin = {
     summaryHint: "E dukshme për këdo që sheh kartën e mësimit.",
     details: "Detajet e mësimit",
     detailsHint: "Vetëm për studentët me akses aktiv.",
+    image: "Fotoja e mësimit (opsionale)",
+    imageEmpty: "Pa foto: shfaqet kopertina e paracaktuar",
+    imageFromCourse: "Pa foto: shfaqet fotoja e kursit",
     course: "Kursi",
     noCourse: "Pa kurs",
     scheduleLegend: "Orari dhe afati i aksesit",
@@ -622,9 +639,26 @@ export const admin = {
     uploadFailed: "Ngarkimi dështoi. Kontrolloni lidhjen dhe provoni përsëri.",
   },
 
+  attendance: {
+    title: "Pjesëmarrja në klasën live",
+    intro: "Kush hyri në klasën në Zoom dhe sa kohë qëndroi. Gjatë klasës, rifreskoni faqen për të parë të rejat.",
+    empty: "Pjesëmarrja shfaqet këtu pasi studentët të hyjnë në klasën live në Zoom.",
+    summary: (came: number, of: number) => `Ndoqën ${came} nga ${of} studentë`,
+    attended: "Ndoqën",
+    absent: "Nuk ndoqën",
+    others: "Të tjerë në klasë",
+    othersHint: "Emra që nuk u lidhën me asnjë student të mësimit (p.sh. hynë nga aplikacioni Zoom me emër tjetër).",
+    time: "Koha në klasë",
+    joins: (n: number) => (n === 1 ? "1 hyrje" : `${n} hyrje`),
+    stillIn: "Ende në klasë",
+    joinedAt: (time: string) => `Hyri ${time}`,
+    leftAt: (time: string) => `doli ${time}`,
+  },
+
   recordings: {
     title: "Regjistrimet",
-    intro: "Ngarkoni regjistrimin e mësimit si video MP4. Studentët e shohin deri në afatin e tyre.",
+    intro:
+      "Kur klasa regjistrohet në Zoom, videoja shfaqet këtu vetë, pak minuta pasi Zoom e përpunon. Mund të ngarkoni edhe një video MP4 me dorë. Studentët e shohin deri në afatin e tyre.",
     choose: "Ngarko regjistrim (MP4)",
     uploading: (name: string) => `Duke ngarkuar ${name}…`,
     finishing: "Duke përfunduar dhe verifikuar videon…",
@@ -638,6 +672,7 @@ export const admin = {
     status: { WAITING: "Në pritje", PROCESSING: "Në përpunim", IMPORTING: "Në ngarkim", READY: "Gati", FAILED: "Dështoi" },
     source: { UPLOAD: "Ngarkuar me dorë", ZOOM: "Nga Zoom" },
     importingHint: "Ngarkimi është në vazhdim ose u ndërpre. Nëse nuk vazhdon, fshijeni dhe provoni përsëri.",
+    zoomImportingHint: "Po kopjohet nga Zoom. Studentët njoftohen sapo të jetë gati.",
     preview: "Shiko",
     hidePreview: "Mbyll pamjen",
     previewLabel: (name: string) => `Pamje e regjistrimit ${name}`,
@@ -677,6 +712,7 @@ export const admin = {
     deletedUser: "Përdorues i fshirë",
     actions: {
       "account.create": "Krijoi llogari",
+      "recording.import": "Importoi regjistrimin nga Zoom",
       "admin.reminders": "Ndryshoi kujtesat para mësimeve",
       "lesson.zoom_sync": "Përditësoi takimin në Zoom",
       "lesson.zoom_meeting_delete": "Fshiu takimin në Zoom",

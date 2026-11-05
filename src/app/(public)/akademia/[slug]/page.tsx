@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CoverImage } from "@/components/cover-image";
 import { ContactActions } from "@/components/public/contact";
 import { CourseMeta } from "@/components/public/course-card";
 import { Container, Eyebrow, LinkButton } from "@/components/public/primitives";
@@ -44,10 +45,22 @@ export default async function CoursePage({ params }: PageProps<"/akademia/[slug]
               {t.backToCourses}
             </Link>
           </p>
-          <Eyebrow className="mb-4">{t.title}</Eyebrow>
-          <h1 className="max-w-3xl text-4xl leading-[1.1] sm:text-5xl">{course.title}</h1>
-          {course.summary && <p className="mt-5 max-w-2xl text-lg leading-relaxed text-muted-foreground">{course.summary}</p>}
-          <CourseMeta course={course} className="mt-8 flex flex-wrap gap-x-12 gap-y-3 text-base" />
+          <div className="grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16">
+            <div>
+              <Eyebrow className="mb-4">{t.title}</Eyebrow>
+              <h1 className="max-w-3xl text-4xl leading-[1.1] sm:text-5xl">{course.title}</h1>
+              {course.summary && <p className="mt-5 max-w-2xl text-lg leading-relaxed text-muted-foreground">{course.summary}</p>}
+              <CourseMeta course={course} className="mt-8 flex flex-wrap gap-x-12 gap-y-3 text-base" />
+            </div>
+            <CoverImage
+              src={course.imageSrc}
+              alt={course.title}
+              title={course.title}
+              sizes="(min-width: 1024px) 480px, 100vw"
+              preload
+              className="order-first aspect-[16/10] rounded-md border border-border/70 lg:order-none"
+            />
+          </div>
         </Container>
       </header>
 

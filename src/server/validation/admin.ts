@@ -58,6 +58,8 @@ const lessonFields = {
   summary: optionalText(1_000),
   details: optionalText(20_000),
   courseId: z.uuid().nullish(),
+  /** Gallery photo; null shows the course photo (or the default cover). */
+  imageId: z.uuid().nullish(),
   isDemo: z.boolean().optional(),
   scheduledStartAt: isoDate,
   scheduledEndAt: isoDate,
@@ -78,6 +80,7 @@ export const updateLessonSchema = z.object({
   summary: lessonFields.summary,
   details: lessonFields.details,
   courseId: lessonFields.courseId,
+  imageId: lessonFields.imageId,
   isDemo: lessonFields.isDemo,
   scheduledStartAt: isoDate.optional(),
   scheduledEndAt: isoDate.optional(),
@@ -92,6 +95,7 @@ export const updateSeriesSchema = z.object({
   summary: lessonFields.summary,
   details: lessonFields.details,
   courseId: lessonFields.courseId,
+  imageId: lessonFields.imageId,
   time: z
     .object({ start: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Ora nuk është e vlefshme."), durationMinutes: z.number().int().min(15).max(12 * 60) })
     .optional(),

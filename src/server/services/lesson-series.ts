@@ -51,6 +51,7 @@ export type SeriesPatch = {
   summary?: string | null;
   details?: string | null;
   courseId?: string | null;
+  imageId?: string | null;
   /** New Tirana start time ("HH:MM") and length for every upcoming date (both or neither). */
   time?: { start: string; durationMinutes: number };
 };

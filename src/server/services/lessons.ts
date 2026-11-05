@@ -28,6 +28,7 @@ export type LessonInput = {
   summary?: string | null;
   details?: string | null;
   courseId?: string | null;
+  imageId?: string | null;
   isDemo?: boolean;
 } & LessonSchedule;
 
@@ -130,6 +131,7 @@ async function createLessons(input: LessonInput, schedules: LessonSchedule[], co
         summary: clean(input.summary),
         details: clean(input.details),
         courseId: input.courseId || null,
+        imageId: input.imageId || null,
         scheduledStartAt,
         scheduledEndAt,
         joinOpensAt,
@@ -206,6 +208,7 @@ export async function updateLesson(lessonId: string, patch: LessonPatch, confirm
       ...(patch.summary !== undefined ? { summary: clean(patch.summary) } : {}),
       ...(patch.details !== undefined ? { details: clean(patch.details) } : {}),
       ...(patch.courseId !== undefined ? { courseId: patch.courseId || null } : {}),
+      ...(patch.imageId !== undefined ? { imageId: patch.imageId || null } : {}),
       ...(patch.isDemo !== undefined ? { isDemo: patch.isDemo } : {}),
       ...schedule,
       meetingStatus,

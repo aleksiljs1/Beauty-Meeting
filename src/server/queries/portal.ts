@@ -5,6 +5,7 @@ import { requireLessonCapability } from "@/server/access/lesson-access";
 import { checkCapability, effectiveMeetingStatus, evaluateLessonAccess, lessonPhase, type LessonAccess, type LessonPhase } from "@/server/access/policy";
 import type { AppUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
+import { coverSelect, lessonCoverSrc } from "./cover";
 import { zoomLive } from "@/server/env";
 import { ApiError } from "@/server/http";
 import { STARTING_SOON_MS } from "@/server/services/live";
@@ -47,6 +48,8 @@ export type StudentLessonCard = {
   hasAccess: boolean;
   canJoin: boolean;
   isDemo: boolean;
+  /** The lesson's photo, else its course's; null for the default cover. */
+  coverSrc: string | null;
 };
 
 const deadlineOf = (access: LessonAccess) => (access.status === "admin" ? null : access.deadline);
@@ -63,7 +66,8 @@ const cardSelect = (user: AppUser) =>
     joinOpensAt: true,
     accessExpiresAt: true,
     isDemo: true,
-    course: { select: { title: true } },
+    course: { select: { title: true, image: coverSelect } },
+    image: coverSelect,
     enrollments: { where: { userId: user.id }, select: { accessExpiresAt: true, revokedAt: true }, take: 1 },
     _count: { select: { recordings: { where: { status: "READY" } } } },
   }) satisfies Prisma.LessonSelect;
@@ -102,6 +106,7 @@ export async function listStudentLessons(user: AppUser, now = new Date()): Promi
       hasAccess,
       canJoin: hasAccess && checkCapability(access, "JOIN_LIVE", row, now).allowed,
       isDemo: row.isDemo,
+      coverSrc: lessonCoverSrc(row),
     });
   }
   // A class still running past its scheduled end sits in the past group: bring it to the top.
@@ -138,6 +143,8 @@ export type ClassroomData = {
     deadline: string | null;
     phase: LessonPhase;
     isDemo: boolean;
+    /** The lesson's photo, else its course's; null for the default cover. */
+    coverSrc: string | null;
   };
   /** History view (expired/cancelled): no content is loaded or exposed. */
   history: null | { reason: "EXPIRED" | "CANCELLED" };
@@ -163,7 +170,7 @@ export async function getClassroom(user: AppUser, rawLessonId: string, now = new
 
   const extra = await prisma.lesson.findUniqueOrThrow({
     where: { id: lessonId },
-    select: { summary: true, details: true, zoomMeetingNumber: true, course: { select: { title: true } }, _count: { select: { recordings: { where: { status: "READY" } } } } },
+    select: { summary: true, details: true, zoomMeetingNumber: true, image: coverSelect, course: { select: { title: true, image: coverSelect } }, _count: { select: { recordings: { where: { status: "READY" } } } } },
   });
 
   const content = checkCapability(access, "VIEW_CONTENT", base, now);
@@ -195,6 +202,7 @@ export async function getClassroom(user: AppUser, rawLessonId: string, now = new
       id: base.id,
       title: base.title,
       courseTitle: extra.course?.title ?? null,
+      coverSrc: lessonCoverSrc(extra),
       summary: hasAccess ? extra.summary : null,
       details: hasAccess ? extra.details : null,
       scheduledStartAt: base.scheduledStartAt.toISOString(),

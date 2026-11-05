@@ -19,6 +19,7 @@ export type ZoomJoinConfig = {
   password: string;
   userName: string;
   zak?: string;
+  customerKey?: string;
 };
 
 export type ZoomFrameStatus = "idle" | "connecting" | "joined" | "left" | "error";
