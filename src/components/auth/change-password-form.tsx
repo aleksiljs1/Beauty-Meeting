@@ -40,9 +40,8 @@ export function ChangePasswordForm() {
       toast.success(p.success);
       return;
     }
-    // Better Auth rejects a wrong current password with 400/401.
     const failure = result.failure ?? "UNKNOWN";
-    const text = failure === "INVALID_CREDENTIALS" || failure === "UNKNOWN" ? p.wrongCurrent : t.failures[failure];
+    const text = failure === "INVALID_CREDENTIALS" ? p.wrongCurrent : t.failures[failure];
     setMessage({ kind: "error", text });
   });
 

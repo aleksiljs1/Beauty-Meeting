@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import type { AppUser } from "@/server/auth/session";
+import { effectiveMeetingStatus } from "@/server/access/policy";
 import { prisma } from "@/server/db";
 import { env } from "@/server/env";
 import { ApiError } from "@/server/http";
@@ -38,7 +39,11 @@ async function loadHostableLesson(lessonId: string, admin: AppUser, now: number)
   if (lesson.publication !== "PUBLISHED") throw new ApiError("CONFLICT", "Publikoni mësimin para se të nisni klasën live.");
   // An ENDED meeting may be restarted (e.g. ended by mistake) until the scheduled end below.
   if (lesson.meetingStatus === "ERROR") throw new ApiError("CONFLICT", "Ky takim ka një gabim dhe nuk mund të niset.");
-  if (now >= lesson.scheduledEndAt.getTime()) throw new ApiError("CONFLICT", "Orari i këtij mësimi ka përfunduar.");
+  // After the scheduled end only a class that is still running may be rejoined (it overran and the
+  // teacher's connection dropped); a new start is no longer possible.
+  if (now >= lesson.scheduledEndAt.getTime() && effectiveMeetingStatus(lesson, new Date(now)) !== "LIVE") {
+    throw new ApiError("CONFLICT", "Orari i këtij mësimi ka përfunduar.");
+  }
   if (!lesson.zoomMeetingNumber) {
     // The meeting is made the first time the class is started: there's no separate "create" step.
     await createZoomMeetingForLesson(lesson.id, admin);

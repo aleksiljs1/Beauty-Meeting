@@ -38,7 +38,7 @@ export function ImagePicker({
 }) {
   const [open, setOpen] = useState(false);
   const [photos, setPhotos] = useState<GalleryPhoto[] | null>(null);
-  const [busy, setBusy] = useState<"upload" | string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -52,25 +52,16 @@ export function ImagePicker({
     }
   }
 
-  async function choose(photo: GalleryPhoto) {
-    setBusy(photo.id);
-    setError(null);
-    try {
-      // A cover is shown on public pages: an unpublished gallery photo gets published.
-      if (!photo.isPublished) await apiSend("patch", `/admin/content/gallery/${photo.id}`, { isPublished: true });
-      onChange(photo.id);
-      setOpen(false);
-    } catch (cause) {
-      setError(errorMessage(cause));
-    } finally {
-      setBusy(null);
-    }
+  /** Choosing doesn't change the photo: a cover is shown even if the photo is kept off the gallery. */
+  function choose(photo: GalleryPhoto) {
+    onChange(photo.id);
+    setOpen(false);
   }
 
   async function upload(file: File) {
     if (!ACCEPTED.includes(file.type)) return setError(t.badType);
     if (file.size > MAX_BYTES) return setError(t.tooLarge);
-    setBusy("upload");
+    setUploading(true);
     setError(null);
     try {
       const grant = await apiSend<UploadGrant>("post", "/admin/content/gallery/uploads", { filename: file.name, mimeType: file.type, sizeBytes: file.size });
@@ -94,7 +85,7 @@ export function ImagePicker({
     } catch (cause) {
       setError(cause instanceof Error && cause.message === t.uploadFailed ? t.uploadFailed : errorMessage(cause));
     } finally {
-      setBusy(null);
+      setUploading(false);
     }
   }
 
@@ -131,8 +122,8 @@ export function ImagePicker({
           <Button type="button" variant="outline" onClick={() => void openGallery()}>
             <ImageIcon aria-hidden /> {t.fromGallery}
           </Button>
-          <Button type="button" variant="outline" onClick={() => fileRef.current?.click()} disabled={busy === "upload"}>
-            {busy === "upload" ? <Loader2 aria-hidden className="animate-spin" /> : <Upload aria-hidden />} {t.upload}
+          <Button type="button" variant="outline" onClick={() => fileRef.current?.click()} disabled={uploading}>
+            {uploading ? <Loader2 aria-hidden className="animate-spin" /> : <Upload aria-hidden />} {t.upload}
           </Button>
           {value && (
             <Button type="button" variant="ghost" onClick={() => onChange(null)}>
@@ -165,8 +156,8 @@ export function ImagePicker({
                   <li key={photo.id}>
                     <button
                       type="button"
-                      onClick={() => void choose(photo)}
-                      disabled={busy !== null}
+                      onClick={() => choose(photo)}
+                      disabled={uploading}
                       aria-pressed={selected}
                       className={cn(
                         "group relative block aspect-[16/10] w-full overflow-hidden rounded-md border focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
@@ -175,9 +166,9 @@ export function ImagePicker({
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element -- admin-only preview route */}
                       <img src={previewOf(photo.id)} alt={photo.alt} loading="lazy" className="size-full object-cover" />
-                      {(selected || busy === photo.id) && (
+                      {selected && (
                         <span className="absolute top-2 right-2 grid size-6 place-items-center rounded-full bg-rose text-primary-foreground">
-                          {busy === photo.id ? <Loader2 aria-hidden className="size-3.5 animate-spin" /> : <Check aria-hidden className="size-3.5" />}
+                          <Check aria-hidden className="size-3.5" />
                         </span>
                       )}
                     </button>
@@ -187,8 +178,8 @@ export function ImagePicker({
             </ul>
           )}
           <div className="flex justify-end">
-            <Button type="button" variant="outline" onClick={() => fileRef.current?.click()} disabled={busy === "upload"}>
-              {busy === "upload" ? <Loader2 aria-hidden className="animate-spin" /> : <Upload aria-hidden />} {t.uploadNew}
+            <Button type="button" variant="outline" onClick={() => fileRef.current?.click()} disabled={uploading}>
+              {uploading ? <Loader2 aria-hidden className="animate-spin" /> : <Upload aria-hidden />} {t.uploadNew}
             </Button>
           </div>
         </DialogContent>

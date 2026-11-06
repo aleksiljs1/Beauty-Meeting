@@ -59,7 +59,7 @@ export function NotificationsList({ initial }: { initial: LiveFeed }) {
     <div className="grid gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-3xl sm:text-4xl">{t.title}</h1>
-        <Button variant="outline" size="lg" onClick={() => void markAll()} disabled={markingAll || unread.length === 0}>
+        <Button variant="outline" size="lg" onClick={() => void markAll()} disabled={markingAll || (unread.length === 0 && data.unreadCount === 0)}>
           <CheckCheck aria-hidden="true" />
           {markingAll ? t.marking : t.markAllRead}
         </Button>

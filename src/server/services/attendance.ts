@@ -1,5 +1,6 @@
 import "server-only";
 import { summarizeStays, type AttendanceSummary } from "@/lib/attendance";
+import { effectiveMeetingStatus } from "@/server/access/policy";
 import { prisma } from "@/server/db";
 import { matchParticipant } from "@/server/zoom/recording-files";
 
@@ -64,7 +65,8 @@ export type AttendanceRow = { userId: string | null; name: string } & Attendance
  * didn't, and anyone else who was in the class (e.g. a guest, or a name that matched nobody).
  */
 export async function getLessonAttendance(lessonId: string, now = new Date()) {
-  const [stays, enrolled] = await Promise.all([
+  const [lesson, recorded, enrolled] = await Promise.all([
+    prisma.lesson.findUniqueOrThrow({ where: { id: lessonId }, select: { meetingStatus: true, scheduledEndAt: true, liveEndedAt: true } }),
     prisma.lessonAttendance.findMany({ where: { lessonId }, orderBy: { joinedAt: "asc" }, select: { userId: true, displayName: true, joinedAt: true, leftAt: true } }),
     prisma.lessonEnrollment.findMany({
       where: { lessonId, revokedAt: null },
@@ -72,6 +74,14 @@ export async function getLessonAttendance(lessonId: string, now = new Date()) {
       select: { user: { select: { id: true, name: true } } },
     }),
   ]);
+
+  // Once the class is over nobody is still in it, even if a "left" or "ended" event never came:
+  // an open stay ends with the class (or, if Zoom never said when it ended, at the scheduled end).
+  const over = effectiveMeetingStatus(lesson, now) === "ENDED";
+  const endedAt = lesson.liveEndedAt ?? lesson.scheduledEndAt;
+  const stays = recorded.map((stay) =>
+    stay.leftAt || !over ? stay : { ...stay, leftAt: new Date(Math.max(endedAt.getTime(), stay.joinedAt.getTime())) },
+  );
 
   const byPerson = new Map<string, { userId: string | null; name: string; stays: typeof stays }>();
   for (const stay of stays) {

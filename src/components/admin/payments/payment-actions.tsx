@@ -34,6 +34,8 @@ export type PaymentActionsAccount = {
   monthlyPriceCents: number | null;
   paidThroughMonth: number;
   monthsLeft: number;
+  /** Still in the course. A student who left keeps their history, but nothing new can be recorded. */
+  member: boolean;
 };
 
 const monthLabel = (month: number) => {
@@ -54,13 +56,13 @@ export function PaymentActions({ account }: { account: PaymentActionsAccount }) 
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem disabled={account.monthsLeft === 0} onSelect={() => setDialog("record")}>
+          <DropdownMenuItem disabled={!account.member || account.monthsLeft === 0} onSelect={() => setDialog("record")}>
             <Plus aria-hidden /> {t.record.open}
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setDialog("history")}>
             <History aria-hidden /> {t.history.open}
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setDialog("firstMonth")}>
+          <DropdownMenuItem disabled={!account.member} onSelect={() => setDialog("firstMonth")}>
             <CalendarClock aria-hidden /> {t.firstMonth.open}
           </DropdownMenuItem>
         </DropdownMenuContent>

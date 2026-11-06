@@ -258,6 +258,9 @@ model Lesson {
   /// Set while a meeting is being created in Zoom — a lock against duplicate meetings
   /// (double clicks, retries after a timeout). Cleared when creation finishes or fails.
   zoomProvisioningStartedAt DateTime? @db.Timestamptz(3)
+  /// When the class's Zoom cloud recording was first found and queued. The hourly catch-up only
+  /// looks for classes without it, so a recording the admin deleted is never imported again.
+  zoomRecordingsQueuedAt    DateTime? @db.Timestamptz(3)
 
   createdById String
   createdBy   User     @relation(fields: [createdById], references: [id], onDelete: Restrict)

@@ -185,4 +185,39 @@ describe("Zoom cloud recordings into Regjistrimet", () => {
     expect(await catchUpMissedRecordings()).toBe(1);
     expect(await catchUpMissedRecordings()).toBe(0); // already queued
   });
+
+  it("never brings back a recording the admin deleted", async () => {
+    await webhook(recordingCompleted());
+    expect(await importNextZoomRecording()).toBe(true);
+    await prisma.recording.deleteMany({ where: { lessonId } });
+    await prisma.lesson.update({ where: { id: lessonId }, data: { meetingStatus: "ENDED", liveEndedAt: new Date() } });
+    zoom.listed = [{ id: Number(MEETING), uuid: "abc==", recording_files: [recordingFile("f-screen", "shared_screen_with_speaker_view", minutesAgo(60), minutesAgo(0))] }];
+    expect(await catchUpMissedRecordings()).toBe(0);
+  });
+
+  it("keeps an imported recording ready even if telling the students fails", async () => {
+    await webhook(recordingCompleted());
+    const notify = vi.spyOn(prisma.notification, "createMany").mockRejectedValueOnce(new Error("database hiccup"));
+    expect(await importNextZoomRecording()).toBe(true);
+    notify.mockRestore();
+    expect(await prisma.recording.findFirstOrThrow({ where: { lessonId } })).toMatchObject({ status: "READY", importAttempts: 1 });
+  });
+});
+
+describe("a class whose 'ended' event never came", () => {
+  it("stops counting attendance at the scheduled end and still finds the recording", async () => {
+    const hoursAgo = (h: number) => new Date(Date.now() - h * 60 * 60_000);
+    await prisma.lesson.update({
+      where: { id: lessonId },
+      data: { scheduledStartAt: hoursAgo(5), scheduledEndAt: hoursAgo(3), liveStartedAt: hoursAgo(5) }, // still LIVE
+    });
+    await webhook(participantEvent("joined", { participant_uuid: "p-klea", user_name: "Klea", customer_key: klea.id, join_time: hoursAgo(4).toISOString() }));
+
+    const [row] = (await getLessonAttendance(lessonId)).attended;
+    expect(row.minutes).toBe(60);
+    expect(row.lastLeftAt).not.toBeNull(); // not "still in the class"
+
+    zoom.listed = [{ id: Number(MEETING), uuid: "abc==", recording_files: [recordingFile("f-late", "active_speaker", hoursAgo(5).toISOString(), hoursAgo(3).toISOString())] }];
+    expect(await catchUpMissedRecordings()).toBe(1);
+  });
 });

@@ -2,8 +2,9 @@ import { prisma } from "@/server/db";
 import { openGalleryObject } from "@/server/storage/public-media";
 
 /**
- * Public gallery image: `/media/gallery/<GalleryItem.id>`. Only PUBLISHED items are served,
- * and only from `gallery/` storage keys. Each item id maps to one immutable upload (a new
+ * Public gallery image: `/media/gallery/<GalleryItem.id>`. Only PUBLISHED items, and photos chosen
+ * as a course or lesson cover (a cover may be a photo kept off the gallery), are served, and only
+ * from `gallery/` storage keys. Each item id maps to one immutable upload (a new
  * image always gets a new id), so the response can be cached for a year.
  */
 
@@ -17,7 +18,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/media/gallery/[
   const { id } = await ctx.params;
   if (!UUID.test(id)) return notFound();
   try {
-    const item = await prisma.galleryItem.findFirst({ where: { id, isPublished: true }, select: { imageKey: true } });
+    const item = await prisma.galleryItem.findFirst({ where: { id, OR: [{ isPublished: true }, { coverOfCourses: { some: {} } }, { coverOfLessons: { some: {} } }] }, select: { imageKey: true } });
     if (!item) return notFound();
     const object = await openGalleryObject(item.imageKey);
     if (!object) return notFound();

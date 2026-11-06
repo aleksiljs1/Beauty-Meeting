@@ -599,7 +599,8 @@ export async function getClassAlerts(adminId: string, now = new Date()) {
       publication: { in: ["PUBLISHED", "DRAFT"] },
       OR: [
         { meetingStatus: "LIVE", scheduledEndAt: { gt: new Date(now.getTime() - END_GRACE_MS) } },
-        { meetingStatus: { notIn: ["LIVE", "ENDED"] }, scheduledStartAt: { gt: now, lte: new Date(now.getTime() + leadMinutes * 60_000) } },
+        // Until its scheduled end, so a teacher who is a few minutes late still gets "Nis klasën".
+        { meetingStatus: { notIn: ["LIVE", "ENDED"] }, scheduledStartAt: { lte: new Date(now.getTime() + leadMinutes * 60_000) }, scheduledEndAt: { gt: now } },
       ],
     },
     orderBy: { scheduledStartAt: "asc" },

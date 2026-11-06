@@ -42,8 +42,8 @@ export function ResetPasswordForm({ token, setup }: { token: string; setup: bool
     setFailure(null);
     const result = await resetPassword(token, password);
     if (result.ok) return setState("done");
-    // Better Auth answers an unknown/expired/used token with a 400 ("UNKNOWN" here).
-    if (result.failure === "UNKNOWN" || result.failure === "INVALID_CREDENTIALS") return setState("invalid");
+    // An unknown, expired or used link; any other failure keeps the form so the student can retry.
+    if (result.failure === "INVALID_CREDENTIALS") return setState("invalid");
     setFailure(result.failure ?? "UNKNOWN");
   });
 

@@ -147,7 +147,8 @@ export default async function PaymentsPage({ searchParams }: PageProps<"/admin/p
                   {a.monthsOwed > 0 && a.amountOwedCents !== null && <span className="block text-xs text-muted-foreground">{t.months(a.monthsOwed)}</span>}
                 </span>
                 <span className="col-start-1 md:col-start-auto">
-                  <Badge variant={STATUS_BADGE[a.status]}>{t.status[a.status]}</Badge>
+                  {/* No alarm for someone who left the course: nothing more can be recorded for them. */}
+                  <Badge variant={a.member ? STATUS_BADGE[a.status] : "outline"}>{t.status[a.status]}</Badge>
                 </span>
                 <span className="col-start-2 row-span-6 row-start-1 justify-self-end md:col-start-auto md:row-span-1 md:row-start-auto">
                   <PaymentActions account={a} />

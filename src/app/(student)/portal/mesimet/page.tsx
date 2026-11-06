@@ -28,7 +28,7 @@ export default async function LessonsPage({ searchParams }: PageProps<"/portal/m
 
   const lessons = filterLessons(await listStudentLessons(user), active.filter);
   // History last, most recent first; everything else chronologically.
-  if (active.filter === "expired" || active.filter === "replay") lessons.reverse();
+  if (active.filter === "expired" || active.filter === "replay") lessons.sort((a, b) => b.scheduledStartAt.localeCompare(a.scheduledStartAt));
 
   return (
     <div className="grid gap-6">

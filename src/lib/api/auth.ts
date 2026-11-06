@@ -10,13 +10,18 @@ import { notifySignedOut } from "./auth-events";
 
 export type AuthFailure = "INVALID_CREDENTIALS" | "DEACTIVATED" | "RATE_LIMITED" | "NETWORK" | "UNKNOWN";
 
+const REJECTED_CODES = new Set(["INVALID_PASSWORD", "INVALID_TOKEN", "USER_NOT_FOUND"]);
+
 function toFailure(error: unknown): AuthFailure {
   if (!axios.isAxiosError(error)) return "UNKNOWN";
   if (!error.response) return "NETWORK";
   if (error.response.status === 429) return "RATE_LIMITED";
   // Only sent once the password was right, so it reveals nothing about which emails exist.
-  if ((error.response.data as { code?: string } | undefined)?.code === "BANNED_USER") return "DEACTIVATED";
+  const code = (error.response.data as { code?: string } | undefined)?.code;
+  if (code === "BANNED_USER") return "DEACTIVATED";
   if (error.response.status === 401 || error.response.status === 403) return "INVALID_CREDENTIALS";
+  // A wrong current password, or a reset link that is unknown, expired or already used.
+  if (code && REJECTED_CODES.has(code)) return "INVALID_CREDENTIALS";
   return "UNKNOWN";
 }
 

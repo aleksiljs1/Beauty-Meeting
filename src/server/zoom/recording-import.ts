@@ -18,9 +18,11 @@ import { pickRecordingFiles, type ZoomRecordingFile } from "./recording-files";
  */
 
 const MAX_ATTEMPTS = 3;
+const GAVE_UP = "Importi nga Zoom dështoi disa herë. Shkarkojeni nga Zoom dhe ngarkojeni me dorë.";
 const RETRY_AFTER_MS = 10 * 60_000;
-/** An import still IMPORTING after this was interrupted (e.g. a restart) and is picked up again. */
-const STUCK_AFTER_MS = 2 * 60 * 60_000;
+/** An import still IMPORTING after this was interrupted (e.g. a restart) and is picked up again.
+ *  Longer than the longest allowed download (client.ts), so a slow import is never taken twice. */
+const STUCK_AFTER_MS = 3 * 60 * 60_000;
 
 /** Queues a meeting's recording files for import. Returns how many new files were queued. */
 export async function queueZoomRecordings(lessonId: string, meetingUuid: string | null, files: ZoomRecordingFile[]) {
@@ -34,7 +36,8 @@ export async function queueZoomRecordings(lessonId: string, meetingUuid: string 
 
   const last = await prisma.recording.aggregate({ where: { lessonId }, _max: { part: true } });
   const first = (last._max.part ?? 0) + 1;
-  const { count } = await prisma.recording.createMany({
+  const [{ count }] = await prisma.$transaction([
+    prisma.recording.createMany({
     data: fresh.map((file, i) => ({
       lessonId,
       source: "ZOOM" as const,
@@ -49,7 +52,10 @@ export async function queueZoomRecordings(lessonId: string, meetingUuid: string 
       displayName: `${lesson.title}${first + i > 1 ? ` (pjesa ${first + i})` : ""}.mp4`.slice(0, 200),
     })),
     skipDuplicates: true,
-  });
+    }),
+    // Marks the lesson as found, so the catch-up never brings back a recording the admin deleted.
+    prisma.lesson.update({ where: { id: lessonId }, data: { zoomRecordingsQueuedAt: new Date() } }),
+  ]);
   return count;
 }
 
@@ -66,58 +72,79 @@ export async function importNextZoomRecording(now = new Date()): Promise<boolean
       ],
     },
     orderBy: { createdAt: "asc" },
-    select: { id: true, status: true, updatedAt: true },
+    select: { id: true, status: true, updatedAt: true, importAttempts: true },
   });
   if (!candidate) return false;
-  // Claim it: if another server instance got there first, this changes nothing.
+  if (candidate.importAttempts >= MAX_ATTEMPTS) {
+    // Interrupted on its last attempt (e.g. it crashed the server each time): stop trying.
+    await prisma.recording.updateMany({
+      where: { id: candidate.id, status: candidate.status, updatedAt: candidate.updatedAt },
+      data: { status: "FAILED", errorMessage: GAVE_UP },
+    });
+    return true;
+  }
+  // Claim it (counting the attempt now, so an import that crashes the server can't loop forever).
+  // If another server instance got there first, this changes nothing.
   const claimed = await prisma.recording.updateMany({
     where: { id: candidate.id, status: candidate.status, updatedAt: candidate.updatedAt },
-    data: { status: "IMPORTING", errorMessage: null },
+    data: { status: "IMPORTING", errorMessage: null, importAttempts: { increment: 1 } },
   });
   if (!claimed.count) return true;
 
-  const recording = await prisma.recording.findUniqueOrThrow({ where: { id: candidate.id } });
+  const recording = await prisma.recording.findUnique({ where: { id: candidate.id } });
+  if (!recording) return true;
   const objectKey = newObjectKey("recordings", recording.lessonId);
   let uploadId: string | null = null;
+  let stored = false;
   try {
     const response = await zoomDownload(await currentDownloadUrl(recording));
     uploadId = await startMultipart(objectKey, "video/mp4");
     const size = await streamIntoStorage(response.body!, objectKey, uploadId);
     uploadId = null;
+    stored = true;
 
     const head = await headObject(objectKey);
     const valid = head !== null && head.size === size && size > 0 && bytesMatch("recording", "video/mp4", await readObjectHead(objectKey, SNIFF_BYTES));
-    if (!valid) {
-      await deleteObject(objectKey).catch(() => undefined);
-      throw new ImportError("Skedari nga Zoom nuk është video MP4 e vlefshme.");
-    }
+    if (!valid) throw new ImportError("Skedari nga Zoom nuk është video MP4 e vlefshme.");
 
-    await prisma.recording.update({
-      where: { id: recording.id },
+    // Only while still ours: the recording or its lesson may have been deleted during the copy.
+    const ready = await prisma.recording.updateMany({
+      where: { id: recording.id, status: "IMPORTING" },
       data: { status: "READY", objectKey, mimeType: "video/mp4", sizeBytes: BigInt(size), providerDownloadUrl: null, readyAt: new Date(), errorMessage: null },
     });
+    if (!ready.count) {
+      await deleteObject(objectKey).catch(() => undefined);
+      return true;
+    }
+  } catch (error) {
+    if (uploadId) await abortMultipart(objectKey, uploadId).catch(() => undefined);
+    if (stored) await deleteObject(objectKey).catch(() => undefined);
+    const attempts = recording.importAttempts;
+    console.error("[recordings] Zoom import failed", recording.id, (error as Error).message);
+    await prisma.recording.updateMany({
+      where: { id: recording.id, status: "IMPORTING" },
+      data: {
+        status: "FAILED",
+        errorMessage:
+          error instanceof ImportError
+            ? error.message
+            : attempts >= MAX_ATTEMPTS
+              ? GAVE_UP
+              : "Importi nga Zoom dështoi; do të provohet përsëri pas pak.",
+      },
+    });
+    return true;
+  }
+
+  // The video is in Regjistrimet; what follows must never turn it back into a failure.
+  try {
     await audit(null, "recording.import", "lesson", recording.lessonId, { recordingId: recording.id });
     await notifyRecordingReady(recording.lessonId, recording.id);
     if (env.ZOOM_RECORDINGS_AFTER_IMPORT === "trash" && recording.providerMeetingUuid && recording.providerFileId) {
       await trashCloudFile(recording.providerMeetingUuid, recording.providerFileId);
     }
   } catch (error) {
-    if (uploadId) await abortMultipart(objectKey, uploadId).catch(() => undefined);
-    const attempts = recording.importAttempts + 1;
-    console.error("[recordings] Zoom import failed", recording.id, (error as Error).message);
-    await prisma.recording.update({
-      where: { id: recording.id },
-      data: {
-        status: "FAILED",
-        importAttempts: attempts,
-        errorMessage:
-          error instanceof ImportError
-            ? error.message
-            : attempts >= MAX_ATTEMPTS
-              ? "Importi nga Zoom dështoi disa herë. Shkarkojeni nga Zoom dhe ngarkojeni me dorë."
-              : "Importi nga Zoom dështoi; do të provohet përsëri pas pak.",
-      },
-    });
+    console.error("[recordings] imported, but the follow-up failed", recording.id, (error as Error).message);
   }
   return true;
 }
@@ -206,15 +233,21 @@ const listSchema = z.object({
 const CATCH_UP_DAYS = 7;
 
 /**
- * Safety net for a lost "recording.completed" event (e.g. the site was offline): for classes that
- * ended in the last week without any Zoom recording, ask Zoom for the host's recordings once and
+ * Safety net for a lost "recording.completed" event (e.g. the site was offline): for classes held
+ * in the last week whose recording was never found, ask Zoom for the host's recordings once and
  * queue what matches. Returns how many files were queued.
  */
 export async function catchUpMissedRecordings(now = new Date()): Promise<number> {
   if (!zoomLive || env.ZOOM_AUTO_RECORDING !== "cloud") return 0;
   const since = new Date(now.getTime() - CATCH_UP_DAYS * 24 * 60 * 60_000);
   const lessons = await prisma.lesson.findMany({
-    where: { zoomMeetingNumber: { not: null }, meetingStatus: "ENDED", liveEndedAt: { gte: since }, recordings: { none: { source: "ZOOM" } } },
+    where: {
+      zoomMeetingNumber: { not: null },
+      zoomRecordingsQueuedAt: null,
+      liveStartedAt: { gte: since },
+      // Over: Zoom said so, or the schedule says so (in case the "ended" event was lost too).
+      OR: [{ meetingStatus: "ENDED" }, { scheduledEndAt: { lt: now } }],
+    },
     select: { id: true, zoomMeetingNumber: true },
   });
   if (!lessons.length) return 0;
