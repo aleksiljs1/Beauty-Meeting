@@ -107,6 +107,9 @@ export default async function InvitationPage({ params }: PageProps<"/ftese/[toke
           <>
             <p className="text-sm text-muted-foreground">{t.previewNote}</p>
             <InvitationJoin token={token} />
+            <Button asChild size="lg" variant="outline">
+              <Link href="/portal">{t.goToPortal}</Link>
+            </Button>
             <p className="text-xs text-muted-foreground">{t.signedInAs(user.email)}</p>
           </>
         ) : (

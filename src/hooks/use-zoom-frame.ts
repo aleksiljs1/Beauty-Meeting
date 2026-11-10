@@ -95,5 +95,11 @@ export function useZoomFrame(fallbackError: string) {
     setError(message);
   }, []);
 
-  return { frameRef, frameKey, open, status, error, start, fail };
+  const close = useCallback(() => {
+    pendingConfig.current = null;
+    setOpen(false);
+    setStatus("left");
+  }, []);
+
+  return { frameRef, frameKey, open, status, error, start, fail, close };
 }

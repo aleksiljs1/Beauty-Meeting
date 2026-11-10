@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { portalText } from "@/i18n/portal";
 import { cn } from "@/lib/utils";
 import type { ClassroomData } from "@/server/queries/portal";
+import { useClassSession } from "./class-session";
 import { ClassroomStage } from "./classroom-stage";
 import { LessonInfo } from "./lesson-info";
 import { MaterialsPanel } from "./materials-panel";
@@ -64,6 +65,14 @@ export function Classroom({ data, autoJoin, initialTab }: { data: ClassroomData;
   const [mobileView, setMobileView] = useState<MobileView>(initialTab === "recordings" ? "recordings" : "classroom");
   const [viewerOpen, setViewerOpen] = useState(false);
   const isDesktop = useIsDesktop();
+
+  // "Open the class" from the corner player, while a phone is showing another tab.
+  const { restoreRequests } = useClassSession();
+  const [seenRestoreRequests, setSeenRestoreRequests] = useState(restoreRequests);
+  if (restoreRequests !== seenRestoreRequests) {
+    setSeenRestoreRequests(restoreRequests);
+    setMobileView("classroom");
+  }
 
   const showPanelTab = useCallback((tab: PanelTab) => {
     setPanelTab(tab);

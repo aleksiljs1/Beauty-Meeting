@@ -4,7 +4,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-/* While a student is in a live class (classroom-stage sets data-in-class on <html>). */
+/* While a student is in a live class (class-session sets data-in-class on <html>). */
 @custom-variant in-class (:root[data-in-class] &);
 
 /*

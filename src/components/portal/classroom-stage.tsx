@@ -5,6 +5,7 @@ import {
   CircleCheck,
   Hourglass,
   Loader2,
+  Minimize2,
   Radio,
   Wrench,
 } from "lucide-react";
@@ -27,9 +28,10 @@ import { cn } from "@/lib/utils";
 import type { StageState } from "@/server/queries/portal";
 import { DemoStage } from "./demo-stage";
 import { ZoomAppLink } from "@/components/zoom/zoom-app-link";
-import { ZoomFrame, ZoomFullscreenButton } from "@/components/zoom/zoom-frame";
-import { isZoomJoinConfig, useZoomFrame } from "@/hooks/use-zoom-frame";
+import { ZoomFullscreenButton } from "@/components/zoom/zoom-frame";
+import { isZoomJoinConfig } from "@/hooks/use-zoom-frame";
 import { zoomText } from "@/i18n/zoom";
+import { ClassSlot, useClassSession } from "./class-session";
 
 const t = portalText.stage;
 
@@ -202,21 +204,11 @@ function ClassroomStageImpl(props: StageProps) {
   const { lessonId, stage, canJoin, autoJoin } = props;
 
   const [join, setJoin] = useState<JoinState>({ kind: "idle" });
-  const zoom = useZoomFrame(portalText.states.errorBody);
-  const startZoom = zoom.start;
+  const session = useClassSession();
+  const startZoom = session.start;
+  const isThisLesson = session.lessonId === lessonId;
+  const inClass = isThisLesson && session.open;
   const autoJoinTried = useRef(false);
-  const classRef = useRef<HTMLDivElement>(null);
-
-  // Joining: bring the class into view and, on a phone, hide the bottom bar that would cover
-  // Zoom's own controls (portal-shell hides it while the root carries data-in-class).
-  useEffect(() => {
-    if (!zoom.open) return;
-    classRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    document.documentElement.dataset.inClass = "";
-    return () => {
-      delete document.documentElement.dataset.inClass;
-    };
-  }, [zoom.open]);
 
   const requestJoin = useCallback(async () => {
     setJoin({ kind: "joining" });
@@ -250,19 +242,42 @@ function ClassroomStageImpl(props: StageProps) {
         `${url.pathname}${url.search}${url.hash}`,
       );
 
-      if ((stage === "LIVE" || stage === "WAITING") && canJoin) void requestJoin();
+      if ((stage === "LIVE" || stage === "WAITING") && canJoin && !inClass) void requestJoin();
     }, 0);
 
     return () => clearTimeout(id);
-  }, [autoJoin, stage, canJoin, requestJoin]);
+  }, [autoJoin, stage, canJoin, inClass, requestJoin]);
 
   const isJoining = join.kind === "joining";
-  const joinError = join.kind === "error" ? join.message : zoom.status === "error" ? zoom.error : null;
+  const joinError = join.kind === "error" ? join.message : isThisLesson ? session.error : null;
   const joinControls = { lessonId, isJoining, zoomAppFallback: props.zoomAppFallback, onJoin: () => void requestJoin() };
 
   let content: ReactNode;
 
-  if (stage === "ENDED") {
+  if (inClass && session.minimized) {
+    content = (
+      <StageMessage icon={<Radio className="size-6" />} title={t.minimizedTitle} tone="live">
+        <p className="max-w-md text-sm text-muted-foreground">{t.minimizedBody}</p>
+        <Button size="lg" className="h-11 min-w-40 px-6 text-base" onClick={session.restore}>
+          {t.restore}
+        </Button>
+      </StageMessage>
+    );
+  } else if (inClass) {
+    content = (
+      <div className="flex min-h-[22rem] flex-1 flex-col bg-black lg:min-h-[32rem]">
+        {/* On a phone the class takes the screen below the header (the bottom bar hides meanwhile). */}
+        <ClassSlot className="h-[calc(100dvh-7.5rem)] min-h-[24rem] scroll-mt-16 md:h-[65vh] md:min-h-[28rem]" />
+        <div className="flex justify-end gap-2 p-2">
+          <Button variant="outline" size="sm" className="border-white/30 bg-transparent text-white hover:bg-white/10" onClick={session.minimize}>
+            <Minimize2 aria-hidden />
+            {t.minimize}
+          </Button>
+          <ZoomFullscreenButton frameRef={session.frameRef} className="border-white/30 bg-transparent text-white hover:bg-white/10" />
+        </div>
+      </div>
+    );
+  } else if (stage === "ENDED") {
     content = (
       <StageMessage icon={<CircleCheck className="size-6" />} title={t.endedTitle}>
         <p className="max-w-md text-sm text-muted-foreground">
@@ -278,21 +293,6 @@ function ClassroomStageImpl(props: StageProps) {
     );
   } else if (join.kind === "demo") {
     content = <DemoStage lessonTitle={props.lessonTitle} onLeave={() => setJoin({ kind: "idle" })} />;
-  } else if (zoom.open) {
-    content = (
-      <div ref={classRef} className="flex min-h-[22rem] flex-1 scroll-mt-16 flex-col bg-black lg:min-h-[32rem]">
-        {/* On a phone the class takes the screen below the header (the bottom bar hides meanwhile). */}
-        <ZoomFrame
-          frameRef={zoom.frameRef}
-          frameKey={zoom.frameKey}
-          title={zoomText.admin.frameTitle}
-          className="h-[calc(100dvh-7.5rem)] min-h-[24rem] flex-1 md:h-[65vh] md:min-h-[28rem]"
-        />
-        <div className="flex justify-end p-2">
-          <ZoomFullscreenButton frameRef={zoom.frameRef} className="border-white/30 bg-transparent text-white hover:bg-white/10" />
-        </div>
-      </div>
-    );
   } else if (stage === "LIVE") {
     content = (
       <StageMessage

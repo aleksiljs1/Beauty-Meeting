@@ -136,6 +136,12 @@ export function PortalShell({ user, academyName, children }: { user: { name: str
           </nav>
 
           <div className="ml-auto flex items-center gap-1">
+            {/* Phones: the bottom bar hides during a class, so home must also be up here. */}
+            <Button asChild variant="ghost" size="icon-lg" className="md:hidden">
+              <Link href="/portal" aria-label={t.nav.dashboard}>
+                <House className="size-5" />
+              </Link>
+            </Button>
             <Button asChild variant="ghost" size="icon-lg" className="relative">
               <Link href="/portal/njoftimet" aria-label={t.notificationsLabel(unread)}>
                 <Bell className="size-5" />

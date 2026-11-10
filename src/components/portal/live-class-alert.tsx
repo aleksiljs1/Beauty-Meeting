@@ -8,18 +8,20 @@ import { Button } from "@/components/ui/button";
 import { dismissLiveAlert, isDismissed, useLiveFeed, type FeedNotification } from "@/hooks/use-live-feed";
 import { portalText } from "@/i18n/portal";
 import { cn } from "@/lib/utils";
+import { useActiveClassLessonId } from "./class-session";
 
 const t = portalText.alert;
 
-function pickAlert(notifications: FeedNotification[], dismissed: ReadonlySet<string>, pathname: string | null) {
+function pickAlert(notifications: FeedNotification[], dismissed: ReadonlySet<string>, pathname: string | null, activeLessonId: string | null) {
   const candidates = notifications.filter(
     (n) =>
       n.active &&
       n.lessonId &&
       !isDismissed(n, dismissed) &&
       (n.type === "LESSON_LIVE" || n.type === "LESSON_STARTING_SOON") &&
-      // Already on that lesson's page: the classroom itself shows the state.
-      pathname !== `/portal/mesimet/${n.lessonId}`,
+      // Already on that lesson's page, or already in that class: nothing to announce.
+      pathname !== `/portal/mesimet/${n.lessonId}` &&
+      n.lessonId !== activeLessonId,
   );
   return candidates.find((n) => n.type === "LESSON_LIVE") ?? candidates.find((n) => n.type === "LESSON_STARTING_SOON") ?? null;
 }
@@ -34,7 +36,8 @@ export function LiveClassAlert({ aboveBottomNav = false }: { aboveBottomNav?: bo
   const { feed, dismissed } = useLiveFeed();
   const pathname = usePathname();
   const headingId = useId();
-  const alert = feed ? pickAlert(feed.notifications, dismissed, pathname) : null;
+  const activeLessonId = useActiveClassLessonId();
+  const alert = feed ? pickAlert(feed.notifications, dismissed, pathname, activeLessonId) : null;
 
   const isLive = alert?.type === "LESSON_LIVE";
   const lessonHref = alert?.lessonId ? `/portal/mesimet/${alert.lessonId}` : "/portal";
