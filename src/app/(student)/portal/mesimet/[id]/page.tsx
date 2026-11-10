@@ -8,11 +8,14 @@ import { Classroom, type PanelTab } from "@/components/portal/classroom";
 import { formatDeadline } from "@/components/portal/lesson-card";
 import { LiveRefresher } from "@/components/portal/live-refresher";
 import { PhaseBadge } from "@/components/portal/phase-badge";
+import { FeedbackForm } from "@/components/feedback/feedback-form";
 import { common } from "@/i18n/common";
+import { feedbackText } from "@/i18n/feedback";
 import { portalText } from "@/i18n/portal";
 import { formatTimeRange, formatWeekdayDate } from "@/lib/datetime";
 import { requirePageUser } from "@/server/auth/session";
 import { ApiError } from "@/server/http";
+import { getOwnLessonFeedback } from "@/server/queries/feedback";
 import { getClassroom } from "@/server/queries/portal";
 
 const t = portalText.lesson;
@@ -41,6 +44,18 @@ export default async function LessonPage({ params, searchParams }: PageProps<"/p
   const query = await searchParams;
   const data = await loadClassroom(id);
   const { lesson } = data;
+  // Shown once the lesson is over (it stays rateable after access to it expires).
+  const ownFeedback = await getOwnLessonFeedback(await requirePageUser("student"), lesson.id);
+  const feedback =
+    ownFeedback === undefined ? null : (
+      <section aria-labelledby="feedback-title" className="max-w-xl rounded-xl border bg-card p-4 sm:p-6">
+        <h2 id="feedback-title" className="text-2xl">
+          {feedbackText.student.lessonPrompt}
+        </h2>
+        <p className="mt-1 mb-4 text-sm text-muted-foreground">{feedbackText.student.lessonPromptBody}</p>
+        <FeedbackForm target={{ topic: "LESSON", lessonId: lesson.id }} saved={ownFeedback} />
+      </section>
+    );
 
   const header = (
     <header className="grid gap-3">
@@ -94,6 +109,7 @@ export default async function LessonPage({ params, searchParams }: PageProps<"/p
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">{data.history.reason === "EXPIRED" ? t.expiredReason : t.cancelledReason}</p>
         </section>
+        {feedback}
       </div>
     );
   }
@@ -105,6 +121,7 @@ export default async function LessonPage({ params, searchParams }: PageProps<"/p
       <LiveRefresher lessonId={lesson.id} />
       {header}
       <Classroom data={data} autoJoin={query.bashkohu === "1"} initialTab={panel ?? "materials"} />
+      {feedback}
     </div>
   );
 }

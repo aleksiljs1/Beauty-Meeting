@@ -1,11 +1,14 @@
-import { BookOpen, PlayCircle } from "lucide-react";
+import { BookOpen, PlayCircle, Star } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { EmptyState } from "@/components/portal/empty-state";
 import { LessonCard } from "@/components/portal/lesson-card";
 import { LiveRefresher } from "@/components/portal/live-refresher";
+import { Button } from "@/components/ui/button";
+import { feedbackText } from "@/i18n/feedback";
 import { portalText } from "@/i18n/portal";
 import { requirePageUser } from "@/server/auth/session";
+import { countPendingFeedback } from "@/server/queries/feedback";
 import { listStudentLessons } from "@/server/queries/portal";
 
 const t = portalText.dashboard;
@@ -16,7 +19,7 @@ const UPCOMING = new Set(["UPCOMING", "STARTING_SOON", "WAITING_FOR_HOST"]);
 
 export default async function DashboardPage() {
   const user = await requirePageUser("student");
-  const lessons = await listStudentLessons(user);
+  const [lessons, pendingFeedback] = await Promise.all([listStudentLessons(user), countPendingFeedback(user)]);
 
   const live = lessons.filter((l) => l.phase === "LIVE");
   const upcoming = lessons.filter((l) => UPCOMING.has(l.phase)).slice(0, 3);
@@ -33,6 +36,19 @@ export default async function DashboardPage() {
         <h1 className="text-3xl sm:text-4xl">{t.greeting(firstName)}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{t.intro}</p>
       </header>
+
+      {pendingFeedback > 0 ? (
+        <aside className="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-4">
+          <Star aria-hidden="true" className="size-5 shrink-0 text-rose-deep" />
+          <div className="min-w-0 flex-1">
+            <p className="font-medium">{feedbackText.student.pendingTitle(pendingFeedback)}</p>
+            <p className="text-sm text-muted-foreground">{feedbackText.student.pendingBody}</p>
+          </div>
+          <Button asChild variant="secondary">
+            <Link href="/portal/vleresimi">{feedbackText.student.pendingAction}</Link>
+          </Button>
+        </aside>
+      ) : null}
 
       {lessons.length === 0 ? (
         <EmptyState icon={BookOpen} title={t.noLessonsTitle}>

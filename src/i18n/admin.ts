@@ -12,6 +12,7 @@ export const admin = {
       payments: "Pagesat",
       lessons: "Mësimet",
       calendar: "Kalendari",
+      feedback: "Vlerësimet",
       materials: "Materialet",
       content: "Përmbajtja",
       integrations: "Integrimet",

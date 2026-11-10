@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, BookOpen, House, LogOut, User } from "lucide-react";
+import { Bell, BookOpen, House, LogOut, Star, User } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Toaster } from "@/components/ui/sonner";
 import { refreshLiveFeed, useLiveFeed } from "@/hooks/use-live-feed";
+import { feedbackText } from "@/i18n/feedback";
 import { portalText } from "@/i18n/portal";
 import { getAccessToken } from "@/lib/api/access-token";
 import { onSignedOut } from "@/lib/api/auth-events";
@@ -174,6 +175,12 @@ export function PortalShell({ user, academyName, children }: { user: { name: str
                   <Link href="/portal/profili">
                     <User />
                     {t.nav.profile}
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/portal/vleresimi">
+                    <Star />
+                    {feedbackText.student.nav}
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={pending} onSelect={() => void signOut()}>

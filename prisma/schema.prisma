@@ -46,6 +46,7 @@ model User {
   adminPreferences   AdminPreferences?
   lessonReminders    AdminLessonReminder[]
   attendance         LessonAttendance[]
+  feedback           Feedback[]
 
   @@unique([email])
   @@map("user")
@@ -210,6 +211,7 @@ model Course {
   members       CourseMember[]
   billingStarts BillingStart[]
   payments      Payment[]
+  feedback      Feedback[]
 
   @@index([isPublic, position])
   @@index([imageId])
@@ -274,6 +276,7 @@ model Lesson {
   notifications Notification[]
   adminReminders AdminLessonReminder[]
   attendance     LessonAttendance[]
+  feedback       Feedback[]
 
   @@index([publication, scheduledStartAt])
   @@index([meetingStatus])
@@ -697,4 +700,40 @@ model LessonAttendance {
   @@unique([lessonId, participantKey, joinedAt])
   @@index([lessonId, userId])
   @@index([userId])
+}
+
+// =============================================================================
+// Feedback
+// =============================================================================
+
+enum FeedbackTopic {
+  LESSON
+  COURSE
+  /// The academy's app/portal in general.
+  APP
+}
+
+/// A student's rating (1-5) with an optional comment, on an ended lesson, an ended course or the
+/// app. One per student per lesson or course (sending again changes it); app feedback can be sent
+/// any number of times. The migration adds a CHECK that the target matches the topic.
+model Feedback {
+  id       String        @id @default(uuid(7)) @db.Uuid
+  userId   String
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic    FeedbackTopic
+  lessonId String?       @db.Uuid
+  lesson   Lesson?       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  courseId String?       @db.Uuid
+  course   Course?       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  rating   Int
+  comment  String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([userId, lessonId])
+  @@unique([userId, courseId])
+  @@index([lessonId])
+  @@index([courseId])
+  @@index([topic, createdAt])
 }
