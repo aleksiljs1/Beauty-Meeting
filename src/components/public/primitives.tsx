@@ -12,7 +12,12 @@ export function Container({ className, ...props }: ComponentProps<"div">) {
 }
 
 export function Eyebrow({ children, className }: { children: ReactNode; className?: string }) {
-  return <p className={cn("text-xs font-medium tracking-[0.18em] text-rose-deep uppercase", className)}>{children}</p>;
+  return (
+    <p className={cn("flex items-center gap-3 text-xs font-medium tracking-[0.18em] text-rose-deep uppercase", className)}>
+      <span aria-hidden className="h-px w-8 shrink-0 bg-gradient-to-r from-rose/0 to-rose" />
+      {children}
+    </p>
+  );
 }
 
 export function SectionHeading({
@@ -45,11 +50,11 @@ export function SectionHeading({
 /** Title block at the top of inner pages. */
 export function PageHeader({ eyebrow, title, intro, children }: { eyebrow?: string; title: string; intro?: string | null; children?: ReactNode }) {
   return (
-    <header className="border-b border-border/70">
+    <header className="panel-sheen border-b border-border/70">
       <Container className="py-14 sm:py-20">
-        {eyebrow && <Eyebrow className="mb-4">{eyebrow}</Eyebrow>}
-        <h1 className="max-w-3xl text-4xl leading-[1.1] sm:text-5xl">{title}</h1>
-        {intro && <p className="mt-5 max-w-2xl text-lg leading-relaxed text-muted-foreground">{intro}</p>}
+        {eyebrow && <Eyebrow className="mb-4 animate-rise">{eyebrow}</Eyebrow>}
+        <h1 className="max-w-3xl text-4xl leading-[1.1] animate-rise [--rise-delay:80ms] sm:text-5xl">{title}</h1>
+        {intro && <p className="mt-5 max-w-2xl text-lg leading-relaxed text-muted-foreground animate-rise [--rise-delay:160ms]">{intro}</p>}
         {children}
       </Container>
     </header>

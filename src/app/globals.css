@@ -175,6 +175,82 @@
   }
 }
 
+/*
+ * Life without noise: a soft gold light at the top of every page, content that rises in on load,
+ * and cards that lift on hover. All transform/opacity only, all flattened by reduced motion.
+ */
+
+/* Warm light behind the top of the page; stays put while scrolling. */
+@utility ambient-glow {
+  background-image:
+    radial-gradient(70rem 32rem at 50% -12rem, rgb(216 175 80 / 0.1), transparent 70%),
+    radial-gradient(40rem 24rem at 100% 0%, rgb(217 58 47 / 0.035), transparent 70%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+
+/* One element rising into place on load; `--rise-delay` staggers siblings. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    translate: 0 0.75rem;
+  }
+}
+@utility animate-rise {
+  animation: rise 600ms cubic-bezier(0.22, 1, 0.36, 1) var(--rise-delay, 0ms) backwards;
+}
+/* The direct children of a list or grid rise one after another (the first eight; the rest together). */
+@utility stagger {
+  & > * {
+    animation: rise 600ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+    animation-delay: 480ms;
+  }
+  & > *:nth-child(1) { animation-delay: 60ms; }
+  & > *:nth-child(2) { animation-delay: 120ms; }
+  & > *:nth-child(3) { animation-delay: 180ms; }
+  & > *:nth-child(4) { animation-delay: 240ms; }
+  & > *:nth-child(5) { animation-delay: 300ms; }
+  & > *:nth-child(6) { animation-delay: 360ms; }
+  & > *:nth-child(7) { animation-delay: 420ms; }
+}
+
+/* A clickable card: lifts, warms its border to gold and casts a soft shadow on hover or focus. */
+@utility card-lift {
+  transition:
+    translate 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 300ms ease-out,
+    box-shadow 300ms ease-out;
+  &:hover,
+  &:has(:focus-visible) {
+    border-color: rgb(216 175 80 / 0.45);
+    box-shadow: 0 18px 40px -24px rgb(0 0 0 / 0.95), 0 0 0 1px rgb(216 175 80 / 0.08);
+    translate: 0 -2px;
+  }
+}
+
+/* Gold text for a word that should shine (a name, a figure). Falls back to plain gold. */
+@utility text-gold {
+  color: var(--rose-deep);
+  background-image: linear-gradient(100deg, #f3d48a 0%, var(--rose) 45%, #b8862f 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* A panel with a little depth: a warm sheen in one corner over the card colour. */
+@utility panel-sheen {
+  background-image:
+    radial-gradient(28rem 14rem at 0% 0%, rgb(216 175 80 / 0.12), transparent 70%),
+    linear-gradient(180deg, rgb(255 255 255 / 0.015), transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-lift:hover,
+  .card-lift:has(:focus-visible) {
+    translate: none;
+  }
+}
+
 /* Gold hairline that grows under a text link on hover/focus (same gesture as the header nav). Wraps across lines. */
 @utility link-underline {
   background-image: linear-gradient(var(--rose), var(--rose));

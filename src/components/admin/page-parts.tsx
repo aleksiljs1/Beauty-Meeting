@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { ChevronLeft, ChevronRight, Inbox } from "lucide-react";
+import { ChevronLeft, ChevronRight, Inbox, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { admin } from "@/i18n/admin";
@@ -13,19 +13,34 @@ import { cn } from "@/lib/utils";
 export function PageHeader({ title, intro, actions }: { title: string; intro?: string; actions?: ReactNode }) {
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div className="space-y-1">
-        <h1 className="text-3xl font-medium">{title}</h1>
-        {intro && <p className="max-w-2xl text-sm text-muted-foreground">{intro}</p>}
+      <div className="space-y-2">
+        <span aria-hidden className="block h-0.5 w-10 rounded-full bg-gradient-to-r from-rose to-rose/0 animate-rise" />
+        <h1 className="text-3xl font-medium sm:text-4xl animate-rise [--rise-delay:60ms]">{title}</h1>
+        {intro && <p className="max-w-2xl text-sm text-muted-foreground animate-rise [--rise-delay:120ms]">{intro}</p>}
       </div>
-      {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+      {actions && <div className="flex flex-wrap gap-2 animate-rise [--rise-delay:180ms]">{actions}</div>}
     </div>
+  );
+}
+
+/** A Lucide icon in a small gold-lit circle (section titles, stats, empty states). */
+export function IconBadge({ icon: Icon, tone = "gold", className }: { icon: LucideIcon; tone?: "gold" | "live" | "danger"; className?: string }) {
+  const tones = {
+    gold: "bg-rose/12 text-rose-deep ring-rose/25",
+    live: "bg-live/15 text-live ring-live/30",
+    danger: "bg-destructive/12 text-destructive ring-destructive/25",
+  } as const;
+  return (
+    <span aria-hidden className={cn("flex size-9 shrink-0 items-center justify-center rounded-full ring-1", tones[tone], className)}>
+      <Icon className="size-4" />
+    </span>
   );
 }
 
 export function EmptyState({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn("flex flex-col items-center gap-2 rounded-md border border-dashed px-4 py-10 text-center text-sm text-muted-foreground", className)}>
-      <Inbox className="size-5" aria-hidden />
+    <div className={cn("flex flex-col items-center gap-3 rounded-md border border-dashed bg-background/30 px-4 py-10 text-center text-sm text-muted-foreground", className)}>
+      <IconBadge icon={Inbox} />
       <p>{children}</p>
     </div>
   );
@@ -127,13 +142,29 @@ export function FilterChip({ href, active, children }: { href: string; active: b
   );
 }
 
-export function SectionCard({ title, description, actions, children }: { title: string; description?: string; actions?: ReactNode; children: ReactNode }) {
+export function SectionCard({
+  title,
+  description,
+  actions,
+  icon,
+  children,
+}: {
+  title: string;
+  description?: string;
+  actions?: ReactNode;
+  /** Shown in a gold circle before the title. */
+  icon?: LucideIcon;
+  children: ReactNode;
+}) {
   return (
-    <section className="space-y-4 rounded-md border bg-card p-4 sm:p-6">
+    <section className="panel-sheen space-y-4 rounded-md border bg-card p-4 shadow-[0_1px_0_rgb(255_255_255/0.03)_inset] sm:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-1">
-          <h2 className="text-xl font-medium">{title}</h2>
-          {description && <p className="max-w-2xl text-sm text-muted-foreground">{description}</p>}
+        <div className="flex items-start gap-3">
+          {icon && <IconBadge icon={icon} className="mt-0.5" />}
+          <div className="space-y-1">
+            <h2 className="text-xl font-medium">{title}</h2>
+            {description && <p className="max-w-2xl text-sm text-muted-foreground">{description}</p>}
+          </div>
         </div>
         {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
       </div>

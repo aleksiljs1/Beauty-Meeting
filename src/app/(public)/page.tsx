@@ -35,23 +35,30 @@ export default async function HomePage() {
       <section aria-labelledby="hero-title">
         <Container className="grid items-center gap-10 py-14 sm:py-20 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16 lg:py-24">
           <div>
-            <Eyebrow className="mb-5">{t.eyebrow}</Eyebrow>
-            <h1 id="hero-title" className="text-5xl leading-[1.02] sm:text-6xl lg:text-7xl">
+            <Eyebrow className="mb-5 animate-rise">{t.eyebrow}</Eyebrow>
+            <h1 id="hero-title" className="text-5xl leading-[1.02] animate-rise [--rise-delay:100ms] sm:text-6xl lg:text-7xl">
               {settings.name}
             </h1>
-            <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground sm:text-xl">{settings.tagline ?? t.heroFallback}</p>
-            <div className="mt-9 flex flex-wrap gap-3">
+            <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground animate-rise [--rise-delay:200ms] sm:text-xl">
+              {settings.tagline ?? t.heroFallback}
+            </p>
+            <div className="mt-9 flex flex-wrap gap-3 animate-rise [--rise-delay:300ms]">
               <LinkButton href="/akademia">{t.heroCtaCourses}</LinkButton>
               <LinkButton href="/kontakt" variant="outline">
                 {t.heroCtaContact}
               </LinkButton>
             </div>
           </div>
-          {heroImage ? (
-            <GalleryImage item={heroImage} preload sizes="(min-width: 1024px) 42vw, 100vw" className="aspect-[4/5] max-h-[38rem] w-full" />
-          ) : (
-            <ImagePlaceholder monogram={monogramOf(settings.name)} className="aspect-[4/5] max-h-[38rem] w-full" />
-          )}
+          <div className="relative animate-rise [--rise-delay:150ms]">
+            {/* Soft light and a gold frame set off behind the photo. */}
+            <span aria-hidden className="pointer-events-none absolute -inset-10 rounded-full bg-rose/10 blur-3xl" />
+            <span aria-hidden className="pointer-events-none absolute inset-0 translate-x-3 translate-y-3 rounded-md border border-rose/40 sm:translate-x-4 sm:translate-y-4" />
+            {heroImage ? (
+              <GalleryImage item={heroImage} preload sizes="(min-width: 1024px) 42vw, 100vw" className="relative aspect-[4/5] max-h-[38rem] w-full" />
+            ) : (
+              <ImagePlaceholder monogram={monogramOf(settings.name)} className="relative aspect-[4/5] max-h-[38rem] w-full" />
+            )}
+          </div>
         </Container>
       </section>
 
@@ -71,7 +78,7 @@ export default async function HomePage() {
       </section>
 
       {/* Academy --------------------------------------------------------------------------- */}
-      <section aria-labelledby="academy-title" className="bg-secondary">
+      <section aria-labelledby="academy-title" className="panel-sheen bg-secondary">
         <Container className="py-16 sm:py-24">
           <Reveal>
             <SectionHeading
@@ -161,7 +168,7 @@ export default async function HomePage() {
       </section>
 
       {/* Contact CTA ----------------------------------------------------------------------- */}
-      <section aria-labelledby="cta-title" className="bg-sand">
+      <section aria-labelledby="cta-title" className="panel-sheen relative overflow-hidden border-t border-rose/20 bg-sand">
         <Container className="flex flex-col gap-8 py-16 sm:py-20 md:flex-row md:items-end md:justify-between">
           <Reveal className="max-w-xl">
             <h2 id="cta-title" className="text-3xl leading-tight sm:text-4xl">

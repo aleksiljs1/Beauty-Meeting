@@ -51,11 +51,18 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
               onClick={onNavigate}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-                active ? "bg-secondary font-medium text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                "group relative flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors duration-200 outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                // The current page: a gold bar at the edge and a warm wash.
+                "before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:origin-center before:scale-y-0 before:rounded-full before:bg-rose before:transition-transform before:duration-300",
+                active
+                  ? "bg-gradient-to-r from-rose/15 to-transparent font-medium text-foreground before:scale-y-100"
+                  : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
               )}
             >
-              <Icon className="size-4" aria-hidden />
+              <Icon
+                className={cn("size-4 transition-colors duration-200", active ? "text-rose-deep" : "group-hover:text-rose-deep")}
+                aria-hidden
+              />
               {item.label}
             </Link>
           </li>
@@ -69,7 +76,10 @@ function Brand() {
   return (
     <Link href="/admin" className="block px-3 font-heading text-2xl leading-tight text-foreground">
       {SHOW_BRAND_NAME && common.brandFallback}
-      <span className="block font-sans text-xs tracking-wide text-muted-foreground uppercase">{admin.shell.title}</span>
+      <span className="mt-1 flex items-center gap-2 font-sans text-xs tracking-[0.16em] text-rose-deep uppercase">
+        <span aria-hidden className="h-px w-5 bg-rose/70" />
+        {admin.shell.title}
+      </span>
     </Link>
   );
 }
@@ -113,8 +123,8 @@ export function AdminShell({ user, children }: { user: { name: string; email: st
   );
 
   return (
-    <div className="flex min-h-full flex-1 bg-background">
-      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col gap-8 border-r bg-card/60 px-3 py-6 lg:flex">
+    <div className="flex min-h-full flex-1">
+      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col gap-8 border-r bg-card/60 px-3 py-6 backdrop-blur-sm lg:flex">
         <Brand />
         <nav aria-label={admin.shell.navLabel} className="flex-1">
           <NavLinks />

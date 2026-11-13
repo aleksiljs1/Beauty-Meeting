@@ -1,12 +1,13 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { AlertTriangle, Plus, Wallet } from "lucide-react";
-import { DemoBadge, EmptyState, MeetingBadge, PageHeader, PublicationBadge, SectionCard } from "@/components/admin/page-parts";
+import { AlertTriangle, CalendarClock, ClipboardCheck, Plus, Radio, Users, Wallet, type LucideIcon } from "lucide-react";
+import { DemoBadge, EmptyState, IconBadge, MeetingBadge, PageHeader, PublicationBadge, SectionCard } from "@/components/admin/page-parts";
 import { LessonThumb } from "@/components/admin/lessons/lesson-list-item";
 import { Button } from "@/components/ui/button";
 import { admin } from "@/i18n/admin";
 import { formatEuro } from "@/lib/billing";
 import { formatDateTime, formatTimeRange, formatWeekdayDate } from "@/lib/datetime";
+import { cn } from "@/lib/utils";
 import { requirePageUser } from "@/server/auth/session";
 import { getAdminDashboard, type DashboardIssue } from "@/server/queries/admin";
 import { getPaymentAlerts } from "@/server/queries/payments";
@@ -30,12 +31,21 @@ const ISSUE_TAB: Record<DashboardIssue["kind"], string> = {
   DRAFT_STARTING: "detaje",
 };
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Stat({ label, value, icon, href, live = false }: { label: string; value: number; icon: LucideIcon; href: string; live?: boolean }) {
   return (
-    <div className="rounded-md border bg-card p-4">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="mt-1 font-heading text-4xl">{value}</p>
-    </div>
+    <Link
+      href={href}
+      className={cn(
+        "panel-sheen card-lift relative flex items-center justify-between gap-4 overflow-hidden rounded-md border bg-card p-5 outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+        live && "border-live/40",
+      )}
+    >
+      <div>
+        <p className="text-sm text-muted-foreground">{label}</p>
+        <p className={cn("mt-1 font-heading text-4xl lining-nums tabular-nums", live ? "text-live" : "text-gold")}>{value}</p>
+      </div>
+      <IconBadge icon={icon} tone={live ? "live" : "gold"} className={cn("size-11", live && "motion-safe:animate-pulse")} />
+    </Link>
   );
 }
 
@@ -68,21 +78,21 @@ export default async function AdminDashboardPage() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Stat label={t.activeStudents} value={data.activeStudents} />
-        <Stat label={t.upcomingLessons} value={data.upcomingCount} />
-        <Stat label={t.liveNow} value={data.live.length} />
+      <div className="stagger grid gap-4 sm:grid-cols-3">
+        <Stat label={t.activeStudents} value={data.activeStudents} icon={Users} href="/admin/studentet" />
+        <Stat label={t.upcomingLessons} value={data.upcomingCount} icon={CalendarClock} href="/admin/kalendari" />
+        <Stat label={t.liveNow} value={data.live.length} icon={Radio} href="/admin/mesimet" live={data.live.length > 0} />
       </div>
 
-      <SectionCard title={t.issuesTitle}>
+      <SectionCard title={t.issuesTitle} icon={ClipboardCheck}>
         {data.issues.length === 0 && paymentAlerts.length === 0 ? (
           <EmptyState>{t.issuesEmpty}</EmptyState>
         ) : (
           <ul className="divide-y">
             {paymentAlerts.map((alert) => (
               <li key={alert.href} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="flex gap-3 text-sm font-medium">
-                  <Wallet className={`mt-0.5 size-4 shrink-0 ${alert.urgent ? "text-destructive" : "text-muted-foreground"}`} aria-hidden />
+                <p className="flex items-center gap-3 text-sm font-medium">
+                  <IconBadge icon={Wallet} tone={alert.urgent ? "danger" : "gold"} />
                   {alert.text}
                 </p>
                 <Button variant="outline" size="sm" asChild>
@@ -93,7 +103,7 @@ export default async function AdminDashboardPage() {
             {data.issues.map((issue) => (
               <li key={`${issue.kind}-${issue.id}`} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex gap-3">
-                  <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden />
+                  <IconBadge icon={AlertTriangle} tone="danger" />
                   <div className="space-y-0.5 text-sm">
                     <p className="font-medium">{ISSUE_LABEL[issue.kind]}</p>
                     <p className="text-muted-foreground">
@@ -117,14 +127,14 @@ export default async function AdminDashboardPage() {
       </SectionCard>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <SectionCard title={t.liveNow}>
+        <SectionCard title={t.liveNow} icon={Radio}>
           {data.live.length === 0 ? (
             <EmptyState>{t.liveEmpty}</EmptyState>
           ) : (
             <LessonList lessons={data.live} />
           )}
         </SectionCard>
-        <SectionCard title={t.upcomingTitle}>
+        <SectionCard title={t.upcomingTitle} icon={CalendarClock}>
           {data.upcoming.length === 0 ? <EmptyState>{t.upcomingEmpty}</EmptyState> : <LessonList lessons={data.upcoming} />}
         </SectionCard>
       </div>
@@ -137,7 +147,10 @@ function LessonList({ lessons }: { lessons: Awaited<ReturnType<typeof getAdminDa
     <ul className="divide-y">
       {lessons.map((lesson) => (
         <li key={lesson.id} className="py-3">
-          <Link href={`/admin/mesimet/${lesson.id}`} className="group flex items-center gap-4 rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+          <Link
+            href={`/admin/mesimet/${lesson.id}`}
+            className="group -mx-2 flex items-center gap-4 rounded-md px-2 py-1 transition-colors duration-200 outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
             <LessonThumb src={lesson.coverSrc} title={lesson.title} />
             <div className="min-w-0 space-y-1">
               <div className="flex flex-wrap items-center gap-2">

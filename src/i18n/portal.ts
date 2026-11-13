@@ -19,7 +19,11 @@ export const portalText = {
 
   dashboard: {
     metaTitle: "Paneli",
-    greeting: (name: string) => `Mirë se vini, ${name}`,
+    /** By the hour in Tirana: morning, day, evening. */
+    greetingFor: (hour: number) => (hour < 12 ? "Mirëmëngjes" : hour < 18 ? "Mirëdita" : "Mirëmbrëma"),
+    upcomingCount: (n: number) => (n === 1 ? "1 mësim i ardhshëm" : `${n} mësime të ardhshme`),
+    replayCount: (n: number) => (n === 1 ? "1 regjistrim" : `${n} regjistrime`),
+    nextLesson: "Mësimi i radhës",
     intro: "Këtu gjeni mësimet tuaja, klasat live dhe regjistrimet.",
     liveNow: "Mësim live tani",
     upcomingTitle: "Mësimet e ardhshme",

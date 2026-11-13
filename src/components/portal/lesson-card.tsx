@@ -24,8 +24,8 @@ export function LessonCard({ lesson, headingLevel = "h3" }: { lesson: StudentLes
   return (
     <article
       className={cn(
-        "group flex flex-col overflow-hidden rounded-lg border bg-card transition-[border-color,box-shadow] duration-200",
-        history ? "bg-card/60" : "hover:border-rose/40 hover:shadow-[0_12px_32px_-20px_rgb(0_0_0/0.9)]",
+        "group flex flex-col overflow-hidden rounded-lg border bg-card",
+        history ? "bg-card/60" : "card-lift",
       )}
     >
       <CoverImage
