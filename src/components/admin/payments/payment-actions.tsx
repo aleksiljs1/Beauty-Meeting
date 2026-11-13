@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
-import { CalendarClock, History, MoreHorizontal, Plus } from "lucide-react";
+import { CalendarClock, History, MoreHorizontal, Plus, Printer } from "lucide-react";
 import { z } from "zod";
 import { DateInput } from "@/components/admin/date-inputs";
 import { FormField } from "@/components/admin/form-field";
@@ -43,12 +43,19 @@ const monthLabel = (month: number) => {
   return t.month(year, m);
 };
 
+/** "Regjistro" in plain sight (the most common task), the rest in the "…" menu. */
 export function PaymentActions({ account }: { account: PaymentActionsAccount }) {
   const [dialog, setDialog] = useState<null | "record" | "history" | "firstMonth">(null);
   const close = () => setDialog(null);
+  const canRecord = account.member && account.monthsLeft > 0;
 
   return (
-    <>
+    <span className="flex items-center justify-end gap-1">
+      {canRecord && (
+        <Button variant="outline" size="sm" onClick={() => setDialog("record")} aria-label={`${t.record.open}: ${account.name}`}>
+          <Plus aria-hidden /> {t.record.button}
+        </Button>
+      )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon" aria-label={`${t.columns.actions}: ${account.name}`}>
@@ -56,9 +63,6 @@ export function PaymentActions({ account }: { account: PaymentActionsAccount }) 
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem disabled={!account.member || account.monthsLeft === 0} onSelect={() => setDialog("record")}>
-            <Plus aria-hidden /> {t.record.open}
-          </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setDialog("history")}>
             <History aria-hidden /> {t.history.open}
           </DropdownMenuItem>
@@ -71,7 +75,7 @@ export function PaymentActions({ account }: { account: PaymentActionsAccount }) 
       {dialog === "record" && <RecordPaymentDialog account={account} onClose={close} />}
       {dialog === "history" && <HistoryDialog account={account} onClose={close} />}
       {dialog === "firstMonth" && <FirstMonthDialog account={account} onClose={close} />}
-    </>
+    </span>
   );
 }
 
@@ -245,6 +249,11 @@ function HistoryDialog({ account, onClose }: { account: PaymentActionsAccount; o
                 {[t.record.methods[p.method], p.note, p.recordedBy && t.history.recordedBy(p.recordedBy)].filter(Boolean).join(" · ")}
               </p>
               {p.cancelledAt && p.cancelReason && <p className="text-xs text-destructive">{t.history.cancelled(p.cancelReason)}</p>}
+              {!p.cancelledAt && (
+                <a href={`/admin/pagesat/deshmi/${p.id}`} target="_blank" rel="noopener" className="inline-flex items-center gap-1 text-xs text-rose-deep underline-offset-4 hover:underline">
+                  <Printer aria-hidden className="size-3.5" /> {t.history.print}
+                </a>
+              )}
               {!p.cancelledAt &&
                 (cancelling === p.id ? (
                   <div className="flex gap-2 pt-1">

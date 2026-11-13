@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { PublicLiveAlert } from "@/components/public/public-live-alert";
 import { SiteFooter } from "@/components/public/site-footer";
 import { SiteHeader } from "@/components/public/site-header";
+import { WhatsAppButton } from "@/components/public/whatsapp-button";
 import { publicSite } from "@/i18n/public";
 import { getPublicSettings } from "@/server/queries/public";
 
@@ -29,6 +30,7 @@ export default async function PublicLayout({ children }: LayoutProps<"/">) {
         {children}
       </main>
       <SiteFooter settings={settings} />
+      <WhatsAppButton number={settings.whatsapp} />
       <PublicLiveAlert />
     </>
   );

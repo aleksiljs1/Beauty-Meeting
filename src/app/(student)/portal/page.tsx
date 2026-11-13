@@ -1,6 +1,7 @@
 import { ArrowRight, BookOpen, CalendarClock, PlayCircle, Radio, Star, type LucideIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ContactAcademy } from "@/components/portal/contact-academy";
 import { EmptyState } from "@/components/portal/empty-state";
 import { LessonCard } from "@/components/portal/lesson-card";
 import { LiveRefresher } from "@/components/portal/live-refresher";
@@ -158,6 +159,8 @@ export default async function DashboardPage() {
           </section>
         </>
       ) : null}
+
+      <ContactAcademy />
     </div>
   );
 }

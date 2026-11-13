@@ -224,7 +224,11 @@ export async function searchStudentsForLesson(lessonId: string, q: string) {
 
 // --- Lessons -------------------------------------------------------------------------------
 
-export type LessonListFilter = { publication?: PublicationStatus; when?: "upcoming" | "past"; page?: number };
+/** `q` searches the title (case-insensitive); `courseId` keeps one course's lessons. */
+export type LessonListFilter = { publication?: PublicationStatus; when?: "upcoming" | "past"; courseId?: string; q?: string; page?: number };
+
+/** `%`, `_` and `\` in the search are plain characters, not LIKE wildcards. */
+const likePattern = (q: string) => `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
 
 const lessonRowSelect = {
   id: true,
@@ -273,6 +277,8 @@ export function lessonFilterWhere(filter: Omit<LessonListFilter, "page">, now: D
   return {
     ...(filter.publication ? { publication: filter.publication } : {}),
     ...(filter.when === "upcoming" ? { scheduledEndAt: { gt: now } } : filter.when === "past" ? { scheduledEndAt: { lte: now } } : {}),
+    ...(filter.courseId ? { courseId: filter.courseId } : {}),
+    ...(filter.q ? { title: { contains: filter.q, mode: "insensitive" as const } } : {}),
   };
 }
 
@@ -290,6 +296,8 @@ export async function listLessons(filter: LessonListFilter, now = new Date()): P
     Prisma.sql`TRUE`,
     ...(filter.publication ? [Prisma.sql`"publication" = ${filter.publication}::"PublicationStatus"`] : []),
     ...(filter.when === "upcoming" ? [Prisma.sql`"scheduledEndAt" > ${now}`] : filter.when === "past" ? [Prisma.sql`"scheduledEndAt" <= ${now}`] : []),
+    ...(filter.courseId ? [Prisma.sql`"courseId" = ${filter.courseId}::uuid`] : []),
+    ...(filter.q ? [Prisma.sql`"title" ILIKE ${likePattern(filter.q)}`] : []),
   ];
   const whereSql = Prisma.join(conditions, " AND ");
   // Upcoming: soonest first. Otherwise newest first, a series by its latest matching date.

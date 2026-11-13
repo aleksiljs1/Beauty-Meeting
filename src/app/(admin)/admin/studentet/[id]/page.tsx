@@ -1,17 +1,29 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CalendarCheck, CalendarClock, CalendarX, ChevronLeft, Percent, type LucideIcon } from "lucide-react";
+import { CalendarCheck, CalendarClock, CalendarX, ChevronLeft, NotebookPen, Percent, Wallet, type LucideIcon } from "lucide-react";
 import { EmptyState, IconBadge, PageHeader, SectionCard } from "@/components/admin/page-parts";
 import { RateBar } from "@/components/admin/participation";
+import { PaymentActions } from "@/components/admin/payments/payment-actions";
+import { StudentActions } from "@/components/admin/students/student-actions";
 import { Badge } from "@/components/ui/badge";
+import { admin } from "@/i18n/admin";
 import { statsText } from "@/i18n/stats";
-import { formatDate, formatTimeRange, formatWeekdayDate } from "@/lib/datetime";
+import { courseMonthLabel, formatEuro } from "@/lib/billing";
+import { formatCalendarDate, formatDate, formatTimeRange, formatWeekdayDate } from "@/lib/datetime";
+import { toProfileInput } from "@/lib/student-profile";
 import { cn } from "@/lib/utils";
 import { requirePageUser } from "@/server/auth/session";
+import { listCourses } from "@/server/queries/admin";
 import { attendanceRate, getStudentParticipation } from "@/server/queries/participation";
+import { listPaymentAccounts } from "@/server/queries/payments";
 
 const t = statsText.participation;
+const p = admin.payments;
+const monthLabel = (month: number) => {
+  const { year, month: m } = courseMonthLabel(month);
+  return p.month(year, m);
+};
 /** Better Auth user ids (letters, digits, - and _), not UUIDs. */
 const USER_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
@@ -30,6 +42,7 @@ export default async function StudentPage({ params }: PageProps<"/admin/studente
   const data = await load((await params).id);
   if (!data) notFound();
   const { student, classes, summary, upcoming } = data;
+  const [courses, { accounts }] = await Promise.all([listCourses(), listPaymentAccounts({ userId: student.id })]);
   const rate = attendanceRate(summary);
   const missed = summary.available - summary.attended;
 
@@ -39,7 +52,17 @@ export default async function StudentPage({ params }: PageProps<"/admin/studente
         <ChevronLeft aria-hidden className="size-4" /> {t.back}
       </Link>
 
-      <PageHeader title={student.name} intro={[student.email, student.profile?.phone, student.profile?.city].filter(Boolean).join(" · ")} />
+      <PageHeader
+        title={student.name}
+        intro={[student.email, student.profile?.phone, student.profile?.city].filter(Boolean).join(" · ")}
+        actions={
+          <StudentActions
+            student={{ id: student.id, name: student.name, email: student.email, active: !student.banned, courses: student.courses, profile: toProfileInput(student.profile) }}
+            courses={courses}
+            afterDelete="/admin/studentet"
+          />
+        }
+      />
 
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className="text-muted-foreground">{t.courses}:</span>
@@ -64,6 +87,48 @@ export default async function StudentPage({ params }: PageProps<"/admin/studente
           {rate !== null && <RateBar rate={rate} label={t.ratio(summary.attended, summary.available)} className="mt-2 text-xs text-muted-foreground" />}
         </Figure>
       </div>
+
+      {student.profile?.notes && (
+        <SectionCard title={t.notesTitle} icon={NotebookPen}>
+          <p className="text-sm whitespace-pre-line">{student.profile.notes}</p>
+        </SectionCard>
+      )}
+
+      <SectionCard title={t.paymentsTitle} description={t.paymentsDescription} icon={Wallet}>
+        {accounts.length === 0 ? (
+          <EmptyState>{t.paymentsEmpty}</EmptyState>
+        ) : (
+          <ul className="divide-y">
+            {accounts.map((a) => (
+              <li key={a.courseId} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
+                <div className="min-w-0 space-y-0.5 text-sm">
+                  <p className="flex flex-wrap items-center gap-2 font-medium">
+                    {a.courseTitle}
+                    <Badge variant={a.status === "OVERDUE" && a.member ? "destructive" : "outline"}>{p.status[a.status]}</Badge>
+                    {!a.member && <Badge variant="outline">{p.leftCourse}</Badge>}
+                  </p>
+                  <p className="text-muted-foreground">
+                    {formatEuro(a.amountPaidCents)} · {p.paidOf(a.monthsPaid, a.durationMonths - a.firstMonth + 1)}
+                  </p>
+                  <p className="text-muted-foreground">
+                    {p.columns.until}: {a.paidUntil ? `${monthLabel(a.paidThroughMonth)} (${formatCalendarDate(a.paidUntil)})` : p.nothingPaid}
+                    {a.monthsOwed > 0 && (
+                      <span className="text-destructive">
+                        {" "}
+                        · {p.columns.owed}: {a.amountOwedCents !== null ? formatEuro(a.amountOwedCents) : p.months(a.monthsOwed)}
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <PaymentActions account={a} />
+              </li>
+            ))}
+          </ul>
+        )}
+        <Link href={`/admin/pagesat?q=${encodeURIComponent(student.email)}`} className="text-sm text-rose-deep underline-offset-4 hover:underline">
+          {t.paymentsAll}
+        </Link>
+      </SectionCard>
 
       <SectionCard title={t.classesTitle} description={t.classesDescription} icon={CalendarCheck}>
         {classes.length === 0 ? (

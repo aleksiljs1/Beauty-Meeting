@@ -24,8 +24,8 @@ export type PaymentAccount = {
   amountPaidCents: number;
 } & BillingSummary;
 
-/** Every student of every course that has billing set up, with what they paid and owe today. */
-export async function listPaymentAccounts(filter: { courseId?: string } = {}, now = new Date()) {
+/** Every student of every course that has billing set up (or one course / one student), with what they paid and owe today. */
+export async function listPaymentAccounts(filter: { courseId?: string; userId?: string } = {}, now = new Date()) {
   const today = todayInAcademy(now);
   const courses = await prisma.course.findMany({
     where: filter.courseId ? { id: filter.courseId } : {},
@@ -36,14 +36,14 @@ export async function listPaymentAccounts(filter: { courseId?: string } = {}, no
   const courseIds = billed.map((c) => c.id);
   const [members, paying, starts, sums] = await Promise.all([
     prisma.courseMember.findMany({
-      where: { courseId: { in: courseIds }, user: { role: "student" } },
+      where: { courseId: { in: courseIds }, user: { role: "student" }, ...(filter.userId ? { userId: filter.userId } : {}) },
       orderBy: { user: { name: "asc" } },
       take: MAX_ACCOUNTS,
       select: { courseId: true, user: { select: { id: true, name: true, email: true, banned: true } } },
     }),
     // Everyone with a payment for the course, so a student taken off it doesn't take their payments along.
     prisma.payment.findMany({
-      where: { courseId: { in: courseIds } },
+      where: { courseId: { in: courseIds }, ...(filter.userId ? { userId: filter.userId } : {}) },
       distinct: ["courseId", "userId"],
       select: { courseId: true, user: { select: { id: true, name: true, email: true, banned: true } } },
     }),
@@ -121,6 +121,17 @@ export type PaymentHistoryEntry = {
   fromMonth: number | null;
   toMonth: number | null;
 };
+
+/** One payment for its printable confirmation, with the months it covers; null when unknown. */
+export async function getPaymentReceipt(id: string) {
+  const payment = await prisma.payment.findUnique({
+    where: { id },
+    select: { courseId: true, userId: true, course: { select: { title: true } }, user: { select: { name: true, email: true } } },
+  });
+  if (!payment) return null;
+  const entry = (await getPaymentHistory(payment.courseId, payment.userId)).find((p) => p.id === id);
+  return entry ? { ...entry, courseTitle: payment.course.title, studentName: payment.user.name, studentEmail: payment.user.email } : null;
+}
 
 /** One student's payments for a course, oldest first, with the months each one covers. */
 export async function getPaymentHistory(courseId: string, userId: string): Promise<PaymentHistoryEntry[]> {

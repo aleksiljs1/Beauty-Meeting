@@ -29,7 +29,8 @@ const detailsSchema = z.object({ name: z.string().trim().min(2, t.validation.nam
 type Student = { id: string; name: string; email: string; active: boolean; courses: { id: string }[]; profile: StudentProfileInput };
 type Course = { id: string; title: string };
 
-export function StudentActions({ student, courses }: { student: Student; courses: Course[] }) {
+/** `afterDelete`: where to go once the student is deleted (their own page no longer exists). */
+export function StudentActions({ student, courses, afterDelete }: { student: Student; courses: Course[]; afterDelete?: string }) {
   const [dialog, setDialog] = useState<null | "rename" | "email" | "courses" | "deactivate" | "reactivate" | "delete">(null);
   const { run, pending } = useApiAction();
   const router = useRouter();
@@ -138,7 +139,8 @@ export function StudentActions({ student, courses }: { student: Student; courses
           const result = await run(() => apiSend("delete", url), { refresh: false });
           if (!result) return false;
           toast.success(t.delete.success);
-          router.refresh();
+          if (afterDelete) router.push(afterDelete);
+          else router.refresh();
           return true;
         }}
       />

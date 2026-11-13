@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ChangePasswordForm } from "@/components/auth/change-password-form";
 import { SignOutButton } from "@/components/auth/sign-out-button";
+import { ContactAcademy } from "@/components/portal/contact-academy";
 import { portalText } from "@/i18n/portal";
 import { requirePageUser } from "@/server/auth/session";
 
@@ -40,6 +41,8 @@ export default async function ProfilePage() {
         </div>
         <ChangePasswordForm />
       </section>
+
+      <ContactAcademy />
 
       <section aria-labelledby="signout-heading" className="grid gap-3 rounded-xl border bg-card p-5 sm:p-6">
         <div>

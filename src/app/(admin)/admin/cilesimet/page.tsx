@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { PageHeader, SectionCard } from "@/components/admin/page-parts";
 import { ReminderSettingsForm } from "@/components/admin/settings/reminder-settings-form";
+import { ChangePasswordForm } from "@/components/auth/change-password-form";
 import { admin } from "@/i18n/admin";
 import { requirePageUser } from "@/server/auth/session";
 import { getReminderSettings } from "@/server/services/admin-reminders";
@@ -18,6 +19,11 @@ export default async function SettingsPage() {
       <PageHeader title={t.title} intro={t.intro} />
       <SectionCard title={t.reminder.title} description={t.reminder.description}>
         <ReminderSettingsForm initial={reminder} accountEmail={accountEmail} />
+      </SectionCard>
+      <SectionCard title={t.password.title} description={t.password.description}>
+        <div className="max-w-md">
+          <ChangePasswordForm />
+        </div>
       </SectionCard>
     </div>
   );

@@ -95,8 +95,14 @@ export const auth = betterAuth({
         throw new APIError("TOO_MANY_REQUESTS", { message: "Too many attempts for this account. Try again later." });
       }
     }),
-    // A successful sign-in marks this browser as known for the account (see email-throttle.ts).
     after: createAuthMiddleware(async (ctx) => {
+      // A new password makes any setup/reset link sent earlier useless (see password-links.ts).
+      const changedBy = ctx.context.session?.user.id;
+      if (ctx.path === "/change-password" && changedBy && !(ctx.context.returned instanceof Error)) {
+        await revokePasswordLinks(changedBy);
+        return;
+      }
+      // A successful sign-in marks this browser as known for the account (see email-throttle.ts).
       const email = ctx.context.newSession?.user.email;
       if (ctx.path !== "/sign-in/email" || !email) return;
       ctx.setCookie(KNOWN_DEVICE_COOKIE, knownDeviceToken(email), {

@@ -195,8 +195,13 @@ export const admin = {
     courseFilter: "Kursi",
     statusFilter: "Gjendja",
     all: "Të gjitha",
+    searchLabel: "Kërko studentin",
+    searchPlaceholder: "Emri ose emaili",
+    search: "Kërko",
+    clearSearch: "Pastro kërkimin",
     empty: "Nuk ka ende studentë në kurset me pagesa.",
     emptyFilter: "Asnjë student me këtë gjendje.",
+    emptySearch: (q: string) => `Asnjë student nuk përputhet me “${q}”.`,
     unbilled: (titles: string) => `Pa të dhëna pagese: ${titles}. Vendosni datën e fillimit dhe kohëzgjatjen te Përmbajtja → Kurset.`,
     setUpCourses: "Hap kurset",
     totals: { owed: "Borxh tani", paid: "Paguar gjithsej", left: "Mbetur deri në fund" },
@@ -213,6 +218,7 @@ export const admin = {
     startsFrom: (label: string) => `Fillon nga ${label}`,
     record: {
       open: "Regjistro pagesë",
+      button: "Regjistro",
       title: "Regjistro pagesë",
       description: (name: string, course: string) => `${name} · ${course}`,
       covers: (from: string, to: string) => `Mbulon: ${from} – ${to}`,
@@ -240,6 +246,25 @@ export const admin = {
       cancelReason: "Arsyeja e anulimit",
       cancelConfirm: "Anulo pagesën",
       cancelSuccess: "Pagesa u anulua.",
+      print: "Printo dëshminë",
+    },
+    receipt: {
+      title: "Dëshmi pagese",
+      number: (n: string) => `Nr. ${n}`,
+      student: "Studenti",
+      course: "Kursi",
+      covers: "Muajt e paguar",
+      amount: "Shuma",
+      paidOn: "Data e pagesës",
+      method: "Mënyra e pagesës",
+      note: "Shënim",
+      recordedBy: "Regjistroi",
+      cancelled: (reason: string) => `Kjo pagesë është anuluar: ${reason}`,
+      disclaimer: "Kjo dëshmi konfirmon pagesën e regjistruar nga akademia. Nuk është faturë tatimore.",
+      signature: "Nënshkrimi",
+      print: "Printo",
+      back: "Kthehu te pagesat",
+      notFound: "Pagesa nuk u gjet.",
     },
     firstMonth: {
       open: "Muaji i fillimit",
@@ -276,9 +301,19 @@ export const admin = {
     demo: "Klasë demo",
   },
 
+  export: {
+    button: "Shkarko në Excel",
+    preparing: "Duke përgatitur…",
+    hint: "Studentët, pagesat dhe pjesëmarrja në një skedar Excel. Ruajeni herë pas here si kopje të të dhënave.",
+  },
+
   preferences: {
     title: "Cilësimet",
     intro: "Cilësimet tuaja si administrator.",
+    password: {
+      title: "Fjalëkalimi",
+      description: "Ndryshoni fjalëkalimin tuaj. Pajisjet e tjera ku jeni të kyçur dalin vetë.",
+    },
     reminder: {
       title: "Kujtesë para mësimeve",
       description: "Merrni një email pak para se të fillojë çdo mësim i publikuar, që të mos ju shpëtojë asnjë klasë. Po aq kohë para, klasa shfaqet edhe në krye të panelit me butonin \"Nis klasën\".",
@@ -312,6 +347,10 @@ export const admin = {
       upcoming: "Të ardhshme",
       past: "Të kaluara",
       apply: "Apliko",
+      course: "Kursi",
+      searchLabel: "Kërko mësimin",
+      searchPlaceholder: "Titulli i mësimit",
+      search: "Kërko",
     },
     columns: { title: "Mësimi", schedule: "Orari", status: "Statusi", students: "Studentë", materials: "Materiale" },
     meetingStatus: {
@@ -785,6 +824,7 @@ export const admin = {
       "recording.upload_abort": "Ndaloi ngarkimin e regjistrimit",
       "recording.delete": "Fshiu regjistrim",
       "recording.expired_delete": "Fshiu regjistrimet pas afatit të aksesit",
+      "admin.export": "Shkarkoi të dhënat në Excel",
     } as Record<string, string>,
     targets: {
       user: "Përdorues",
@@ -797,6 +837,7 @@ export const admin = {
       galleryItem: "Foto",
       service: "Shërbim",
       academySettings: "Të dhënat e akademisë",
+      admin: "Administrator",
     } as Record<string, string>,
   },
 } as const;

@@ -98,6 +98,11 @@ export const publicSite = {
     empty: "Fotot e galerisë do të publikohen së shpejti.",
   },
 
+  whatsappFloat: {
+    label: "Na shkruani në WhatsApp",
+    message: "Përshëndetje! Dua informacion për ",
+  },
+
   contact: {
     title: "Kontakt",
     description: "Adresa, orari dhe mënyrat për të na kontaktuar.",

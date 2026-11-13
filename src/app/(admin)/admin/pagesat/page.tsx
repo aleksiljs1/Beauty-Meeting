@@ -1,12 +1,18 @@
 import type { Metadata } from "next";
+import Form from "next/form";
 import Link from "next/link";
+import { Search } from "lucide-react";
 import { EmptyState, FilterChip, PageHeader } from "@/components/admin/page-parts";
+import { ExportButton } from "@/components/admin/export-button";
 import { PaymentActions } from "@/components/admin/payments/payment-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { admin } from "@/i18n/admin";
 import { courseMonthLabel, formatEuro, type BillingStatus } from "@/lib/billing";
 import { formatCalendarDate } from "@/lib/datetime";
+import { fold } from "@/lib/help-search";
 import { requirePageUser } from "@/server/auth/session";
 import { listCourses } from "@/server/queries/admin";
 import { listPaymentAccounts } from "@/server/queries/payments";
@@ -42,7 +48,11 @@ export default async function PaymentsPage({ searchParams }: PageProps<"/admin/p
   const courses = await listCourses();
   const courseId = courses.find((c) => c.id === one(params.kursi))?.id;
   const status = STATUSES.find((s) => s === one(params.gjendja));
-  const { accounts, unbilledCourses } = await listPaymentAccounts({ courseId });
+  const q = one(params.q)?.trim().slice(0, 100) ?? "";
+  const listed = await listPaymentAccounts({ courseId });
+  const { unbilledCourses } = listed;
+  // Name or email, ignoring accents ("Kënga" matches "kenga").
+  const accounts = q ? listed.accounts.filter((a) => fold(`${a.name} ${a.email}`).includes(fold(q))) : listed.accounts;
   // Deactivated students and students taken off the course (usually dropouts) aren't chased for
   // money: they stay listed under "all", with what they paid, but count toward neither the debt nor
   // the status filters.
@@ -52,6 +62,7 @@ export default async function PaymentsPage({ searchParams }: PageProps<"/admin/p
 
   const href = ({ kursi = courseId, gjendja = status }: { kursi?: string; gjendja?: string }) => {
     const search = new URLSearchParams();
+    if (q) search.set("q", q);
     if (kursi) search.set("kursi", kursi);
     if (gjendja) search.set("gjendja", gjendja);
     return search.size ? `/admin/pagesat?${search}` : "/admin/pagesat";
@@ -59,7 +70,7 @@ export default async function PaymentsPage({ searchParams }: PageProps<"/admin/p
 
   return (
     <div className="space-y-6">
-      <PageHeader title={t.title} intro={t.intro} />
+      <PageHeader title={t.title} intro={t.intro} actions={<ExportButton />} />
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Total label={t.totals.owed} cents={sum(active, (a) => a.amountOwedCents)} />
@@ -76,6 +87,18 @@ export default async function PaymentsPage({ searchParams }: PageProps<"/admin/p
           </Button>
         </div>
       )}
+
+      <Form action="/admin/pagesat" className="flex max-w-lg items-end gap-2" role="search">
+        <div className="flex-1 space-y-1.5">
+          <Label htmlFor="payment-search">{t.searchLabel}</Label>
+          <Input id="payment-search" name="q" type="search" defaultValue={q} placeholder={t.searchPlaceholder} />
+          {courseId && <input type="hidden" name="kursi" value={courseId} />}
+          {status && <input type="hidden" name="gjendja" value={status} />}
+        </div>
+        <Button type="submit" variant="outline">
+          <Search aria-hidden /> {t.search}
+        </Button>
+      </Form>
 
       <div className="space-y-2">
         {courses.length > 1 && (
@@ -105,10 +128,10 @@ export default async function PaymentsPage({ searchParams }: PageProps<"/admin/p
       </div>
 
       {shown.length === 0 ? (
-        <EmptyState>{accounts.length ? t.emptyFilter : t.empty}</EmptyState>
+        <EmptyState>{q ? t.emptySearch(q) : accounts.length ? t.emptyFilter : t.empty}</EmptyState>
       ) : (
         <div className="rounded-md border bg-card">
-          <div className="hidden grid-cols-[2fr_1.5fr_1.5fr_2fr_1fr_1fr_3rem] gap-4 border-b px-4 py-2 text-xs font-medium text-muted-foreground md:grid">
+          <div className="hidden grid-cols-[2fr_1.5fr_1.5fr_2fr_1fr_1fr_9rem] gap-4 border-b px-4 py-2 text-xs font-medium text-muted-foreground md:grid">
             <span>{t.columns.student}</span>
             <span>{t.columns.course}</span>
             <span>{t.columns.paid}</span>
@@ -121,7 +144,7 @@ export default async function PaymentsPage({ searchParams }: PageProps<"/admin/p
             {shown.map((a) => (
               <li
                 key={`${a.courseId}:${a.userId}`}
-                className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-4 py-3 md:grid-cols-[2fr_1.5fr_1.5fr_2fr_1fr_1fr_3rem]"
+                className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-4 py-3 md:grid-cols-[2fr_1.5fr_1.5fr_2fr_1fr_1fr_9rem]"
               >
                 <span className="flex flex-wrap items-center gap-2 font-medium">
                   {a.name}

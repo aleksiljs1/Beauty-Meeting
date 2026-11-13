@@ -1,17 +1,20 @@
+import Form from "next/form";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { Plus, Repeat } from "lucide-react";
+import { Plus, Repeat, Search } from "lucide-react";
 import { BulkDeleteLessons } from "@/components/admin/lessons/bulk-delete-lessons";
 import { LessonItem, LessonThumb, lessonRowClass } from "@/components/admin/lessons/lesson-list-item";
 import { DemoBadge, EmptyState, PageHeader, Pagination, PublicationBadge } from "@/components/admin/page-parts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { admin } from "@/i18n/admin";
 import { common } from "@/i18n/common";
 import { formatDate, formatTimeRange, formatWeekdayDate } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 import { requirePageUser } from "@/server/auth/session";
-import { countFilteredLessons, listLessons, type LessonListFilter, type SeriesEntry } from "@/server/queries/admin";
+import { countFilteredLessons, listCourses, listLessons, type LessonListFilter, type SeriesEntry } from "@/server/queries/admin";
 
 export const metadata: Metadata = { title: admin.lessons.title };
 
@@ -20,10 +23,12 @@ const PUBLICATIONS = ["DRAFT", "PUBLISHED", "CANCELLED", "ARCHIVED"] as const;
 const WHEN = { "te-ardhshme": "upcoming", "te-kaluara": "past" } as const;
 const one = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 
-type Query = { statusi?: string; koha?: string; faqe?: number };
+type Query = { q?: string; kursi?: string; statusi?: string; koha?: string; faqe?: number };
 
 function buildHref(query: Query) {
   const search = new URLSearchParams();
+  if (query.q) search.set("q", query.q);
+  if (query.kursi) search.set("kursi", query.kursi);
   if (query.statusi) search.set("statusi", query.statusi);
   if (query.koha) search.set("koha", query.koha);
   if (query.faqe && query.faqe > 1) search.set("faqe", String(query.faqe));
@@ -52,10 +57,15 @@ export default async function LessonsPage({ searchParams }: PageProps<"/admin/me
   const kohaKey = one(params.koha);
   const koha = kohaKey && kohaKey in WHEN ? (kohaKey as keyof typeof WHEN) : undefined;
   const page = Math.max(1, Number(one(params.faqe)) || 1);
+  const q = one(params.q)?.trim().slice(0, 100) || undefined;
+  const courses = await listCourses();
+  const kursi = courses.find((c) => c.id === one(params.kursi))?.id;
+  // Every link keeps the other filters: `base` plus what the link changes.
+  const base = { q, kursi, statusi, koha };
 
-  const filter: LessonListFilter = { publication: statusi, when: koha ? WHEN[koha] : undefined, page };
+  const filter: LessonListFilter = { publication: statusi, when: koha ? WHEN[koha] : undefined, courseId: kursi, q, page };
   const [result, counts] = await Promise.all([listLessons(filter), countFilteredLessons(filter)]);
-  const filtered = !!statusi || !!koha;
+  const filtered = !!(statusi || koha || kursi || q);
 
   return (
     <div className="space-y-6">
@@ -64,7 +74,7 @@ export default async function LessonsPage({ searchParams }: PageProps<"/admin/me
         intro={t.intro}
         actions={
           <>
-            <BulkDeleteLessons filter={{ publication: filter.publication, when: filter.when }} counts={counts} />
+            <BulkDeleteLessons filter={{ publication: filter.publication, when: filter.when, courseId: kursi, q }} counts={counts} />
             <Button asChild>
               <Link href="/admin/mesimet/i-ri">
                 <Plus aria-hidden /> {t.newLesson}
@@ -74,26 +84,52 @@ export default async function LessonsPage({ searchParams }: PageProps<"/admin/me
         }
       />
 
+      <Form action="/admin/mesimet" className="flex max-w-lg items-end gap-2" role="search">
+        <div className="flex-1 space-y-1.5">
+          <Label htmlFor="lesson-search">{t.filters.searchLabel}</Label>
+          <Input id="lesson-search" name="q" type="search" defaultValue={q} placeholder={t.filters.searchPlaceholder} />
+          {kursi && <input type="hidden" name="kursi" value={kursi} />}
+          {statusi && <input type="hidden" name="statusi" value={statusi} />}
+          {koha && <input type="hidden" name="koha" value={koha} />}
+        </div>
+        <Button type="submit" variant="outline">
+          <Search aria-hidden /> {t.filters.search}
+        </Button>
+      </Form>
+
       <div className="space-y-3" role="group" aria-label={t.filters.label}>
+        {courses.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="w-20 text-xs text-muted-foreground">{t.filters.course}</span>
+            <Chip href={buildHref({ ...base, kursi: undefined })} active={!kursi}>
+              {t.filters.all}
+            </Chip>
+            {courses.map((c) => (
+              <Chip key={c.id} href={buildHref({ ...base, kursi: c.id })} active={kursi === c.id}>
+                {c.title}
+              </Chip>
+            ))}
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-2">
           <span className="w-20 text-xs text-muted-foreground">{t.filters.when}</span>
-          <Chip href={buildHref({ statusi })} active={!koha}>
+          <Chip href={buildHref({ ...base, koha: undefined })} active={!koha}>
             {t.filters.all}
           </Chip>
-          <Chip href={buildHref({ statusi, koha: "te-ardhshme" })} active={koha === "te-ardhshme"}>
+          <Chip href={buildHref({ ...base, koha: "te-ardhshme" })} active={koha === "te-ardhshme"}>
             {t.filters.upcoming}
           </Chip>
-          <Chip href={buildHref({ statusi, koha: "te-kaluara" })} active={koha === "te-kaluara"}>
+          <Chip href={buildHref({ ...base, koha: "te-kaluara" })} active={koha === "te-kaluara"}>
             {t.filters.past}
           </Chip>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="w-20 text-xs text-muted-foreground">{t.filters.publication}</span>
-          <Chip href={buildHref({ koha })} active={!statusi}>
+          <Chip href={buildHref({ ...base, statusi: undefined })} active={!statusi}>
             {t.filters.all}
           </Chip>
           {PUBLICATIONS.map((p) => (
-            <Chip key={p} href={buildHref({ koha, statusi: p })} active={statusi === p}>
+            <Chip key={p} href={buildHref({ ...base, statusi: p })} active={statusi === p}>
               {common.publication[p]}
             </Chip>
           ))}
@@ -109,7 +145,7 @@ export default async function LessonsPage({ searchParams }: PageProps<"/admin/me
           ))}
         </ul>
       )}
-      <Pagination page={result.page} pageCount={result.pageCount} href={(p) => buildHref({ statusi, koha, faqe: p })} />
+      <Pagination page={result.page} pageCount={result.pageCount} href={(p) => buildHref({ ...base, faqe: p })} />
     </div>
   );
 }

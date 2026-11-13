@@ -131,7 +131,8 @@ export async function getStudentParticipation(userId: string, now = new Date()) 
       banned: true,
       createdAt: true,
       courseMemberships: { orderBy: { course: { position: "asc" } }, select: { course: { select: { id: true, title: true } } } },
-      profile: { select: { phone: true, city: true } },
+      profile: { select: { phone: true, birthDate: true, gender: true, city: true, notes: true } },
+      accounts: { where: { providerId: "credential", password: { not: null } }, select: { id: true }, take: 1 },
     },
   });
   if (!student) return null;
@@ -146,7 +147,7 @@ export async function getStudentParticipation(userId: string, now = new Date()) 
   ]);
   classes.sort((a, b) => b.scheduledStartAt.getTime() - a.scheduledStartAt.getTime());
   return {
-    student: { ...student, courses: student.courseMemberships.map((m) => m.course) },
+    student: { ...student, courses: student.courseMemberships.map((m) => m.course), hasPassword: student.accounts.length > 0 },
     classes,
     summary: summarizeParticipation(classes),
     upcoming: upcoming.map((l) => ({ ...l, courseTitle: l.course?.title ?? null })),

@@ -126,7 +126,7 @@ export function AdminShell({ user, children }: { user: { name: string; email: st
 
   return (
     <div className="flex min-h-full flex-1">
-      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col gap-6 border-r bg-card/60 px-3 py-6 backdrop-blur-sm lg:flex">
+      <aside className="sticky top-0 hidden h-dvh print:hidden w-64 shrink-0 flex-col gap-6 border-r bg-card/60 px-3 py-6 backdrop-blur-sm lg:flex">
         <Brand />
         {/* Scrolls on its own on short screens, so the account menu below stays reachable. */}
         <nav aria-label={admin.shell.navLabel} className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
@@ -136,7 +136,7 @@ export function AdminShell({ user, children }: { user: { name: string; email: st
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center justify-between gap-2 border-b bg-background/95 px-4 py-2 lg:hidden">
+        <header className="sticky top-0 z-30 flex items-center justify-between gap-2 border-b bg-background/95 px-4 py-2 lg:hidden print:hidden">
           <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" aria-label={admin.shell.openMenu}>

@@ -6,6 +6,7 @@ import { EmptyState, FilterChip, PageHeader, Pagination } from "@/components/adm
 import { RateBar } from "@/components/admin/participation";
 import { CreateStudentDialog } from "@/components/admin/students/create-student-dialog";
 import { StudentActions } from "@/components/admin/students/student-actions";
+import { ExportButton } from "@/components/admin/export-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,7 +46,12 @@ export default async function StudentsPage({ searchParams }: PageProps<"/admin/s
 
   return (
     <div className="space-y-6">
-      <PageHeader title={t.title} intro={t.intro} actions={<CreateStudentDialog defaultOpen={one(params.krijo) === "1"} courses={courses} />} />
+      <PageHeader title={t.title} intro={t.intro} actions={
+          <>
+            <ExportButton />
+            <CreateStudentDialog defaultOpen={one(params.krijo) === "1"} courses={courses} />
+          </>
+        } />
 
       <Form action="/admin/studentet" className="flex max-w-lg items-end gap-2" role="search">
         <div className="flex-1 space-y-1.5">

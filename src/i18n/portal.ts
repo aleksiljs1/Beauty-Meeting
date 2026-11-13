@@ -186,6 +186,13 @@ export const portalText = {
     olderUnread: (n: number) => `Edhe ${n === 1 ? "1 njoftim më i vjetër i palexuar" : `${n} njoftime më të vjetra të palexuara`} (shfaqen vetëm 20 të fundit).`,
   },
 
+  contact: {
+    title: "Keni pyetje?",
+    body: "Për çdo problem me mësimet, aksesin ose pagesat, na shkruani ose na telefononi.",
+    whatsappText: "Përshëndetje! Ju shkruaj nga portali i studentëve dhe kam një pyetje:",
+    emailSubject: "Pyetje nga portali i studentëve",
+  },
+
   profile: {
     metaTitle: "Profili",
     title: "Profili",

@@ -67,5 +67,10 @@ export const statsText = {
     inactive: "Çaktivizuar",
     since: (date: string) => `Student që nga ${date}`,
     note: "Pjesëmarrja vjen nga Zoom: studenti njihet kur hyn nga faqja ose me emrin e vet.",
+    notesTitle: "Shënime",
+    paymentsTitle: "Pagesat",
+    paymentsDescription: "Sa ka paguar për çdo kurs dhe sa i ka mbetur. Te “…” gjeni historikun dhe dëshmitë e pagesave për printim.",
+    paymentsEmpty: "Ky student nuk është në asnjë kurs me pagesa.",
+    paymentsAll: "Të gjitha pagesat",
   },
 } as const;

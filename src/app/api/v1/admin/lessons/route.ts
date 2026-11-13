@@ -8,12 +8,24 @@ import { createLessonSchema, pageQuery } from "@/server/validation/admin";
 const filterSchema = z.object({
   publication: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED", "CANCELLED"]).optional(),
   when: z.enum(["upcoming", "past"]).optional(),
+  courseId: z.uuid().optional(),
+  q: z.string().trim().min(1).max(100).optional(),
 });
 // Listing forgives a bad filter (an old link just shows everything); deleting never does, or a
 // typo would widen the delete to every lesson.
-const lenientFilterSchema = z.object({ publication: filterSchema.shape.publication.catch(undefined), when: filterSchema.shape.when.catch(undefined) });
+const lenientFilterSchema = z.object({
+  publication: filterSchema.shape.publication.catch(undefined),
+  when: filterSchema.shape.when.catch(undefined),
+  courseId: filterSchema.shape.courseId.catch(undefined),
+  q: filterSchema.shape.q.catch(undefined),
+});
 
-const filterParams = (url: URL) => ({ publication: url.searchParams.get("publication") ?? undefined, when: url.searchParams.get("when") ?? undefined });
+const filterParams = (url: URL) => ({
+  publication: url.searchParams.get("publication") ?? undefined,
+  when: url.searchParams.get("when") ?? undefined,
+  courseId: url.searchParams.get("courseId") ?? undefined,
+  q: url.searchParams.get("q") ?? undefined,
+});
 
 export const GET = route(async (request) => {
   await requireApiUser(request, "admin");

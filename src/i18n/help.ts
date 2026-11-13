@@ -46,7 +46,7 @@ export const helpText = {
       student: "Shtoni studentët",
       lesson: "Krijoni dhe publikoni mësimin e parë",
       enrolled: "Futni studentët në mësim (nga kursi ose me ftesë)",
-      zoom: "Lidhni Zoom-in me llogarinë e akademisë",
+      zoom: "Lidhni Zoom-in me llogarinë e akademisë (e bën personi që mirëmban faqen; “Integrimet” tregon nëse është lidhur)",
       gallery: "Ngarkoni foto në galeri",
       reminders: "Ndizni kujtesën me email para mësimeve",
     },
@@ -109,6 +109,18 @@ export const helpText = {
     },
 
     // --- Mësimet -------------------------------------------------------------------------
+    {
+      id: "gjej-mesimin",
+      category: "lessons",
+      title: "Gjeni një mësim",
+      keywords: ["kërko", "gjej", "filtro", "listë", "kursi"],
+      steps: [
+        "Hapni Mësimet dhe shkruani një pjesë të titullit te “Kërko mësimin”.",
+        "Ngushtoni listën me filtrat: kursi, koha (të ardhshme / të kaluara) dhe publikimi.",
+      ],
+      tips: [{ text: "“Fshi” sipër listës fshin vetëm mësimet që shfaqen me këto filtra; mësimet e zhvilluara nuk fshihen kurrë, arkivohen." }],
+      link: { href: "/admin/mesimet", label: "Hap mësimet" },
+    },
     {
       id: "kursi",
       category: "lessons",
@@ -320,7 +332,7 @@ export const helpText = {
       steps: [
         "Hapni Studentët → menyja “…” pranë studentit → “Kurset”.",
         "Zgjidhni kurset që ndjek.",
-        "Shënoni “Shtoje edhe në mësimet e ardhshme” që të hyjë menjëherë edhe në mësimet e planifikuara.",
+        "Shënoni “Shtoje edhe në mësimet e ardhshme të kurseve të reja” që të hyjë menjëherë edhe në mësimet e planifikuara.",
       ],
       link: { href: "/admin/studentet", label: "Hap studentët" },
     },
@@ -355,14 +367,15 @@ export const helpText = {
       title: "Regjistroni një pagesë",
       keywords: ["pagesë", "para", "paguaj", "kesh", "bankë", "faturë", "arkëto"],
       steps: [
-        "Hapni Pagesat dhe gjeni studentin (filtroni sipas kursit nëse duhet).",
-        "Klikoni “Regjistro pagesë”.",
+        "Hapni Pagesat dhe gjeni studentin: shkruani emrin te “Kërko studentin” (ose filtroni sipas kursit).",
+        "Klikoni “Regjistro” në rreshtin e tij (edhe nga faqja e studentit, te “Pagesat”).",
         "Shkruani sa muaj paguan; shuma plotësohet nga çmimi mujor (ndryshojeni nëse ka zbritje).",
         "Zgjidhni datën dhe mënyrën (para në dorë, bankë) dhe klikoni “Regjistro”.",
       ],
       tips: [
         { text: "Një pagesë e gabuar nuk fshihet: te “Historiku i pagesave” → “Anulo”, me arsyen." },
         { text: "Pagesat bëhen jashtë faqes; portali nuk merr pagesa online." },
+        { text: "Për një dëshmi pagese për printim: “…” → “Historiku i pagesave” → “Printo dëshminë”." },
       ],
       link: { href: "/admin/pagesat", label: "Hap pagesat" },
     },
@@ -401,8 +414,11 @@ export const helpText = {
         "Prisni “Gati”: studentët shohin vetëm materialet e verifikuara.",
         "Renditini me shigjetat dhe riemërtojini që të jenë të qarta.",
       ],
-      tips: [{ text: "PDF, PowerPoint, Word deri në 100 MB, foto deri në 50 MB, video MP4 deri në 4 GB." }],
-      link: { href: "/admin/materialet", label: "Hap materialet" },
+      tips: [
+        { text: "PDF, PowerPoint, Word deri në 100 MB, foto deri në 50 MB, video MP4 deri në 4 GB." },
+        { text: "Të gjitha materialet e ngarkuara, nga çdo mësim, i gjeni te “Materialet” në menu." },
+      ],
+      link: { href: "/admin/mesimet", label: "Hap mësimet" },
     },
     {
       id: "riperdor",
@@ -413,7 +429,7 @@ export const helpText = {
         "Hapni mësimin e ri → skeda “Materialet” → “Nga materialet”.",
         "Zgjidhni materialet dhe klikoni “Shto”: nuk ngarkohen përsëri.",
       ],
-      link: { href: "/admin/materialet", label: "Hap materialet" },
+      link: { href: "/admin/mesimet", label: "Hap mësimet" },
     },
     {
       id: "regjistrimet",
@@ -452,6 +468,30 @@ export const helpText = {
     },
 
     // --- Statistikat dhe vlerësimet ----------------------------------------------------------------
+    {
+      id: "eksport",
+      category: "insight",
+      title: "Shkarkoni të dhënat në Excel",
+      keywords: ["excel", "eksport", "shkarko", "kopje", "backup", "tabelë", "csv"],
+      steps: [
+        "Hapni Studentët ose Pagesat dhe klikoni “Shkarko në Excel”.",
+        "Skedari ka tri fletë: Studentët, Pagesat dhe Pjesëmarrja.",
+      ],
+      tips: [{ text: "Ruajeni herë pas here në kompjuter: është kopja juaj e të dhënave të akademisë." }],
+      link: { href: "/admin/studentet", label: "Hap studentët" },
+    },
+    {
+      id: "fjalekalimi",
+      category: "start",
+      title: "Ndryshoni fjalëkalimin tuaj",
+      keywords: ["fjalëkalim", "password", "siguri", "ndrysho"],
+      steps: [
+        "Hapni Cilësimet → “Fjalëkalimi”.",
+        "Shkruani fjalëkalimin e tanishëm dhe të riun dy herë, pastaj ruajeni.",
+      ],
+      tips: [{ text: "Pajisjet e tjera ku ishit të kyçur dalin vetë. Nëse e keni harruar, përdorni “Keni harruar fjalëkalimin?” te faqja e hyrjes." }],
+      link: { href: "/admin/cilesimet", label: "Hap cilësimet" },
+    },
     {
       id: "statistikat",
       category: "insight",
