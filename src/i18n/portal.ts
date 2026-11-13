@@ -162,6 +162,7 @@ export const portalText = {
     details: "Detaje",
     noDetails: "Nuk ka detaje shtesë për këtë mësim.",
     timezoneNote: "Të gjitha oraret janë sipas orës së Tiranës.",
+    addToCalendar: "Shto në kalendar",
   },
 
   notifications: {
@@ -186,11 +187,73 @@ export const portalText = {
     olderUnread: (n: number) => `Edhe ${n === 1 ? "1 njoftim më i vjetër i palexuar" : `${n} njoftime më të vjetra të palexuara`} (shfaqen vetëm 20 të fundit).`,
   },
 
+  help: {
+    metaTitle: "Ndihmë",
+    title: "Ndihmë",
+    intro: "Përgjigje të shkurtra për pyetjet më të shpeshta. Nëse nuk e gjeni përgjigjen, na kontaktoni.",
+    menu: "Ndihmë",
+    sections: [
+      {
+        title: "Si hyj në klasën live?",
+        steps: [
+          "Pak para orës, në panel shfaqet njoftimi “Mësimi ka filluar” ose “Fillon së shpejti”.",
+          "Klikoni “Bashkohu”: klasa hapet brenda faqes, pa pasur nevojë për aplikacion.",
+          "Nëse mësuesja nuk e ka nisur ende, prisni pak dhe provoni përsëri; faqja përditësohet vetë.",
+        ],
+      },
+      {
+        title: "Kamera dhe mikrofoni",
+        steps: [
+          "Herën e parë shfletuesi pyet nëse lejoni kamerën dhe mikrofonin: zgjidhni “Lejo”.",
+          "Nëse e refuzuat gabimisht, prekni ikonën e drynit pranë adresës së faqes dhe lejojini atje.",
+          "Mbyllni aplikacionet e tjera që përdorin kamerën (p.sh. WhatsApp video), pastaj hyni përsëri.",
+        ],
+      },
+      {
+        title: "Klasa nuk hapet ose ngec",
+        steps: [
+          "Kontrolloni internetin; në telefon, provoni Wi‑Fi në vend të të dhënave mobile.",
+          "Rifreskoni faqen dhe klikoni përsëri “Bashkohu”.",
+          "Përdorni Chrome, Safari ose Edge të përditësuar.",
+          "Nëse ende nuk funksionon, përdorni “Hap në aplikacionin Zoom” te faqja e mësimit.",
+        ],
+      },
+      {
+        title: "Regjistrimet dhe materialet",
+        steps: [
+          "Pas klasës, regjistrimi shfaqet te mësimi → “Regjistrimet” (zakonisht brenda pak orësh). Merrni edhe një njoftim.",
+          "Materialet (PDF, foto, video) janë te mësimi → “Materialet”.",
+          "Mund t’i shihni deri në afatin e aksesit që shkruhet te mësimi.",
+        ],
+      },
+      {
+        title: "Fjalëkalimi",
+        steps: [
+          "Për ta ndryshuar: Profili → “Fjalëkalimi”.",
+          "Nëse e keni harruar: te faqja e hyrjes, “Keni harruar fjalëkalimin?”; emaili vjen brenda pak minutash (kontrolloni edhe Spam).",
+        ],
+      },
+    ],
+  },
+
+  myCourses: {
+    title: "Kurset e mia",
+    lessons: (done: number, total: number) => `${done} nga ${total} mësime të përfunduara`,
+    attendance: "Pjesëmarrja",
+    attended: (came: number, of: number) => `në ${came} nga ${of} klasa`,
+    next: "Mësimi i radhës",
+    paidUntil: "Paguar deri",
+    nothingPaid: "Ende asnjë pagesë",
+    overdue: "keni një pagesë në vonesë",
+    nextDue: (date: string) => `pagesa e radhës më ${date}`,
+  },
+
   contact: {
     title: "Keni pyetje?",
     body: "Për çdo problem me mësimet, aksesin ose pagesat, na shkruani ose na telefononi.",
     whatsappText: "Përshëndetje! Ju shkruaj nga portali i studentëve dhe kam një pyetje:",
     emailSubject: "Pyetje nga portali i studentëve",
+    helpLink: "Udhëzime: si hyj në klasë, kamera, regjistrimet",
   },
 
   profile: {

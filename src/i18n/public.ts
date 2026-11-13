@@ -67,6 +67,8 @@ export const publicSite = {
     empty: "Lista e shërbimeve do të publikohet së shpejti.",
     priceLabel: "Çmimi",
     listHeading: "Lista e shërbimeve",
+    book: "Rezervo në WhatsApp",
+    bookingMessage: (service: string) => `Përshëndetje! Dua të rezervoj një takim për: ${service}. Kur keni orar të lirë?`,
   },
 
   academy: {

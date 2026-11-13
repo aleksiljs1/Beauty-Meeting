@@ -1,3 +1,4 @@
+import { CalendarPlus } from "lucide-react";
 import { common } from "@/i18n/common";
 import { portalText } from "@/i18n/portal";
 import { formatTimeRange, formatWeekdayDate } from "@/lib/datetime";
@@ -7,8 +8,11 @@ const t = portalText.info;
 
 export function LessonInfo({
   lesson,
+  calendarHref = null,
 }: {
   lesson: { summary: string | null; details: string | null; courseTitle: string | null; scheduledStartAt: string; scheduledEndAt: string; deadline: string | null };
+  /** "Shto në kalendar" for a lesson still to come. */
+  calendarHref?: string | null;
 }) {
   return (
     <div className="grid gap-5 text-sm">
@@ -23,6 +27,13 @@ export function LessonInfo({
           <dt className="text-xs text-muted-foreground">{portalText.lesson.scheduleLabel}</dt>
           <dd className="first-letter:uppercase">{formatWeekdayDate(lesson.scheduledStartAt)}</dd>
           <dd>{formatTimeRange(lesson.scheduledStartAt, lesson.scheduledEndAt)}</dd>
+          {calendarHref ? (
+            <dd className="mt-1.5">
+              <a href={calendarHref} download className="inline-flex min-h-10 items-center gap-1.5 text-rose-deep underline-offset-4 hover:underline">
+                <CalendarPlus aria-hidden className="size-4" /> {t.addToCalendar}
+              </a>
+            </dd>
+          ) : null}
         </div>
         {lesson.deadline ? (
           <div>

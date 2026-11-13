@@ -1,4 +1,5 @@
 import { publicSite } from "@/i18n/public";
+import { whatsappHref } from "@/lib/public-content";
 import { cn } from "@/lib/utils";
 import type { PublicService } from "@/server/queries/public";
 import { EmptyState } from "./primitives";
@@ -9,8 +10,10 @@ import { Reveal } from "./reveal";
  * Rows reveal on scroll (staggered per visual row) and a gold hairline grows along the bottom
  * border on hover, the same gesture as the header navigation.
  */
-export function ServiceList({ services, compact = false }: { services: PublicService[]; compact?: boolean }) {
+export function ServiceList({ services, compact = false, whatsapp = null }: { services: PublicService[]; compact?: boolean; whatsapp?: string | null }) {
   if (services.length === 0) return <EmptyState>{publicSite.services.empty}</EmptyState>;
+  // "Rezervo": an appointment request on WhatsApp, with the service already named.
+  const wa = whatsappHref(whatsapp);
   return (
     <ul className={cn("grid border-t border-border/80", compact ? "md:grid-cols-2 md:gap-x-14" : "")}>
       {services.map((service, index) => (
@@ -28,6 +31,17 @@ export function ServiceList({ services, compact = false }: { services: PublicSer
             <h3 className="text-2xl leading-snug transition-colors duration-300 group-hover:text-rose-deep">{service.title}</h3>
             {service.description && (
               <p className={cn("mt-2 leading-relaxed whitespace-pre-line text-muted-foreground", compact && "line-clamp-2")}>{service.description}</p>
+            )}
+            {wa && (
+              <a
+                href={`${wa}?text=${encodeURIComponent(publicSite.services.bookingMessage(service.title))}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="relative mt-3 inline-flex min-h-10 items-center rounded-sm text-sm font-medium underline decoration-rose/60 underline-offset-[6px] hover:decoration-rose-deep focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              >
+                {publicSite.services.book}
+                <span className="sr-only">: {service.title}</span>
+              </a>
             )}
           </div>
           {service.priceText && (

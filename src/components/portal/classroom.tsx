@@ -193,7 +193,7 @@ export function Classroom({ data, autoJoin, initialTab }: { data: ClassroomData;
           </div>
           <div id="ppanel-info" role="tabpanel" aria-labelledby="ptab-info" hidden={panelTab !== "info"} className="rounded-xl border bg-card/60 p-3 sm:p-4">
             <h2 className="mb-3 text-xl">{t.tabs.info}</h2>
-            <LessonInfo lesson={lesson} />
+            <LessonInfo lesson={lesson} calendarHref={["UPCOMING", "STARTING_SOON", "WAITING_FOR_HOST"].includes(lesson.phase) ? `/portal/mesimet/${lesson.id}/kalendar` : null} />
           </div>
           <div id="ppanel-recordings" role="tabpanel" aria-labelledby="ptab-recordings" hidden={panelTab !== "recordings"} className="rounded-xl border bg-card/60 p-3 sm:p-4">
             <h2 className="mb-3 text-xl">{t.tabs.recordings}</h2>

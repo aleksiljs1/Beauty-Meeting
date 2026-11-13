@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, BookOpen, House, LogOut, Star, User } from "lucide-react";
+import { Bell, BookOpen, CircleHelp, House, LogOut, Star, User } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
@@ -181,6 +181,12 @@ export function PortalShell({ user, academyName, children }: { user: { name: str
                   <Link href="/portal/vleresimi">
                     <Star />
                     {feedbackText.student.nav}
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/portal/ndihme">
+                    <CircleHelp />
+                    {portalText.help.menu}
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={pending} onSelect={() => void signOut()}>

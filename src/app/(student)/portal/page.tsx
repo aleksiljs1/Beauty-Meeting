@@ -2,6 +2,7 @@ import { ArrowRight, BookOpen, CalendarClock, PlayCircle, Radio, Star, type Luci
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ContactAcademy } from "@/components/portal/contact-academy";
+import { MyCourses } from "@/components/portal/my-courses";
 import { EmptyState } from "@/components/portal/empty-state";
 import { LessonCard } from "@/components/portal/lesson-card";
 import { LiveRefresher } from "@/components/portal/live-refresher";
@@ -160,6 +161,7 @@ export default async function DashboardPage() {
         </>
       ) : null}
 
+      <MyCourses user={user} />
       <ContactAcademy />
     </div>
   );
