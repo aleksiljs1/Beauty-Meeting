@@ -10,26 +10,27 @@ import { Button } from "@/components/ui/button";
 import { authText } from "@/i18n/auth";
 import { fieldInfo } from "@/i18n/field-info";
 import { resetPassword, type AuthFailure } from "@/lib/api/auth";
+import { withNext } from "@/lib/safe-next";
 import { FormField } from "./form-field";
 import { newPasswordSchema } from "./password-schema";
 
 const t = authText;
 type Values = z.infer<typeof newPasswordSchema>;
 
-export function InvalidResetLink({ setup }: { setup: boolean }) {
+export function InvalidResetLink({ setup, next }: { setup: boolean; next: string | null }) {
   return (
     <div role="alert" className="grid gap-4 text-center">
       <TriangleAlert aria-hidden="true" className="mx-auto size-8 text-rose-deep" />
       <h2 className="text-2xl">{t.reset.invalidTitle}</h2>
       <p className="text-sm text-muted-foreground">{setup ? t.reset.invalidSetupBody : t.reset.invalidBody}</p>
       <Button asChild size="lg" className="h-10">
-        <Link href="/fjalekalimi/harruar">{t.reset.requestNew}</Link>
+        <Link href={withNext("/fjalekalimi/harruar", next)}>{t.reset.requestNew}</Link>
       </Button>
     </div>
   );
 }
 
-export function ResetPasswordForm({ token, setup }: { token: string; setup: boolean }) {
+export function ResetPasswordForm({ token, setup, next }: { token: string; setup: boolean; next: string | null }) {
   const [state, setState] = useState<"form" | "done" | "invalid">("form");
   const [failure, setFailure] = useState<AuthFailure | null>(null);
   const {
@@ -47,7 +48,7 @@ export function ResetPasswordForm({ token, setup }: { token: string; setup: bool
     setFailure(result.failure ?? "UNKNOWN");
   });
 
-  if (state === "invalid") return <InvalidResetLink setup={setup} />;
+  if (state === "invalid") return <InvalidResetLink setup={setup} next={next} />;
 
   if (state === "done") {
     return (
@@ -56,7 +57,7 @@ export function ResetPasswordForm({ token, setup }: { token: string; setup: bool
         <h2 className="text-2xl">{setup ? t.reset.setupDoneTitle : t.reset.doneTitle}</h2>
         <p className="text-sm text-muted-foreground">{t.reset.doneBody}</p>
         <Button asChild size="lg" className="h-10">
-          <Link href="/hyr">{t.reset.goToLogin}</Link>
+          <Link href={withNext("/hyr", next)}>{t.reset.goToLogin}</Link>
         </Button>
       </div>
     );

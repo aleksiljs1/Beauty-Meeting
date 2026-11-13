@@ -4,6 +4,7 @@ import { prisma } from "@/server/db";
 import { env, zoomLive } from "@/server/env";
 import { audit } from "@/server/services/audit";
 import { notifyRecordingReady } from "@/server/services/live";
+import { createRecordingParts } from "@/server/services/recordings";
 import { bytesMatch, SNIFF_BYTES } from "@/server/storage/file-types";
 import { abortMultipart, completeMultipart, deleteObject, headObject, MULTIPART_PART_BYTES, newObjectKey, readObjectHead, startMultipart, uploadPart } from "@/server/storage/storage";
 import { requireZoomCredentials, zoomDownload, zoomRequest } from "./client";
@@ -34,10 +35,8 @@ export async function queueZoomRecordings(lessonId: string, meetingUuid: string 
   const fresh = picked.filter((f) => !existing.some((e) => e.providerFileId === f.id));
   if (!fresh.length) return 0;
 
-  const last = await prisma.recording.aggregate({ where: { lessonId }, _max: { part: true } });
-  const first = (last._max.part ?? 0) + 1;
-  const [{ count }] = await prisma.$transaction([
-    prisma.recording.createMany({
+  return createRecordingParts(lessonId, async (tx, first) => {
+    const { count } = await tx.recording.createMany({
     data: fresh.map((file, i) => ({
       lessonId,
       source: "ZOOM" as const,
@@ -52,11 +51,11 @@ export async function queueZoomRecordings(lessonId: string, meetingUuid: string 
       displayName: `${lesson.title}${first + i > 1 ? ` (pjesa ${first + i})` : ""}.mp4`.slice(0, 200),
     })),
     skipDuplicates: true,
-    }),
+    });
     // Marks the lesson as found, so the catch-up never brings back a recording the admin deleted.
-    prisma.lesson.update({ where: { id: lessonId }, data: { zoomRecordingsQueuedAt: new Date() } }),
-  ]);
-  return count;
+    await tx.lesson.update({ where: { id: lessonId }, data: { zoomRecordingsQueuedAt: new Date() } });
+    return count;
+  });
 }
 
 /** Imports the next queued recording, if any. Returns false when there was nothing to do. */

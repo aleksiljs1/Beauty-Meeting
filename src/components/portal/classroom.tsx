@@ -90,7 +90,7 @@ export function Classroom({ data, autoJoin, initialTab }: { data: ClassroomData;
       <div
         role="tablist"
         aria-label={t.mobileTabsLabel}
-        className="sticky top-14 z-20 -mx-4 grid grid-cols-4 gap-1 border-b bg-background/95 px-4 py-2 backdrop-blur-sm lg:hidden"
+        className="sticky top-14 z-20 -mx-4 grid grid-cols-4 in-class:static gap-1 border-b bg-background/95 px-4 py-2 backdrop-blur-sm lg:hidden"
       >
         {MOBILE_TABS.map((tab) => {
           const selected = mobileView === tab.id;

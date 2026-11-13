@@ -66,6 +66,21 @@ describe("participation", () => {
     expect(page?.upcoming.map((l) => l.id)).toEqual([upcoming.id]);
   });
 
+  it("counts two devices at once only once and ends a stay with no 'left' event at the class end", async () => {
+    const student = await createUser("student");
+    const lesson = await classAt(2);
+    await enroll(lesson.id, student.id, { createdAt: new Date(lesson.scheduledStartAt.getTime() - DAY) });
+    const at = (min: number) => new Date(lesson.scheduledStartAt.getTime() + min * 60_000);
+    await prisma.lessonAttendance.createMany({
+      data: [
+        { lessonId: lesson.id, userId: student.id, participantKey: "phone", displayName: "Studenti", joinedAt: at(0), leftAt: at(60) },
+        { lessonId: lesson.id, userId: student.id, participantKey: "laptop", displayName: "Studenti", joinedAt: at(30), leftAt: null },
+      ],
+    });
+    const page = await getStudentParticipation(student.id);
+    expect(page?.classes.map((c) => c.minutes)).toEqual([120]); // 0–120, the class lasted 2 hours
+  });
+
   it("is not available for other users", async () => {
     expect(await getStudentParticipation(adminId)).toBeNull();
   });

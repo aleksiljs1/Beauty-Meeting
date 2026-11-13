@@ -1,5 +1,7 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
+import { summarizeStays, type Stay } from "@/lib/attendance";
+import { END_GRACE_MS } from "@/server/access/policy";
 import { prisma } from "@/server/db";
 
 /**
@@ -11,11 +13,20 @@ import { prisma } from "@/server/db";
  * saw them in the class (matched by our id or their name).
  */
 
+/**
+ * The one rule for "this class was held and is over", shared by participation, statistics and
+ * which lessons a student may rate: it started (not a demo), and it ended, or is past its end
+ * (a lost "ended" event; one still shown live counts once its grace is over).
+ */
 export const heldLessonWhere = (now: Date): Prisma.LessonWhereInput => ({
   isDemo: false,
   publication: { in: ["PUBLISHED", "ARCHIVED"] },
   liveStartedAt: { not: null },
-  OR: [{ meetingStatus: "ENDED" }, { scheduledEndAt: { lte: now } }],
+  OR: [
+    { meetingStatus: "ENDED" },
+    { meetingStatus: { not: "LIVE" }, scheduledEndAt: { lte: now } },
+    { scheduledEndAt: { lte: new Date(now.getTime() - END_GRACE_MS) } },
+  ],
 });
 
 export type HeldClass = {
@@ -45,7 +56,18 @@ export async function heldClasses({ userIds, lesson = {}, now = new Date() }: { 
     select: {
       userId: true,
       createdAt: true,
-      lesson: { select: { id: true, title: true, scheduledStartAt: true, scheduledEndAt: true, courseId: true, course: { select: { title: true } } } },
+      lesson: {
+        select: {
+          id: true,
+          title: true,
+          scheduledStartAt: true,
+          scheduledEndAt: true,
+          meetingStatus: true,
+          liveEndedAt: true,
+          courseId: true,
+          course: { select: { title: true } },
+        },
+      },
     },
   });
   const counted = enrollments.filter((e) => e.createdAt <= e.lesson.scheduledEndAt);
@@ -55,15 +77,18 @@ export async function heldClasses({ userIds, lesson = {}, now = new Date() }: { 
     where: { lessonId: { in: [...new Set(counted.map((e) => e.lesson.id))] }, userId: { in: [...new Set(counted.map((e) => e.userId))] } },
     select: { lessonId: true, userId: true, joinedAt: true, leftAt: true },
   });
-  const minutes = new Map<string, number>();
+  const staysOf = new Map<string, Stay[]>();
   for (const v of visits) {
     const key = `${v.userId}:${v.lessonId}`;
-    const ms = Math.max(0, (v.leftAt ?? now).getTime() - v.joinedAt.getTime());
-    minutes.set(key, (minutes.get(key) ?? 0) + ms / 60_000);
+    staysOf.set(key, [...(staysOf.get(key) ?? []), v]);
   }
 
   return counted.map((e) => {
-    const spent = minutes.get(`${e.userId}:${e.lesson.id}`);
+    // As on the lesson's attendance tab: overlapping devices count once, and a stay whose
+    // "left" event never came ends with the class (still running: now).
+    const classEnd = e.lesson.meetingStatus === "LIVE" ? now : (e.lesson.liveEndedAt ?? e.lesson.scheduledEndAt);
+    const stays = staysOf.get(`${e.userId}:${e.lesson.id}`);
+    const spent = stays && summarizeStays(stays, classEnd)?.minutes;
     return {
       userId: e.userId,
       lessonId: e.lesson.id,
@@ -72,8 +97,8 @@ export async function heldClasses({ userIds, lesson = {}, now = new Date() }: { 
       courseTitle: e.lesson.course?.title ?? null,
       scheduledStartAt: e.lesson.scheduledStartAt,
       scheduledEndAt: e.lesson.scheduledEndAt,
-      attended: spent !== undefined,
-      minutes: Math.round(spent ?? 0),
+      attended: stays !== undefined,
+      minutes: spent ?? 0,
     };
   });
 }

@@ -1,5 +1,5 @@
 import Image from "next/image";
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -86,21 +86,24 @@ function motifFor(title: string) {
 
 /** Line-art cover: a soft gold glow, a fine dot pattern and a beauty motif inside a thin frame. */
 function DefaultCover({ title }: { title: string }) {
+  // Unique per cover: with shared ids, every cover in a grid would use the first one's patterns.
+  const id = useId();
+  const [glow, dots] = [`${id}-glow`, `${id}-dots`];
   return (
     <svg aria-hidden viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 size-full">
       <defs>
-        <radialGradient id="cover-glow" cx="50%" cy="45%" r="65%">
+        <radialGradient id={glow} cx="50%" cy="45%" r="65%">
           <stop offset="0%" stopColor="var(--rose)" stopOpacity="0.22" />
           <stop offset="60%" stopColor="var(--rose)" stopOpacity="0.04" />
           <stop offset="100%" stopColor="var(--rose)" stopOpacity="0" />
         </radialGradient>
-        <pattern id="cover-dots" width="16" height="16" patternUnits="userSpaceOnUse">
+        <pattern id={dots} width="16" height="16" patternUnits="userSpaceOnUse">
           <circle cx="2" cy="2" r="1" fill="var(--rose)" opacity="0.14" />
         </pattern>
       </defs>
       <rect width="400" height="250" fill="var(--card)" />
-      <rect width="400" height="250" fill="url(#cover-dots)" />
-      <rect width="400" height="250" fill="url(#cover-glow)" />
+      <rect width="400" height="250" fill={`url(#${dots})`} />
+      <rect width="400" height="250" fill={`url(#${glow})`} />
       <rect x="14" y="14" width="372" height="222" rx="6" fill="none" stroke="var(--rose)" strokeOpacity="0.25" />
       <g transform="translate(140 65) scale(1)" fill="none" stroke="var(--rose-deep)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
         {motifFor(title)}

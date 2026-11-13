@@ -91,6 +91,22 @@ describe("lesson administration", () => {
     expect(await prisma.lesson.findUnique({ where: { id: removed.id } })).toBeNull();
   });
 
+  it("keeps lessons that took place, with their attendance, instead of deleting them", async () => {
+    const student = await createUser("student");
+    const course = await prisma.course.create({ data: { title: "Kurs", slug: "kurs-mbajtur" } });
+    const held = await createLesson({ title: "U mbajt", courseId: course.id, ...schedule(-2 * DAY) }, false, admin, [student.id]);
+    await prisma.lesson.update({ where: { id: held.id }, data: { publication: "PUBLISHED", liveStartedAt: new Date(Date.now() - 2 * DAY) } });
+    await prisma.lessonAttendance.create({ data: { lessonId: held.id, userId: student.id, participantKey: "p1", displayName: "Studente", joinedAt: new Date(Date.now() - 2 * DAY) } });
+    const notHeld = await createLesson({ title: "Pa mbajtur", courseId: course.id, ...schedule() }, false, admin);
+
+    await expect(deleteLesson(held.id, admin)).rejects.toMatchObject({ code: "CONFLICT" });
+    expect(await deleteFilteredLessons({}, "all", admin)).toMatchObject({ count: 1, skipped: 1 });
+    await deleteCourse(admin, course.id, { withLessons: true });
+    expect(await prisma.lesson.findUnique({ where: { id: held.id } })).toMatchObject({ courseId: null });
+    expect(await prisma.lessonAttendance.count({ where: { lessonId: held.id } })).toBe(1);
+    expect(await prisma.lesson.findUnique({ where: { id: notHeld.id } })).toBeNull();
+  });
+
   it("runs the demo classroom only for demo lessons", async () => {
     const demo = await createLesson({ title: "Demo", ...schedule(), isDemo: true }, false, admin);
     const real = await createFixtureLesson(admin.id);

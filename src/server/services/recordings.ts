@@ -1,4 +1,5 @@
 import "server-only";
+import type { Prisma } from "@/generated/prisma/client";
 import { grantLifetimeSeconds } from "@/server/access/policy";
 import { requireLessonCapability } from "@/server/access/lesson-access";
 import type { AppUser } from "@/server/auth/session";
@@ -34,9 +35,25 @@ import { notifyRecordingReady } from "./live";
  */
 export const PLAYBACK_URL_TTL_SECONDS = 5 * 60;
 
-export async function startRecordingUpload(admin: AppUser, lessonId: string, file: { filename: string; mimeType: string; sizeBytes: number }) {
-  const lesson = await prisma.lesson.findUnique({ where: { id: lessonId }, select: { id: true } });
+/**
+ * Creates recordings numbered after the lesson's last part. The lesson row is locked meanwhile,
+ * so two uploads (or an upload and a Zoom import) at once can't both become "Pjesa 2".
+ */
+export function createRecordingParts<T>(lessonId: string, create: (tx: Prisma.TransactionClient, firstPart: number) => Promise<T>): Promise<T> {
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "Lesson" WHERE id = ${lessonId}::uuid FOR UPDATE`;
+    const last = await tx.recording.aggregate({ where: { lessonId }, _max: { part: true } });
+    return create(tx, (last._max.part ?? 0) + 1);
+  });
+}
+
+export async function startRecordingUpload(admin: AppUser, lessonId: string, file: { filename: string; mimeType: string; sizeBytes: number }, now = new Date()) {
+  const lesson = await prisma.lesson.findUnique({ where: { id: lessonId }, select: { id: true, accessExpiresAt: true } });
   if (!lesson) throw new ApiError("NOT_FOUND", "Mësimi nuk u gjet.");
+  // It would be deleted with the lesson's other recordings within the hour (deleteExpiredRecordings).
+  if (lesson.accessExpiresAt <= now) {
+    throw new ApiError("CONFLICT", "Afati i aksesit të këtij mësimi ka mbaruar. Zgjateni te “Afati i aksesit” para se të ngarkoni regjistrimin.");
+  }
   const rule = ruleForDeclaredFile("recording", file.filename, file.mimeType);
   if (!rule) throw new ApiError("VALIDATION_FAILED", "Lejohen vetëm video MP4.");
   if (file.sizeBytes <= 0 || file.sizeBytes > MAX_UPLOAD_BYTES.recording) {
@@ -45,8 +62,8 @@ export async function startRecordingUpload(admin: AppUser, lessonId: string, fil
 
   const objectKey = newObjectKey("recordings", lessonId);
   const uploadId = await startMultipart(objectKey, rule.mime);
-  const last = await prisma.recording.aggregate({ where: { lessonId }, _max: { part: true } });
-  const recording = await prisma.recording.create({
+  const recording = await createRecordingParts(lessonId, (tx, part) =>
+    tx.recording.create({
     data: {
       lessonId,
       source: "UPLOAD",
@@ -56,10 +73,11 @@ export async function startRecordingUpload(admin: AppUser, lessonId: string, fil
       mimeType: rule.mime,
       sizeBytes: BigInt(file.sizeBytes),
       displayName: sanitizeDisplayName(file.filename),
-      part: (last._max.part ?? 0) + 1,
+      part,
     },
     select: { id: true },
-  });
+    }),
+  );
   return { recordingId: recording.id, partSizeBytes: MULTIPART_PART_BYTES, partCount: Math.ceil(file.sizeBytes / MULTIPART_PART_BYTES) };
 }
 

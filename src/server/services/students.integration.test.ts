@@ -6,6 +6,7 @@ import { createUser, resetDatabase } from "@/test/fixtures";
 const { saveStudentProfile } = await import("./students");
 const { listStudents } = await import("@/server/queries/admin");
 const { updateStudentSchema } = await import("@/server/validation/admin");
+const { prisma } = await import("@/server/db");
 
 let admin: Awaited<ReturnType<typeof createUser>>;
 
@@ -37,5 +38,20 @@ describe("optional student details", () => {
     for (const birthDate of ["2001-02-30", "2999-01-01"]) expect(updateStudentSchema.safeParse({ profile: { ...emptyStudentProfile, birthDate } }).success).toBe(false);
     expect(ageOn("2001-05-20", "2026-05-19")).toBe(24);
     expect(ageOn("2001-05-20", "2026-05-20")).toBe(25);
+  });
+});
+
+describe("password links", () => {
+  it("keeps only the newest setup link working, and none once the password is set", async () => {
+    const { createAccountSetupLink } = await import("./accounts");
+    const { auth } = await import("@/server/auth/auth");
+    const student = await createUser("student");
+    const token = (url: string) => new URL(url).searchParams.get("token")!;
+    const first = token(await createAccountSetupLink(student.id));
+    const second = token(await createAccountSetupLink(student.id));
+
+    await expect(auth.api.resetPassword({ body: { token: first, newPassword: "Fjalekalim-i-ri-1" } })).rejects.toThrow();
+    await auth.api.resetPassword({ body: { token: second, newPassword: "Fjalekalim-i-ri-2" } });
+    expect(await prisma.verification.count({ where: { value: student.id } })).toBe(0);
   });
 });

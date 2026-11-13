@@ -42,5 +42,11 @@ export function postLoginDestination(role: "admin" | "student", next: unknown): 
   return path;
 }
 
+/** `path` carrying a validated `next` along (sign-in → forgot password → new password → sign-in). */
+export function withNext(path: string, next: string | null | undefined): string {
+  const safe = safeNextPath(next);
+  return safe ? `${path}${path.includes("?") ? "&" : "?"}next=${encodeURIComponent(safe)}` : path;
+}
+
 /** Request header the proxy sets to the page being asked for (path + query), for login redirects. */
 export const REQUEST_PATH_HEADER = "x-academy-path";

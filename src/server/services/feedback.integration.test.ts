@@ -57,7 +57,7 @@ describe("lesson feedback", () => {
   });
 
   it("opens as soon as the class is ended, even before its scheduled end", async () => {
-    const lesson = await lessonAt(1, { meetingStatus: "ENDED" });
+    const lesson = await lessonAt(1, { meetingStatus: "ENDED", liveStartedAt: new Date(Date.now() - HOUR) });
     await enroll(lesson.id);
     await expect(rateLesson(lesson.id, 4)).resolves.toBeTruthy();
   });

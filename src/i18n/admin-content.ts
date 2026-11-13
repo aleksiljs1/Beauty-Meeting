@@ -87,7 +87,7 @@ export const adminContent = {
     deleteTitle: "Të fshihet kursi?",
     deleteBody: "Kursi hiqet nga faqja dhe studentët hiqen nga kursi. Pa zgjedhjen më poshtë, mësimet e tij mbeten, por pa kurs. Një kurs me pagesa të regjistruara nuk mund të fshihet.",
     deleteLessons: (n: number) =>
-      `Fshi edhe ${n === 1 ? "mësimin e tij" : `${n} mësimet e tij`} (me studentët dhe regjistrimet; materialet mbeten te Materialet). Studentët që i prisnin marrin një email.`,
+      `Fshi edhe ${n === 1 ? "mësimin e tij" : `${n} mësimet e tij`} (me studentët dhe regjistrimet; materialet mbeten te Materialet). Mësimet që janë zhvilluar mbeten, pa kurs, që të ruhet prania. Studentët që i prisnin marrin një email.`,
   },
 
   gallery: {

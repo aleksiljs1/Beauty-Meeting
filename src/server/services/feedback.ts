@@ -1,9 +1,9 @@
 import "server-only";
 import { z } from "zod";
 import type { Prisma } from "@/generated/prisma/client";
-import { END_GRACE_MS } from "@/server/access/policy";
 import type { AppUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
+import { heldLessonWhere } from "@/server/queries/participation";
 import { ApiError } from "@/server/http";
 
 /**
@@ -31,20 +31,11 @@ export const feedbackInputSchema = z.discriminatedUnion("topic", [
 export type FeedbackInput = z.infer<typeof feedbackInputSchema>;
 
 /**
- * The student's lessons (enrolment not revoked) that took place and are over: ended, or started
- * and past their end (a lost "ended" event; a class still live counts once its grace is over).
- * A lesson that never started (the teacher didn't come) isn't one to rate.
+ * The student's lessons (enrolment not revoked) that were held and are over (heldLessonWhere).
+ * A lesson that never started (the teacher didn't come) or a demo isn't one to rate.
  */
 export function rateableLessonsWhere(userId: string, now: Date): Prisma.LessonWhereInput {
-  return {
-    publication: { in: [...HELD] },
-    enrollments: { some: { userId, revokedAt: null } },
-    OR: [
-      { meetingStatus: "ENDED" },
-      { liveStartedAt: { not: null }, meetingStatus: { not: "LIVE" }, scheduledEndAt: { lte: now } },
-      { meetingStatus: "LIVE", scheduledEndAt: { lte: new Date(now.getTime() - END_GRACE_MS) } },
-    ],
-  };
+  return { AND: [heldLessonWhere(now), { enrollments: { some: { userId, revokedAt: null } } }] };
 }
 
 /** Courses that are over: at least one lesson held and none still to come. */

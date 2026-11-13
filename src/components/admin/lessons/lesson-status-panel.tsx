@@ -41,6 +41,7 @@ export function LessonStatusPanel({
     run(() => apiSend("post", `/admin/lessons/${lesson.id}/demo`, { action }), { success });
 
   const isLive = lesson.meetingStatus === "LIVE";
+  const held = !lesson.isDemo && lesson.liveStartedAt !== null; // see tookPlace: kept for attendance
   const p = lesson.publication;
 
   return (
@@ -139,7 +140,7 @@ export function LessonStatusPanel({
             onConfirm={() => run(() => apiSend("delete", `/admin/lessons/${lesson.id}/live`), { success: t.endLiveDone })}
           />
         )}
-        {!isLive && (
+        {!isLive && !held && (
           <ConfirmAction
             trigger={
               <Button variant="ghost" className="text-destructive" disabled={pending}>
@@ -159,6 +160,7 @@ export function LessonStatusPanel({
         )}
       </div>
 
+      {held && !isLive && <p className="text-sm text-muted-foreground">{t.heldNoDelete}</p>}
       {zoomMode === "demo" && <p className="text-sm text-muted-foreground">{t.zoomStatus}</p>}
 
       {lesson.isDemo && (

@@ -7,7 +7,7 @@ import { ApiError } from "@/server/http";
 import { publishFeedChanged } from "@/server/realtime/publish";
 import { audit } from "./audit";
 import { enrollStudents } from "./course-members";
-import { ACTIVE_PUBLICATIONS, assertConcurrencyLimit, assertSchedules, deleteLessons, setLessonPublication, updateLesson } from "./lessons";
+import { ACTIVE_PUBLICATIONS, assertConcurrencyLimit, assertSchedules, deleteLessons, setLessonPublication, tookPlace, updateLesson } from "./lessons";
 import { notifyLessonsChanged, studentsExpecting } from "./live";
 
 /**
@@ -24,6 +24,7 @@ const lessonSelect = {
   publication: true,
   meetingStatus: true,
   isDemo: true,
+  liveStartedAt: true,
   zoomMeetingNumber: true,
   scheduledStartAt: true,
   scheduledEndAt: true,
@@ -93,10 +94,10 @@ export async function setSeriesPublication(seriesId: string, publication: "PUBLI
   return { count: lessons.length, zoomDeleted };
 }
 
-/** Deletes the whole series, or only its dates that haven't ended yet. */
+/** Deletes the whole series, or only its dates that haven't ended yet. Dates that took place stay (see `tookPlace`). */
 export async function deleteSeries(seriesId: string, admin: AppUser, { upcomingOnly = false, now = new Date() } = {}) {
   const lessons = await seriesLessons(seriesId, upcomingOnly ? { scheduledEndAt: { gt: now } } : {});
-  return deleteLessons(lessons.map((l) => l.id), admin, now);
+  return deleteLessons(lessons.filter((l) => !tookPlace(l)).map((l) => l.id), admin, now);
 }
 
 /** Enrols students in every upcoming date (restoring dates they'd been taken out of: an explicit choice). */

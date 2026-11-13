@@ -2,6 +2,7 @@ import "client-only";
 import axios from "axios";
 import { authHttp, clearAccessToken, refreshAccessToken } from "./access-token";
 import { notifySignedOut } from "./auth-events";
+import { withNext } from "@/lib/safe-next";
 
 /**
  * Calls to Better Auth's endpoints (/api/auth/*). These are cookie-authenticated and
@@ -45,9 +46,10 @@ export async function signOut(): Promise<void> {
 }
 
 /** Always resolves the same way whether or not the email exists (no account enumeration). */
-export async function requestPasswordReset(email: string): Promise<{ ok: boolean; failure?: AuthFailure }> {
+/** `next` (e.g. an invitation the student was opening) rides along in the emailed link. */
+export async function requestPasswordReset(email: string, next: string | null = null): Promise<{ ok: boolean; failure?: AuthFailure }> {
   try {
-    await authHttp.post("/request-password-reset", { email, redirectTo: "/fjalekalimi/i-ri" });
+    await authHttp.post("/request-password-reset", { email, redirectTo: withNext("/fjalekalimi/i-ri", next) });
     return { ok: true };
   } catch (error) {
     const failure = toFailure(error);

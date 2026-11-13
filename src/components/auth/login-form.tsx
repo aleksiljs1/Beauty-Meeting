@@ -13,7 +13,7 @@ import { fieldInfo } from "@/i18n/field-info";
 import { signIn, signOut, type AuthFailure } from "@/lib/api/auth";
 import { apiGet } from "@/lib/api/client";
 import { setSessionHint } from "@/lib/api/session-hint";
-import { postLoginDestination } from "@/lib/safe-next";
+import { postLoginDestination, withNext } from "@/lib/safe-next";
 import { FormField } from "./form-field";
 
 const t = authText;
@@ -82,7 +82,7 @@ export function LoginForm({ next }: { next: string | null }) {
         {busy ? t.login.submitting : t.login.submit}
       </Button>
       <p className="text-center text-sm">
-        <Link href="/fjalekalimi/harruar" className="text-rose-deep underline-offset-4 hover:underline">
+        <Link href={withNext("/fjalekalimi/harruar", next)} className="text-rose-deep underline-offset-4 hover:underline">
           {t.login.forgot}
         </Link>
       </p>

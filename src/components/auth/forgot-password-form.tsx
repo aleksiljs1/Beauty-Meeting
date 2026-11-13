@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { authText } from "@/i18n/auth";
 import { fieldInfo } from "@/i18n/field-info";
 import { requestPasswordReset, type AuthFailure } from "@/lib/api/auth";
+import { withNext } from "@/lib/safe-next";
 import { FormField } from "./form-field";
 
 const t = authText;
@@ -19,7 +20,7 @@ const schema = z.object({
 });
 type Values = z.infer<typeof schema>;
 
-export function ForgotPasswordForm() {
+export function ForgotPasswordForm({ next }: { next: string | null }) {
   const [done, setDone] = useState(false);
   const [failure, setFailure] = useState<AuthFailure | null>(null);
   const {
@@ -30,7 +31,7 @@ export function ForgotPasswordForm() {
 
   const onSubmit = handleSubmit(async ({ email }) => {
     setFailure(null);
-    const result = await requestPasswordReset(email);
+    const result = await requestPasswordReset(email, next);
     // Same neutral confirmation whether or not the account exists; only transport problems differ.
     if (!result.ok && (result.failure === "NETWORK" || result.failure === "RATE_LIMITED")) {
       setFailure(result.failure);
@@ -46,7 +47,7 @@ export function ForgotPasswordForm() {
         <h2 className="text-2xl">{t.forgot.doneTitle}</h2>
         <p className="text-sm text-muted-foreground">{t.forgot.doneBody}</p>
         <Button asChild variant="outline" size="lg" className="h-10">
-          <Link href="/hyr">{t.forgot.backToLogin}</Link>
+          <Link href={withNext("/hyr", next)}>{t.forgot.backToLogin}</Link>
         </Button>
       </div>
     );
@@ -66,7 +67,7 @@ export function ForgotPasswordForm() {
         {isSubmitting ? t.forgot.submitting : t.forgot.submit}
       </Button>
       <p className="text-center text-sm">
-        <Link href="/hyr" className="text-rose-deep underline-offset-4 hover:underline">
+        <Link href={withNext("/hyr", next)} className="text-rose-deep underline-offset-4 hover:underline">
           {t.forgot.backToLogin}
         </Link>
       </p>

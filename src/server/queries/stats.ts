@@ -1,5 +1,5 @@
 import "server-only";
-import { addMonths, todayInAcademy } from "@/lib/datetime";
+import { addMonths, fromZonedInputValue, todayInAcademy } from "@/lib/datetime";
 import { prisma } from "@/server/db";
 import { getPaymentAlerts } from "./payments";
 import { attendanceRate, heldClasses, summarizeParticipation, type HeldClass } from "./participation";
@@ -12,8 +12,10 @@ import { attendanceRate, heldClasses, summarizeParticipation, type HeldClass } f
 const MONTHS_SHOWN = 12;
 const ATTENDANCE_DAYS = 30;
 const RATING_DAYS = 90;
-/** A student is "at risk" after missing this many of their latest classes in a row. */
+/** A student is "at risk" after missing this many of their latest classes in a row… */
 const AT_RISK_MISSES = 2;
+/** …the latest of them within this many days (students of finished courses drop off). */
+const AT_RISK_DAYS = ATTENDANCE_DAYS;
 
 export type MonthIncome = { month: string; cents: number };
 
@@ -31,7 +33,7 @@ export async function getAcademyStats(now = new Date()) {
     prisma.feedback.findMany({ where: { topic: { in: ["LESSON", "COURSE"] } }, select: { rating: true, createdAt: true, lessonId: true, courseId: true, lesson: { select: { courseId: true } } } }),
     prisma.course.findMany({ orderBy: { position: "asc" }, select: { id: true, title: true } }),
     prisma.courseMember.groupBy({ by: ["courseId"], where: { user: { role: "student", banned: { not: true } } }, _count: { _all: true } }),
-    prisma.user.count({ where: { role: "student", createdAt: { gte: new Date(`${thisMonth}T00:00:00Z`) } } }),
+    prisma.user.count({ where: { role: "student", createdAt: { gte: fromZonedInputValue(`${thisMonth}T00:00`)! } } }), // Tirana midnight
   ]);
 
   // Money by month (paidOn is a calendar date, already the academy's day).
@@ -49,7 +51,7 @@ export async function getAcademyStats(now = new Date()) {
   const recentRatings = ratings.filter((r) => r.createdAt >= ratingSince);
 
   const activeStudents = await prisma.user.findMany({ where: { role: "student", banned: { not: true } }, select: { id: true, name: true } });
-  const atRisk = studentsAtRisk(classes, activeStudents);
+  const atRisk = studentsAtRisk(classes, activeStudents, new Date(now.getTime() - AT_RISK_DAYS * 86_400_000));
 
   const byCourse = courses.map((course) => {
     const courseClasses = classes.filter((c) => c.courseId === course.id);
@@ -78,7 +80,7 @@ export async function getAcademyStats(now = new Date()) {
     monthly,
     atRisk,
     byCourse,
-    periods: { attendanceDays: ATTENDANCE_DAYS, ratingDays: RATING_DAYS, atRiskMisses: AT_RISK_MISSES },
+    periods: { attendanceDays: ATTENDANCE_DAYS, ratingDays: RATING_DAYS, atRiskMisses: AT_RISK_MISSES, atRiskDays: AT_RISK_DAYS },
   };
 }
 
@@ -86,16 +88,17 @@ function average(values: number[]): number | null {
   return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
 }
 
-/** Active students whose latest classes (at least AT_RISK_MISSES) were all missed, longest streak first. */
-function studentsAtRisk(classes: HeldClass[], students: { id: string; name: string }[]) {
+/** Active students whose latest classes (at least AT_RISK_MISSES, the last one since `since`) were all missed, longest streak first. */
+function studentsAtRisk(classes: HeldClass[], students: { id: string; name: string }[], since: Date) {
   const byStudent = new Map<string, HeldClass[]>();
   for (const c of classes) byStudent.set(c.userId, [...(byStudent.get(c.userId) ?? []), c]);
   return students
-    .map((s) => {
+    .flatMap((s) => {
       const latest = (byStudent.get(s.id) ?? []).sort((a, b) => b.scheduledStartAt.getTime() - a.scheduledStartAt.getTime());
+      if (!latest[0] || latest[0].scheduledStartAt < since) return [];
       const streak = latest.findIndex((c) => c.attended);
       const missedInRow = streak === -1 ? latest.length : streak;
-      return { ...s, missedInRow, lastAttended: latest.find((c) => c.attended)?.scheduledStartAt ?? null };
+      return [{ ...s, missedInRow, lastAttended: latest.find((c) => c.attended)?.scheduledStartAt ?? null }];
     })
     .filter((s) => s.missedInRow >= AT_RISK_MISSES)
     .sort((a, b) => b.missedInRow - a.missedInRow || a.name.localeCompare(b.name));

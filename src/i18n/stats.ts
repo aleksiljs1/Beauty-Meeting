@@ -28,7 +28,7 @@ export const statsText = {
   },
   atRisk: {
     title: "Studentë që mungojnë",
-    description: (n: number) => `Kanë humbur ${n} ose më shumë klasat e tyre të fundit radhazi. Një telefonatë mund t'i mbajë në kurs.`,
+    description: (n: number, days: number) => `Kanë humbur ${n} ose më shumë klasat e tyre të fundit radhazi (e fundit në ${days} ditët e kaluara). Një telefonatë mund t'i mbajë në kurs.`,
     missed: (n: number) => plural(n, "mungesë radhazi", "mungesa radhazi"),
     lastSeen: (date: string) => `Hera e fundit në klasë: ${date}`,
     neverSeen: "Ende asnjë klasë",

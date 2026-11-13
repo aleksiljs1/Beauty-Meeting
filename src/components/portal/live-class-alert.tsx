@@ -31,6 +31,7 @@ function pickAlert(notifications: FeedNotification[], dismissed: ReadonlySet<str
  * makes no requests (see useLiveFeed). It never steals focus, plays no sound, never joins on
  * its own and never touches camera/microphone. "Bashkohu" only navigates to the lesson page,
  * where the server re-checks access; it never carries meeting links or credentials.
+ * During a class it is a slim bar at the top, clear of Zoom's controls and the corner player.
  */
 export function LiveClassAlert({ aboveBottomNav = false }: { aboveBottomNav?: boolean }) {
   const { feed, dismissed } = useLiveFeed();
@@ -40,6 +41,7 @@ export function LiveClassAlert({ aboveBottomNav = false }: { aboveBottomNav?: bo
   const alert = feed ? pickAlert(feed.notifications, dismissed, pathname, activeLessonId) : null;
 
   const isLive = alert?.type === "LESSON_LIVE";
+  const compact = activeLessonId !== null;
   const lessonHref = alert?.lessonId ? `/portal/mesimet/${alert.lessonId}` : "/portal";
 
   return (
@@ -49,11 +51,35 @@ export function LiveClassAlert({ aboveBottomNav = false }: { aboveBottomNav?: bo
       aria-label={alert ? undefined : t.regionLabel}
       aria-labelledby={alert ? headingId : undefined}
       className={cn(
-        "pointer-events-none fixed inset-x-0 z-40 flex justify-center px-3 md:inset-x-auto md:right-6 md:bottom-6 md:justify-end md:px-0",
-        aboveBottomNav ? "bottom-[calc(env(safe-area-inset-bottom)+4.75rem)]" : "bottom-[calc(env(safe-area-inset-bottom)+1rem)]",
+        "pointer-events-none fixed inset-x-0 z-40 flex justify-center px-3",
+        compact
+          ? "top-[calc(env(safe-area-inset-top)+4rem)]"
+          : cn(
+              "md:inset-x-auto md:right-6 md:bottom-6 md:justify-end md:px-0",
+              aboveBottomNav ? "bottom-[calc(env(safe-area-inset-bottom)+4.75rem)]" : "bottom-[calc(env(safe-area-inset-bottom)+1rem)]",
+            ),
       )}
     >
-      {alert ? (
+      {alert && compact ? (
+        <section
+          key={alert.id}
+          className="pointer-events-auto flex w-full max-w-md items-center gap-2 rounded-full border bg-card py-1.5 pr-1.5 pl-3 text-sm shadow-lg animate-in fade-in-0 slide-in-from-top-2"
+        >
+          {isLive ? <Radio aria-hidden className="size-4 shrink-0 text-live" /> : <Clock3 aria-hidden className="size-4 shrink-0 text-rose-deep" />}
+          <p className="min-w-0 flex-1 truncate">
+            <span id={headingId} className="font-medium">
+              {isLive ? t.liveTitle : t.soonTitle}
+            </span>{" "}
+            <span className="text-muted-foreground">{alert.lessonTitle}</span>
+          </p>
+          <Button asChild size="sm" variant="secondary">
+            <Link href={lessonHref}>{t.view}</Link>
+          </Button>
+          <Button variant="ghost" size="icon-sm" aria-label={t.close} onClick={() => void dismissLiveAlert(alert.id)}>
+            <X />
+          </Button>
+        </section>
+      ) : alert ? (
         <section
           key={alert.id}
           className="pointer-events-auto w-full max-w-sm rounded-lg border bg-card p-4 shadow-lg ring-1 ring-foreground/5 animate-in fade-in-0 slide-in-from-bottom-2"

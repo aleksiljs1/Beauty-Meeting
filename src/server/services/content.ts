@@ -16,7 +16,7 @@ import { bytesMatch, MAX_UPLOAD_BYTES, ruleForDeclaredFile, SNIFF_BYTES } from "
 import { GALLERY_IMAGE_TYPES, isGalleryKey } from "@/server/storage/public-media";
 import { deleteObject, headObject, newObjectKey, presignPut, readObjectHead } from "@/server/storage/storage";
 import { audit } from "./audit";
-import { deleteLessons } from "./lessons";
+import { deleteLessons, tookPlace } from "./lessons";
 import { assertBillingChangeKeepsPayments } from "./payments";
 
 /**
@@ -216,10 +216,16 @@ export async function updateCourse(admin: AppUser, id: string, input: Partial<Co
   return toAdminCourse(course);
 }
 
-/** With `withLessons`, the course's lessons are deleted too (see deleteLessons); otherwise they stay, without a course. */
+/**
+ * With `withLessons`, the course's lessons that haven't taken place are deleted too (see
+ * deleteLessons); the rest stay, without a course, so attendance and ratings are kept.
+ */
 export async function deleteCourse(admin: AppUser, id: string, { withLessons = false } = {}) {
   if (await prisma.payment.count({ where: { courseId: id } })) throw new ApiError("CONFLICT", e.courseHasPayments);
-  if (withLessons) await deleteLessons((await prisma.lesson.findMany({ where: { courseId: id }, select: { id: true } })).map((l) => l.id), admin);
+  if (withLessons) {
+    const lessons = await prisma.lesson.findMany({ where: { courseId: id }, select: { id: true, isDemo: true, liveStartedAt: true } });
+    await deleteLessons(lessons.filter((l) => !tookPlace(l)).map((l) => l.id), admin);
+  }
   try {
     await rethrowMissing(prisma.course.delete({ where: { id } }));
   } catch (error) {

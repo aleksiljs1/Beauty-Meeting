@@ -301,6 +301,12 @@ export async function setLessonPublication(lessonId: string, publication: Public
   return { zoomDeleted: deleted };
 }
 
+/**
+ * A lesson whose class took place: its attendance and ratings are history the participation
+ * figures and statistics rely on, so it can be archived but not deleted. Demo classes don't count.
+ */
+export const tookPlace = (lesson: { isDemo: boolean; liveStartedAt: Date | null }) => !lesson.isDemo && lesson.liveStartedAt !== null;
+
 /** Deletes one lesson; see `deleteLessons`. */
 export async function deleteLesson(lessonId: string, admin: AppUser) {
   const { count, zoomNotDeleted } = await deleteLessons([lessonId], admin);
@@ -309,9 +315,9 @@ export async function deleteLesson(lessonId: string, admin: AppUser) {
 }
 
 /**
- * Deletes lessons for good, whatever their state, with their enrolments and recordings (their
- * materials stay in the library). Nothing is deleted while one of them is live or has a
- * recording upload running. Students still expecting a published lesson get one email about it.
+ * Deletes lessons for good, with their enrolments and recordings (their materials stay in the
+ * library). Nothing is deleted while one of them is live, has a recording upload running or
+ * already took place (see `tookPlace`). Students still expecting a published lesson get one email about it.
  */
 export async function deleteLessons(lessonIds: string[], admin: AppUser, now = new Date()) {
   const lessons = await prisma.lesson.findMany({
@@ -324,11 +330,16 @@ export async function deleteLessons(lessonIds: string[], admin: AppUser, now = n
       scheduledEndAt: true,
       zoomMeetingNumber: true,
       seriesId: true,
+      isDemo: true,
+      liveStartedAt: true,
       recordings: { select: { objectKey: true, uploadId: true } },
       enrollments: { where: { revokedAt: null }, select: { userId: true } },
     },
   });
   if (lessons.some((l) => effectiveMeetingStatus(l, now) === "LIVE")) throw new ApiError("CONFLICT", "Një mësim është live. Përfundojeni fillimisht.");
+  if (lessons.some(tookPlace)) {
+    throw new ApiError("CONFLICT", "Një mësim është zhvilluar tashmë: arkivojeni në vend që ta fshini, që të ruhen prania dhe vlerësimet e studentëve.");
+  }
   if (lessons.some((l) => l.recordings.some((r) => r.uploadId))) {
     throw new ApiError("CONFLICT", "Një ngarkim regjistrimi është në vazhdim. Ndalojeni ose fshijeni fillimisht.");
   }
@@ -357,8 +368,8 @@ export async function deleteLessons(lessonIds: string[], admin: AppUser, now = n
 
 /**
  * The lessons list's bulk delete: every lesson matching its filter, either only the drafts
- * (published, cancelled and archived ones stay) or all of them. Lessons that are live or have a
- * recording upload running are skipped instead of stopping the rest; the others go as in
+ * (published, cancelled and archived ones stay) or all of them. Lessons that are live, have
+ * recordings or already took place are skipped instead of stopping the rest; the others go as in
  * `deleteLessons` (students expecting one hear about it once).
  */
 export async function deleteFilteredLessons(filter: Omit<LessonListFilter, "page">, scope: "drafts" | "all", admin: AppUser, now = new Date()) {
@@ -367,9 +378,9 @@ export async function deleteFilteredLessons(filter: Omit<LessonListFilter, "page
     where: scope === "drafts" ? { AND: [where, { publication: "DRAFT" }] } : where,
     // Recordings (finished or still uploading) are too valuable to lose in a bulk action: such
     // lessons are skipped and can only be deleted one by one.
-    select: { id: true, meetingStatus: true, scheduledEndAt: true, _count: { select: { recordings: true } } },
+    select: { id: true, meetingStatus: true, scheduledEndAt: true, isDemo: true, liveStartedAt: true, _count: { select: { recordings: true } } },
   });
-  const deletable = lessons.filter((l) => effectiveMeetingStatus(l, now) !== "LIVE" && !l._count.recordings);
+  const deletable = lessons.filter((l) => effectiveMeetingStatus(l, now) !== "LIVE" && !l._count.recordings && !tookPlace(l));
   const { count, zoomNotDeleted } = deletable.length ? await deleteLessons(deletable.map((l) => l.id), admin, now) : { count: 0, zoomNotDeleted: [] };
   return { count, skipped: lessons.length - deletable.length, zoomWarning: zoomNotDeleted.length ? zoomText.warnings.meetingsNotDeleted(zoomNotDeleted) : null };
 }

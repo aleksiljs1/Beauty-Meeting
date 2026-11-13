@@ -71,6 +71,8 @@ const DRAFT_WARNING_MS = 48 * HOUR;
 
 export async function getAdminDashboard(now = new Date()) {
   const stale = new Date(now.getTime() - HOUR);
+  // The count and the list below it are the same lessons (drafts included: they carry a badge).
+  const upcomingWhere: Prisma.LessonWhereInput = { scheduledStartAt: { gt: now }, publication: { in: ["PUBLISHED", "DRAFT"] }, meetingStatus: { not: "LIVE" } };
   const [activeStudents, live, upcoming, upcomingCount, failedRecordings, stalledRecordings, failedMaterials, stalledMaterials, draftsSoon] = await Promise.all([
     prisma.user.count({ where: activeStudentWhere }),
     prisma.lesson.findMany({
@@ -81,12 +83,12 @@ export async function getAdminDashboard(now = new Date()) {
       take: 10,
     }),
     prisma.lesson.findMany({
-      where: { scheduledStartAt: { gt: now }, publication: { in: ["PUBLISHED", "DRAFT"] }, meetingStatus: { not: "LIVE" } },
+      where: upcomingWhere,
       orderBy: { scheduledStartAt: "asc" },
       select: dashboardLessonSelect,
       take: 8,
     }),
-    prisma.lesson.count({ where: { scheduledStartAt: { gt: now }, publication: "PUBLISHED" } }),
+    prisma.lesson.count({ where: upcomingWhere }),
     prisma.recording.findMany({
       where: { status: "FAILED" },
       orderBy: { updatedAt: "desc" },

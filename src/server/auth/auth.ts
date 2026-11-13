@@ -9,7 +9,8 @@ import { prisma } from "@/server/db";
 import { env, isProduction } from "@/server/env";
 import { sendMail } from "@/server/mail";
 import { passwordResetEmail } from "@/server/mail/templates";
-import { allowEmailAttempt } from "./email-throttle";
+import { allowEmailAttempt, isKnownDevice, KNOWN_DEVICE_COOKIE, KNOWN_DEVICE_MAX_AGE, knownDeviceToken } from "./email-throttle";
+import { revokePasswordLinks } from "./password-links";
 import { ac, roles } from "./roles";
 
 /** Lifetime of the in-memory access JWT used by the Axios client. */
@@ -33,10 +34,12 @@ export const auth = betterAuth({
     // Not awaited: the reply must take as long for an unknown email as for a real account, or
     // the wait would tell who has one. The server is long-running, so the send still completes.
     sendResetPassword: async ({ user, url }) => {
+      await revokePasswordLinks(user.id, { keepNewest: true }); // the one just made
       void sendMail(passwordResetEmail({ to: user.email, name: user.name, url })).catch((error) =>
         console.error("[mail] password reset email failed", user.id, error),
       );
     },
+    onPasswordReset: ({ user }) => revokePasswordLinks(user.id),
   },
 
   // The session cookie is the long-lived credential (HttpOnly). It is refreshed
@@ -87,9 +90,22 @@ export const auth = betterAuth({
       const email: unknown = ctx.body?.email;
       if (!scope || typeof email !== "string") return;
       const ip = getIP(ctx.request ?? ctx.headers ?? new Headers(), ctx.context.options);
-      if (!(await allowEmailAttempt(scope, email, ip))) {
+      const knownDevice = isKnownDevice(email, ctx.getCookie(KNOWN_DEVICE_COOKIE));
+      if (!(await allowEmailAttempt(scope, email, ip, { knownDevice }))) {
         throw new APIError("TOO_MANY_REQUESTS", { message: "Too many attempts for this account. Try again later." });
       }
+    }),
+    // A successful sign-in marks this browser as known for the account (see email-throttle.ts).
+    after: createAuthMiddleware(async (ctx) => {
+      const email = ctx.context.newSession?.user.email;
+      if (ctx.path !== "/sign-in/email" || !email) return;
+      ctx.setCookie(KNOWN_DEVICE_COOKIE, knownDeviceToken(email), {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: "lax",
+        path: "/",
+        maxAge: KNOWN_DEVICE_MAX_AGE,
+      });
     }),
   },
 

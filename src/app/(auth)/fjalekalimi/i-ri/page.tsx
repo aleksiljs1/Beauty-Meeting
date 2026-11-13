@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { InvalidResetLink, ResetPasswordForm } from "@/components/auth/reset-password-form";
 import { authText } from "@/i18n/auth";
+import { safeNextPath } from "@/lib/safe-next";
 
 export const metadata: Metadata = { title: authText.reset.metaTitle, robots: { index: false } };
 
@@ -10,6 +11,7 @@ export default async function NewPasswordPage({ searchParams }: PageProps<"/fjal
   const params = await searchParams;
   const token = first(params.token);
   const setup = first(params.setup) === "1";
+  const next = safeNextPath(first(params.next));
   // Better Auth redirects here with ?error=INVALID_TOKEN when an emailed link is unknown/expired.
   const invalid = !!first(params.error) || !token || token.length > 200;
 
@@ -19,14 +21,14 @@ export default async function NewPasswordPage({ searchParams }: PageProps<"/fjal
   return (
     <div className="grid gap-6">
       {invalid ? (
-        <InvalidResetLink setup={setup} />
+        <InvalidResetLink setup={setup} next={next} />
       ) : (
         <>
           <div className="text-center">
             <h1 className="text-3xl">{title}</h1>
             <p className="mt-1 text-sm text-muted-foreground">{description}</p>
           </div>
-          <ResetPasswordForm token={token} setup={setup} />
+          <ResetPasswordForm token={token} setup={setup} next={next} />
         </>
       )}
     </div>

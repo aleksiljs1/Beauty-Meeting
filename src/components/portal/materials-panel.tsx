@@ -96,7 +96,9 @@ export function MaterialsPanel({
       const tab = window.open("", "_blank");
       const granted = await grant(material, "view");
       if (!tab) {
-        if (granted) window.location.assign(granted.url);
+        // Blocked: never navigate this page away (it would drop a running class); a second tap,
+        // on the message, is a fresh gesture the browser lets open the tab.
+        if (granted) toast(t.tabBlocked, { duration: 30_000, action: { label: t.openAction, onClick: () => window.open(granted.url, "_blank", "noopener") } });
         return;
       }
       if (granted) {

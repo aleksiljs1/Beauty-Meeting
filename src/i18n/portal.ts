@@ -133,6 +133,8 @@ export const portalText = {
     closeViewer: "Mbyll materialin",
     viewerTitle: (name: string) => `Materiali: ${name}`,
     openNewTab: "Hap në skedë të re",
+    tabBlocked: "Shfletuesi nuk e hapi skedën e re. Prekni “Hap” për ta parë materialin.",
+    openAction: "Hap",
     officeHint: "Ky skedar mund të shkarkohet dhe të hapet në kompjuter.",
     viewerFallback: "Nëse materiali nuk shfaqet, përdorni \"Shkarko\".",
     expired: "Afati i aksesit ka përfunduar. Materiali nuk është më i disponueshëm.",

@@ -3,6 +3,7 @@ import { publicSite } from "@/i18n/public";
 import { mailtoHref, safeExternalUrl, telHref, whatsappHref } from "@/lib/public-content";
 import type { PublicSettings } from "@/server/queries/public";
 import { OpeningHours } from "./contact";
+import { CurrentYear } from "./current-year";
 import { NAV_LINKS } from "./nav-links";
 import { Container } from "./primitives";
 
@@ -20,7 +21,6 @@ export function SiteFooter({ settings }: { settings: PublicSettings }) {
     { label: "Instagram", href: safeExternalUrl(settings.instagramUrl) },
     { label: "Facebook", href: safeExternalUrl(settings.facebookUrl) },
   ].filter((s): s is { label: string; href: string } => Boolean(s.href));
-  const year = new Date().getFullYear();
 
   return (
     <footer className="mt-auto border-t border-border/70 bg-secondary/60">
@@ -83,7 +83,7 @@ export function SiteFooter({ settings }: { settings: PublicSettings }) {
       <div className="border-t border-border/70">
         <Container className="flex flex-col gap-3 py-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <p>
-            © {year} {settings.name}. {t.rights}
+            © <CurrentYear /> {settings.name}. {t.rights}
           </p>
           <ul className="flex gap-5">
             <li>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { postLoginDestination, safeNextPath } from "./safe-next";
+import { postLoginDestination, safeNextPath, withNext } from "./safe-next";
 
 describe("safeNextPath", () => {
   it("accepts same-origin relative paths, keeping query and hash", () => {
@@ -68,5 +68,14 @@ describe("postLoginDestination", () => {
     expect(postLoginDestination("student", "/fjalekalimi/i-ri")).toBe("/portal");
     // A path that merely starts with the same letters is not the admin area.
     expect(postLoginDestination("student", "/administrata")).toBe("/administrata");
+  });
+});
+
+describe("withNext", () => {
+  it("carries a safe next along and drops an unsafe one", () => {
+    expect(withNext("/fjalekalimi/harruar", "/ftese/abc?x=1")).toBe("/fjalekalimi/harruar?next=%2Fftese%2Fabc%3Fx%3D1");
+    expect(withNext("/hyr?a=1", "/portal")).toBe("/hyr?a=1&next=%2Fportal");
+    expect(withNext("/hyr", "//evil.com")).toBe("/hyr");
+    expect(withNext("/hyr", null)).toBe("/hyr");
   });
 });

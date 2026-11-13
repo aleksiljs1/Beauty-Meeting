@@ -332,10 +332,10 @@ export const admin = {
       allTitle: "Të fshihen të gjitha mësimet?",
       draftsBody: (n: number) => `Fshihen ${n === 1 ? "1 mësim draft" : `${n} mësime draft`} me studentët e tyre. Mësimet e publikuara mbeten. Materialet mbeten te "Materialet".`,
       allBody: (n: number) =>
-        `Fshihen ${n === 1 ? "1 mësim" : `${n} mësime`}, edhe të publikuarat, me studentët e tyre. Studentët që prisnin një mësim të publikuar marrin një email. Mësimet që kanë regjistrime nuk fshihen këtu (fshijini një nga një nëse duhet). Materialet mbeten te "Materialet". Kjo nuk kthehet pas.`,
+        `Fshihen ${n === 1 ? "1 mësim" : `${n} mësime`}, edhe të publikuarat, me studentët e tyre. Studentët që prisnin një mësim të publikuar marrin një email. Mësimet që kanë regjistrime nuk fshihen këtu (fshijini një nga një nëse duhet), as ato që janë zhvilluar (ruhet prania). Materialet mbeten te "Materialet". Kjo nuk kthehet pas.`,
       typeCount: (n: number) => `Për të konfirmuar, shkruani numrin e mësimeve: ${n}`,
       done: (count: number, skipped: number) =>
-        `U fshinë ${count} mësime.${skipped ? ` ${skipped} nuk u fshinë sepse janë live ose kanë regjistrime.` : ""}`,
+        `U fshinë ${count} mësime.${skipped ? ` ${skipped} nuk u fshinë sepse janë live, kanë regjistrime ose janë zhvilluar.` : ""}`,
     },
     tabs: { details: "Detaje", students: "Studentët", attendance: "Pjesëmarrja", invitations: "Ftesat", materials: "Materialet", recordings: "Regjistrimet" },
   },
@@ -365,7 +365,8 @@ export const admin = {
     deleteUpcoming: "Fshi datat e ardhshme",
     deleteUpcomingBody: (n: number) => `${n} ${n === 1 ? "datë që nuk ka mbaruar fshihet" : "data që nuk kanë mbaruar fshihen"} përgjithmonë, me studentët dhe regjistrimet. Datat e kaluara mbeten.`,
     deleteAll: "Fshi serinë",
-    deleteAllBody: (n: number) => `Të ${n} datat fshihen përgjithmonë, me studentët dhe regjistrimet; materialet mbeten te Materialet. Studentët që prisnin data të ardhshme marrin një email.`,
+    deleteAllBody: (n: number) =>
+      `Të ${n} datat fshihen përgjithmonë, me studentët dhe regjistrimet; materialet mbeten te Materialet. Datat që janë zhvilluar mbeten, që të ruhen prania dhe vlerësimet. Studentët që prisnin data të ardhshme marrin një email.`,
     deleted: (n: number) => `U fshinë ${n} ${n === 1 ? "mësim" : "mësime"}.`,
     datesHeading: "Datat",
     studentsHeading: "Studentët e datave të ardhshme",
@@ -456,6 +457,7 @@ export const admin = {
     deleteBody: (students: number) =>
       `Mësimi, regjistrimet e tij dhe lista e studentëve fshihen përgjithmonë; materialet mbeten te Materialet.${students ? ` ${students === 1 ? "1 student humb" : `${students} studentë humbasin`} aksesin; nëse mësimi është i publikuar dhe nuk ka mbaruar, marrin një email.` : ""} Kjo nuk mund të zhbëhet.`,
     deleted: "Mësimi u fshi.",
+    heldNoDelete: "Ky mësim është zhvilluar, prandaj nuk fshihet: prania dhe vlerësimet e studentëve ruhen. Arkivojeni nëse nuk doni ta shihni.",
     done: {
       PUBLISHED: "Mësimi u publikua.",
       DRAFT: "Mësimi u kthye në draft.",

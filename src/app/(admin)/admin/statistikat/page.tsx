@@ -57,7 +57,7 @@ export default async function StatsPage() {
       </SectionCard>
 
       <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-        <SectionCard title={t.atRisk.title} description={t.atRisk.description(s.periods.atRiskMisses)} icon={UserRoundX}>
+        <SectionCard title={t.atRisk.title} description={t.atRisk.description(s.periods.atRiskMisses, s.periods.atRiskDays)} icon={UserRoundX}>
           {s.atRisk.length === 0 ? (
             <EmptyState>{t.atRisk.empty}</EmptyState>
           ) : (

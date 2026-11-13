@@ -92,13 +92,17 @@ export async function listPaymentAccounts(filter: { courseId?: string } = {}, no
   };
 }
 
-/** For the dashboard: active students who owe money now or soon. */
+/**
+ * For the dashboard: active students who owe money now or soon, each counted once however many
+ * courses they are behind in. A course without a price can't be owed.
+ */
 export async function getPaymentAlerts(now = new Date()) {
-  const active = (await listPaymentAccounts({}, now)).accounts.filter((a) => a.active && a.member);
+  const active = (await listPaymentAccounts({}, now)).accounts.filter((a) => a.active && a.member && (a.monthlyPriceCents ?? 0) > 0);
   const overdue = active.filter((a) => a.status === "OVERDUE");
+  const students = (accounts: PaymentAccount[]) => new Set(accounts.map((a) => a.userId)).size;
   return {
-    overdue: overdue.length,
-    dueSoon: active.filter((a) => a.status === "DUE_SOON").length,
+    overdue: students(overdue),
+    dueSoon: students(active.filter((a) => a.status === "DUE_SOON")),
     amountOwedCents: overdue.reduce((total, a) => total + (a.amountOwedCents ?? 0), 0),
   };
 }

@@ -1,6 +1,7 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
 import { auth } from "@/server/auth/auth";
+import { revokePasswordLinks } from "@/server/auth/password-links";
 import type { Role } from "@/server/auth/roles";
 import { prisma } from "@/server/db";
 import { env } from "@/server/env";
@@ -18,6 +19,7 @@ export const ACCOUNT_SETUP_VALID_HOURS = 72;
  */
 
 export async function createAccountSetupLink(userId: string, validHours = ACCOUNT_SETUP_VALID_HOURS): Promise<string> {
+  await revokePasswordLinks(userId); // only the newest link works
   const ctx = await auth.$context;
   const token = randomBytes(32).toString("base64url");
   await ctx.internalAdapter.createVerificationValue({
