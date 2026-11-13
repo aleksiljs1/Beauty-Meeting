@@ -309,6 +309,9 @@ export type FeedNotification = {
   lessonId: string | null;
   /** Null when the student no longer has access — the notice stays as harmless history. */
   lessonTitle: string | null;
+  /** The lesson's current time (with the title), e.g. the new one after "schedule changed". */
+  lessonStartsAt: string | null;
+  lessonEndsAt: string | null;
   createdAt: string;
   readAt: string | null;
   dismissedAt: string | null;
@@ -366,7 +369,9 @@ export async function getLiveFeed(user: AppUser, now = new Date()): Promise<Live
       id: row.id,
       type: row.type,
       lessonId: row.lessonId,
-      lessonTitle: lesson && access && checkCapability(access, "VIEW_CARD", lesson, now).allowed ? lesson.title : null,
+      ...(lesson && access && checkCapability(access, "VIEW_CARD", lesson, now).allowed
+        ? { lessonTitle: lesson.title, lessonStartsAt: lesson.scheduledStartAt.toISOString(), lessonEndsAt: lesson.scheduledEndAt.toISOString() }
+        : { lessonTitle: null, lessonStartsAt: null, lessonEndsAt: null }),
       createdAt: row.createdAt.toISOString(),
       readAt: row.readAt?.toISOString() ?? null,
       dismissedAt: row.dismissedAt?.toISOString() ?? null,

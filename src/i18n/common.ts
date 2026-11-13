@@ -22,7 +22,7 @@ export const common = {
     notFound: "Faqja nuk u gjet.",
   },
   lessonPhase: {
-    UPCOMING: "Së shpejti",
+    UPCOMING: "I planifikuar",
     STARTING_SOON: "Fillon së shpejti",
     WAITING_FOR_HOST: "Në pritje të mësueses",
     LIVE: "Live tani",

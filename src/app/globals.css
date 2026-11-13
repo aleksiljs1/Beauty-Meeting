@@ -120,6 +120,15 @@
   [role="button"]:not(:disabled) {
     cursor: pointer;
   }
+  /* Fingers need at least 40px: on touch screens small buttons grow (their look stays the same). */
+  @media (pointer: coarse) {
+    [data-slot="button"] {
+      min-height: 2.5rem;
+    }
+    [data-slot="button"][data-size^="icon"] {
+      min-width: 2.5rem;
+    }
+  }
 }
 
 /* Respect reduced-motion preferences everywhere (toasts, dialogs, page transitions). */

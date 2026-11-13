@@ -21,7 +21,7 @@ function formatDuration(seconds: number | null) {
 
 function RecordingPlayer({ lessonId, recording, visible }: { lessonId: string; recording: RecordingItem; visible: boolean }) {
   const requestGrant = useCallback(() => apiSend<VideoGrant>("post", `/lessons/${lessonId}/recordings/${recording.id}/playback`), [lessonId, recording.id]);
-  return <ProtectedVideo requestGrant={requestGrant} visible={visible} expiredMessage={t.expired} />;
+  return <ProtectedVideo requestGrant={requestGrant} visible={visible} label={t.playerLabel(recording.displayName ?? t.part(recording.part))} expiredMessage={t.expired} />;
 }
 
 export function RecordingsPanel({ lessonId, recordings, visible }: { lessonId: string; recordings: RecordingItem[]; visible: boolean }) {

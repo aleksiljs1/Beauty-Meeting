@@ -15,6 +15,8 @@ export default async function AcademyPage() {
     <>
       <PageHeader eyebrow={settings.name} title={t.title} intro={t.intro} />
       <Container className="py-14 sm:py-20">
+        {/* The cards' titles are h3: this keeps the outline h1 → h2 → h3 for screen readers. */}
+        <h2 className="sr-only">{t.listHeading}</h2>
         {courses.length > 0 ? (
           <ul className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
             {courses.map((course, index) => (

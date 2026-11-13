@@ -1,6 +1,6 @@
 "use client";
 
-import { Maximize2 } from "lucide-react";
+import { Maximize2, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, use, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { ZoomFrame } from "@/components/zoom/zoom-frame";
@@ -31,6 +31,8 @@ type ClassSession = {
   start: (config: ZoomJoinConfig) => void;
   minimize: () => void;
   restore: () => void;
+  /** Leaves the call (the frame closes). */
+  leave: () => void;
   setSlot: (slot: HTMLElement | null) => void;
 };
 
@@ -85,8 +87,8 @@ export function ClassSessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const session = useMemo<ClassSession>(
-    () => ({ lessonId, open, error, minimized, restoreRequests, frameRef, frameKey, slot, start, minimize, restore, setSlot }),
-    [lessonId, open, error, minimized, restoreRequests, frameRef, frameKey, slot, start, minimize, restore],
+    () => ({ lessonId, open, error, minimized, restoreRequests, frameRef, frameKey, slot, start, minimize, restore, leave: close, setSlot }),
+    [lessonId, open, error, minimized, restoreRequests, frameRef, frameKey, slot, start, minimize, restore, close],
   );
 
   return (
@@ -117,7 +119,7 @@ type Box = Size & { left: number; top: number };
 const MINI_MAX: Size = { width: 240, height: 200 };
 
 function ClassWindow() {
-  const { lessonId, minimized, frameRef, frameKey, slot, restore } = useClassSession();
+  const { lessonId, minimized, frameRef, frameKey, slot, restore, leave } = useClassSession();
   const router = useRouter();
   const pathname = usePathname();
   const [box, setBox] = useState<Box | null>(null);
@@ -185,6 +187,17 @@ function ClassWindow() {
           <span className="flex size-8 items-center justify-center rounded-md bg-black/60 text-white">
             <Maximize2 aria-hidden="true" className="size-4" />
           </span>
+        </button>
+      )}
+      {docked ? null : (
+        <button
+          type="button"
+          onClick={() => window.confirm(portalText.stage.leaveConfirm) && leave()}
+          aria-label={portalText.stage.leave}
+          title={portalText.stage.leave}
+          className="absolute top-1.5 left-1.5 flex size-8 items-center justify-center rounded-md bg-black/60 text-white outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          <X aria-hidden="true" className="size-4" />
         </button>
       )}
     </div>

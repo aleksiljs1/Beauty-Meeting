@@ -126,9 +126,10 @@ export function AdminShell({ user, children }: { user: { name: string; email: st
 
   return (
     <div className="flex min-h-full flex-1">
-      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col gap-8 border-r bg-card/60 px-3 py-6 backdrop-blur-sm lg:flex">
+      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col gap-6 border-r bg-card/60 px-3 py-6 backdrop-blur-sm lg:flex">
         <Brand />
-        <nav aria-label={admin.shell.navLabel} className="flex-1">
+        {/* Scrolls on its own on short screens, so the account menu below stays reachable. */}
+        <nav aria-label={admin.shell.navLabel} className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
           <NavLinks />
         </nav>
         <div className="border-t pt-3">{userMenu}</div>
@@ -142,7 +143,7 @@ export function AdminShell({ user, children }: { user: { name: string; email: st
                 <Menu aria-hidden />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-72 gap-6 px-3 py-6">
+            <SheetContent side="left" className="w-72 gap-6 overflow-y-auto px-3 py-6">
               <SheetHeader className="p-0">
                 <SheetTitle className="sr-only">{admin.shell.navLabel}</SheetTitle>
                 <SheetDescription className="sr-only">{admin.shell.title}</SheetDescription>

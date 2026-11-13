@@ -48,16 +48,13 @@ export function LessonCard({ lesson, headingLevel = "h3" }: { lesson: StudentLes
         </div>
 
         <Heading className={cn("text-xl leading-snug", history && "text-muted-foreground")}>
-          {history ? (
-            lesson.title
-          ) : (
-            <Link
-              href={href}
-              className="rounded-sm underline-offset-4 transition-colors duration-200 outline-none hover:text-rose-deep hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
-            >
-              {lesson.title}
-            </Link>
-          )}
+          {/* Expired and cancelled lessons open too: their page says why, and shows the details. */}
+          <Link
+            href={href}
+            className="rounded-sm underline-offset-4 transition-colors duration-200 outline-none hover:text-rose-deep hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            {lesson.title}
+          </Link>
         </Heading>
 
         {lesson.summary ? <p className="line-clamp-2 text-sm text-muted-foreground">{lesson.summary}</p> : null}
@@ -85,7 +82,12 @@ export function LessonCard({ lesson, headingLevel = "h3" }: { lesson: StudentLes
         </dl>
 
         {history ? (
-          <p className="text-xs text-muted-foreground">{lesson.phase === "CANCELLED" ? t.cancelled : t.historyOnly}</p>
+          <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-1">
+            <p className="text-xs text-muted-foreground">{lesson.phase === "CANCELLED" ? t.cancelled : t.historyOnly}</p>
+            <Button asChild size="lg" variant="ghost">
+              <Link href={href}>{t.open}</Link>
+            </Button>
+          </div>
         ) : (
           <div className="mt-auto flex flex-wrap gap-2 pt-1">
             {lesson.phase === "LIVE" && lesson.canJoin ? (

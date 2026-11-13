@@ -26,8 +26,12 @@ export default async function DashboardPage() {
   const live = lessons.filter((l) => l.phase === "LIVE");
   const allUpcoming = lessons.filter((l) => UPCOMING.has(l.phase));
   const upcoming = allUpcoming.slice(0, 3);
-  const allReplays = lessons.filter((l) => l.phase === "REPLAY").sort((a, b) => b.scheduledStartAt.localeCompare(a.scheduledStartAt));
-  const replays = allReplays.slice(0, 3);
+  const allReplays = lessons.filter((l) => l.phase === "REPLAY");
+  // Recent lessons include those over but still waiting for their recording, so they don't vanish.
+  const replays = lessons
+    .filter((l) => l.phase === "REPLAY" || l.phase === "ENDED")
+    .sort((a, b) => b.scheduledStartAt.localeCompare(a.scheduledStartAt))
+    .slice(0, 3);
   const firstName = user.name.split(/\s+/)[0] || user.name;
   const now = new Date();
   const hour = Number(toZonedInputValue(now).slice(11, 13));
@@ -138,7 +142,7 @@ export default async function DashboardPage() {
               <h2 id="replays-heading" className="text-2xl">
                 {t.replaysTitle}
               </h2>
-              <Link href="/portal/mesimet?filtri=regjistrime" className="text-sm text-rose-deep underline-offset-4 hover:underline">
+              <Link href="/portal/mesimet?filtri=te-perfunduara" className="text-sm text-rose-deep underline-offset-4 hover:underline">
                 {t.seeAll}
               </Link>
             </div>

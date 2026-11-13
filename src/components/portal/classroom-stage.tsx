@@ -210,7 +210,10 @@ function ClassroomStageImpl(props: StageProps) {
   const inClass = isThisLesson && session.open;
   const autoJoinTried = useRef(false);
 
+  const otherClassOpen = session.open && !isThisLesson;
   const requestJoin = useCallback(async () => {
+    // Joining replaces the class in the corner player: never without asking.
+    if (otherClassOpen && !window.confirm(t.switchConfirm)) return;
     setJoin({ kind: "joining" });
     try {
       // The server re-checks enrolment, deadline, join window and meeting state every time.
@@ -225,7 +228,7 @@ function ClassroomStageImpl(props: StageProps) {
     } catch (error) {
       setJoin({ kind: "error", message: errorMessage(error) });
     }
-  }, [lessonId, startZoom]);
+  }, [lessonId, startZoom, otherClassOpen]);
 
   // "Bashkohu" from the alert/dashboard was an explicit click; finish it here once.
   useEffect(() => {
@@ -347,14 +350,27 @@ function ClassroomStageImpl(props: StageProps) {
     );
   }
 
+  // Only the state's name is announced when it changes (not the countdown or the whole stage);
+  // join errors announce themselves (role="alert").
+  const announcement = inClass
+    ? session.minimized
+      ? t.minimizedTitle
+      : t.liveTitle
+    : stage === "ENDED"
+      ? t.endedTitle
+      : join.kind === "demo"
+        ? null
+        : { LIVE: t.liveTitle, WAITING: t.waitingTitle, NOT_OPEN: t.notOpenTitle, NOT_READY: t.notReadyTitle }[stage];
+
   return (
     <section
       aria-label={t.regionLabel}
       className="flex min-h-[22rem] flex-col overflow-hidden rounded-xl border bg-card lg:min-h-[32rem]"
     >
-      <div aria-live="polite" className="flex flex-1 flex-col">
-        {content}
-      </div>
+      <p className="sr-only" aria-live="polite">
+        {announcement}
+      </p>
+      <div className="flex flex-1 flex-col">{content}</div>
     </section>
   );
 }

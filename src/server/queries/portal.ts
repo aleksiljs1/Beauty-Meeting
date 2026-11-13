@@ -118,8 +118,9 @@ export type LessonFilter = "all" | "upcoming" | "live" | "replay" | "expired";
 const FILTER_PHASES: Record<Exclude<LessonFilter, "all">, LessonPhase[]> = {
   upcoming: ["UPCOMING", "STARTING_SOON", "WAITING_FOR_HOST"],
   live: ["LIVE"],
-  replay: ["REPLAY"],
-  expired: ["EXPIRED"],
+  // Over: with its recording, or still waiting for it (or held without one).
+  replay: ["REPLAY", "ENDED"],
+  expired: ["EXPIRED", "CANCELLED"],
 };
 
 export function filterLessons(cards: StudentLessonCard[], filter: LessonFilter): StudentLessonCard[] {

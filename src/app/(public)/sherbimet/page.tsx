@@ -19,6 +19,7 @@ export default async function ServicesPage() {
         </div>
       </PageHeader>
       <Container className="py-14 sm:py-20">
+        <h2 className="sr-only">{t.listHeading}</h2>
         <div className="max-w-4xl">
           <ServiceList services={services} />
         </div>

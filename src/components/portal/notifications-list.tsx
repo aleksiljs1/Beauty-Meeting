@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { refreshLiveFeed, useLiveFeed, type FeedNotification, type LiveFeed } from "@/hooks/use-live-feed";
 import { portalText } from "@/i18n/portal";
 import { ApiClientError, apiSend } from "@/lib/api/client";
-import { formatDateTime, timezoneAbbreviation } from "@/lib/datetime";
+import { formatDateTime, formatTimeRange, formatWeekdayDate, timezoneAbbreviation } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "./empty-state";
 
@@ -85,6 +85,11 @@ export function NotificationsList({ initial }: { initial: LiveFeed }) {
                     {unreadItem ? <span className="sr-only"> — {t.unread}</span> : null}
                   </p>
                   <p className="truncate text-sm text-muted-foreground">{n.lessonTitle ?? t.unavailableLesson}</p>
+                  {n.type === "LESSON_RESCHEDULED" && n.lessonStartsAt && n.lessonEndsAt ? (
+                    <p className="text-sm">
+                      {t.newTime} <span className="first-letter:uppercase">{formatWeekdayDate(n.lessonStartsAt)}</span>, {formatTimeRange(n.lessonStartsAt, n.lessonEndsAt)}
+                    </p>
+                  ) : null}
                   <p className="mt-1 text-xs text-muted-foreground">
                     <time dateTime={n.createdAt}>
                       {formatDateTime(n.createdAt)} ({timezoneAbbreviation(n.createdAt)})
@@ -111,6 +116,8 @@ export function NotificationsList({ initial }: { initial: LiveFeed }) {
           })}
         </ul>
       )}
+      {/* The badge counts every unread notice; the list holds the latest 20. */}
+      {data.unreadCount > unread.length ? <p className="text-sm text-muted-foreground">{t.olderUnread(data.unreadCount - unread.length)}</p> : null}
     </div>
   );
 }

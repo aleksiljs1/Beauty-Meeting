@@ -17,7 +17,7 @@ const FILTERS: { slug: string | null; filter: LessonFilter; label: string }[] = 
   { slug: null, filter: "all", label: t.filters.all },
   { slug: "te-ardhshme", filter: "upcoming", label: t.filters.upcoming },
   { slug: "live", filter: "live", label: t.filters.live },
-  { slug: "regjistrime", filter: "replay", label: t.filters.replay },
+  { slug: "te-perfunduara", filter: "replay", label: t.filters.replay },
   { slug: "skaduar", filter: "expired", label: t.filters.expired },
 ];
 

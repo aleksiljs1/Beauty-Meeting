@@ -66,6 +66,7 @@ export const publicSite = {
     intro: "Shërbimet që ofrojmë në sallon. Për termine dhe informacion të mëtejshëm, na kontaktoni.",
     empty: "Lista e shërbimeve do të publikohet së shpejti.",
     priceLabel: "Çmimi",
+    listHeading: "Lista e shërbimeve",
   },
 
   academy: {
@@ -74,6 +75,7 @@ export const publicSite = {
     intro: "Kurset e akademisë kombinojnë praktikën në sallë me mësime live online, materiale dhe regjistrime për studentët e regjistruar.",
     empty: "Kurset do të publikohen së shpejti. Na kontaktoni për informacion.",
     details: "Më shumë",
+    listHeading: "Lista e kurseve",
     duration: "Kohëzgjatja",
     price: "Çmimi",
     backToCourses: "Të gjitha kurset",
