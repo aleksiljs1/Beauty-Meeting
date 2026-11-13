@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import Form from "next/form";
 import { Search } from "lucide-react";
 import { EmptyState, FilterChip, PageHeader, Pagination } from "@/components/admin/page-parts";
+import { RateBar } from "@/components/admin/participation";
 import { CreateStudentDialog } from "@/components/admin/students/create-student-dialog";
 import { StudentActions } from "@/components/admin/students/student-actions";
 import { Badge } from "@/components/ui/badge";
@@ -9,10 +11,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { admin } from "@/i18n/admin";
+import { statsText } from "@/i18n/stats";
 import { todayInAcademy } from "@/lib/datetime";
 import { ageOn } from "@/lib/student-profile";
 import { requirePageUser } from "@/server/auth/session";
 import { listCourses, listStudents } from "@/server/queries/admin";
+import { attendanceRate, participationByStudent } from "@/server/queries/participation";
 
 export const metadata: Metadata = { title: admin.students.title };
 
@@ -27,6 +31,7 @@ export default async function StudentsPage({ searchParams }: PageProps<"/admin/s
   const courses = await listCourses();
   const courseId = courses.find((c) => c.id === one(params.kursi))?.id;
   const result = await listStudents({ q, page, courseId });
+  const participation = await participationByStudent(result.items.map((s) => s.id));
   const today = todayInAcademy();
 
   const buildHref = ({ p = 1, kursi = courseId }: { p?: number; kursi?: string }) => {
@@ -71,18 +76,20 @@ export default async function StudentsPage({ searchParams }: PageProps<"/admin/s
         <EmptyState>{q || courseId ? t.emptySearch : t.empty}</EmptyState>
       ) : (
         <div className="rounded-md border bg-card">
-          <div className="hidden grid-cols-[2fr_2fr_1.5fr_1fr_6rem_3rem] gap-4 border-b px-4 py-2 text-xs font-medium text-muted-foreground md:grid">
+          <div className="hidden grid-cols-[2fr_2fr_1.5fr_1fr_9rem_3rem] gap-4 border-b px-4 py-2 text-xs font-medium text-muted-foreground md:grid">
             <span>{t.columns.name}</span>
             <span>{t.columns.email}</span>
             <span>{t.columns.courses}</span>
             <span>{t.columns.status}</span>
-            <span className="text-right">{t.columns.enrollments}</span>
+            <span>{statsText.participation.column}</span>
             <span className="sr-only">{t.columns.actions}</span>
           </div>
           <ul className="divide-y">
             {result.items.map((student) => (
-              <li key={student.id} className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-4 py-3 md:grid-cols-[2fr_2fr_1.5fr_1fr_6rem_3rem]">
-                <span className="font-medium">{student.name}</span>
+              <li key={student.id} className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-4 py-3 md:grid-cols-[2fr_2fr_1.5fr_1fr_9rem_3rem]">
+                <Link href={`/admin/studentet/${student.id}`} className="justify-self-start rounded-sm font-medium underline-offset-4 outline-none hover:text-rose-deep hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">
+                  {student.name}
+                </Link>
                 <span className="col-start-1 min-w-0 text-sm text-muted-foreground md:col-start-auto">
                   <span className="block truncate">{student.email}</span>
                   {(student.profile.phone || student.profile.birthDate) && (
@@ -109,10 +116,7 @@ export default async function StudentsPage({ searchParams }: PageProps<"/admin/s
                     </Badge>
                   )}
                 </span>
-                <span className="col-start-1 text-sm text-muted-foreground md:col-start-auto md:text-right md:text-foreground">
-                  <span className="md:sr-only">{t.columns.enrollments}: </span>
-                  {student.enrollments}
-                </span>
+                <ParticipationCell studentId={student.id} value={participation.get(student.id)} />
                 <span className="col-start-2 row-span-5 row-start-1 justify-self-end md:col-start-auto md:row-span-1 md:row-start-auto">
                   <StudentActions student={student} courses={courses} />
                 </span>
@@ -123,5 +127,27 @@ export default async function StudentsPage({ searchParams }: PageProps<"/admin/s
       )}
       <Pagination page={result.page} pageCount={result.pageCount} href={href} />
     </div>
+  );
+}
+
+/** "18 / 24" with a bar; opens the student's classes (missed ones in red). */
+function ParticipationCell({ studentId, value }: { studentId: string; value?: { available: number; attended: number } }) {
+  const p = statsText.participation;
+  const rate = value ? attendanceRate(value) : null;
+  return (
+    <span className="col-start-1 text-sm md:col-start-auto">
+      <span className="text-muted-foreground md:sr-only">{p.column}: </span>
+      {value && rate !== null ? (
+        <Link
+          href={`/admin/studentet/${studentId}`}
+          aria-label={p.label(value.attended, value.available)}
+          className="inline-flex rounded-sm outline-none hover:text-rose-deep focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          <RateBar rate={rate} label={p.ratio(value.attended, value.available)} />
+        </Link>
+      ) : (
+        <span className="text-muted-foreground">{p.noClasses}</span>
+      )}
+    </span>
   );
 }

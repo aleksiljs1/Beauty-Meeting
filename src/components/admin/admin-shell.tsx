@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { BookOpen, CalendarDays, CircleHelp, FolderOpen, History, LayoutDashboard, LogOut, Menu, PanelsTopLeft, Plug, Settings, Star, UserRound, Users, Wallet } from "lucide-react";
+import { BarChart3, BookOpen, CalendarDays, CircleHelp, FolderOpen, History, LayoutDashboard, LogOut, Menu, PanelsTopLeft, Plug, Settings, Star, UserRound, Users, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -17,6 +17,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { signOut } from "@/lib/api/auth";
 import { onSignedOut } from "@/lib/api/auth-events";
 import { admin } from "@/i18n/admin";
+import { statsText } from "@/i18n/stats";
 import { common } from "@/i18n/common";
 import { SHOW_BRAND_NAME } from "@/lib/brand";
 import { ClassAlertBanner } from "./class-alert-banner";
@@ -24,6 +25,7 @@ import { cn } from "@/lib/utils";
 
 const NAV = [
   { href: "/admin", label: admin.shell.nav.dashboard, icon: LayoutDashboard, exact: true },
+  { href: "/admin/statistikat", label: statsText.nav, icon: BarChart3 },
   { href: "/admin/studentet", label: admin.shell.nav.students, icon: Users },
   { href: "/admin/pagesat", label: admin.shell.nav.payments, icon: Wallet },
   { href: "/admin/mesimet", label: admin.shell.nav.lessons, icon: BookOpen },
