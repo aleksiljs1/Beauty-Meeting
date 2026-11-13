@@ -6,7 +6,7 @@ import { CheckCircle2, FileText, Upload, X, XCircle } from "lucide-react";
 import { formatBytes, putToPresignedUrl, UploadAbortedError, uploadParts } from "@/components/admin/uploads";
 import { errorMessage } from "@/components/admin/use-api-action";
 import { Button } from "@/components/ui/button";
-import { ApiClientError, apiSend } from "@/lib/api/client";
+import { ApiClientError, apiSend, UPLOAD_FINISH_TIMEOUT_MS } from "@/lib/api/client";
 import { prepareMaterialFile, summarizeUploads, type UploadItemStatus } from "@/lib/admin/material-uploads";
 import { cn } from "@/lib/utils";
 import { admin } from "@/i18n/admin";
@@ -53,7 +53,7 @@ async function uploadFile(lessonId: string | undefined, file: File, mimeType: st
     throw error;
   }
   onVerify();
-  await apiSend("post", `${url}/finish`, parts ? { parts } : {});
+  await apiSend("post", `${url}/finish`, parts ? { parts } : {}, { timeoutMs: UPLOAD_FINISH_TIMEOUT_MS });
 }
 
 type QueueItem = { key: string; file: File; mimeType: string; status: UploadItemStatus; loaded: number; error: string | null };

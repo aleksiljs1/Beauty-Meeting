@@ -7,6 +7,7 @@ import { prisma } from "@/server/db";
 import { env } from "@/server/env";
 import { ApiError } from "@/server/http";
 import { audit } from "./audit";
+import { notifyIfLive } from "./live";
 
 /**
  * One shared invitation link per lesson (sent to the whole class). It never replaces login:
@@ -123,7 +124,7 @@ export async function redeemInvitation(token: string, user: AppUser, now = new D
   const lessonId = invitation.lessonId;
 
   try {
-    return await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const enrollment = await tx.lessonEnrollment.findUnique({
         where: { lessonId_userId: { lessonId, userId: user.id } },
         select: { revokedAt: true },
@@ -151,6 +152,9 @@ export async function redeemInvitation(token: string, user: AppUser, now = new D
       await tx.invitationRedemption.create({ data: { invitationId: invitation.id, userId: user.id, enrollmentId: created.id } });
       return { lessonId, state: "ENROLLED" as const };
     });
+    // Joined through the link while the class is on: tell them it's live, like everyone else.
+    if (result.state === "ENROLLED") await notifyIfLive([lessonId]);
+    return result;
   } catch (error) {
     // Two simultaneous requests from the same student: the loser hits the unique constraint
     // and its transaction (including the counter increment) is rolled back.

@@ -22,14 +22,17 @@ beforeEach(async () => {
 let courseCount = 0;
 const createCourse = (title = "Ngjyrosja") => prisma.course.create({ data: { title, slug: `kursi-${++courseCount}-${Date.now()}` } });
 
-/** A lesson that started `hoursAgo` hours ago and lasted 2 hours (negative = in the future). */
+/** A lesson that started `hoursAgo` hours ago and lasted 2 hours (negative = in the future); past ones were held. */
 function lessonAt(hoursAgo: number, overrides: Parameters<typeof createLesson>[1] = {}) {
   const start = new Date(Date.now() - hoursAgo * HOUR);
+  const end = new Date(start.getTime() + 2 * HOUR);
+  const held = end.getTime() <= Date.now() ? { meetingStatus: "ENDED" as const, liveStartedAt: start, liveEndedAt: end } : {};
   return createLesson(admin.id, {
     scheduledStartAt: start,
-    scheduledEndAt: new Date(start.getTime() + 2 * HOUR),
+    scheduledEndAt: end,
     joinOpensAt: new Date(start.getTime() - 15 * 60_000),
     accessExpiresAt: new Date(start.getTime() + 30 * DAY),
+    ...held,
     ...overrides,
   });
 }
@@ -57,6 +60,16 @@ describe("lesson feedback", () => {
     const lesson = await lessonAt(1, { meetingStatus: "ENDED" });
     await enroll(lesson.id);
     await expect(rateLesson(lesson.id, 4)).resolves.toBeTruthy();
+  });
+
+  it("is not offered for a lesson that never took place, nor during a class that runs late", async () => {
+    const noShow = await lessonAt(5, { meetingStatus: "SCHEDULED", liveStartedAt: null, liveEndedAt: null });
+    const runningLate = await lessonAt(2.5, { meetingStatus: "LIVE", liveEndedAt: null });
+    const lostEnd = await lessonAt(5, { meetingStatus: "LIVE", liveEndedAt: null }); // "ended" never came; grace is over
+    await Promise.all([enroll(noShow.id), enroll(runningLate.id), enroll(lostEnd.id)]);
+
+    for (const lesson of [noShow, runningLate]) await expect(rateLesson(lesson.id)).rejects.toMatchObject({ code: "CONFLICT" });
+    await expect(rateLesson(lostEnd.id)).resolves.toBeTruthy();
   });
 
   it("keeps one rating per student and lesson: sending again changes it", async () => {

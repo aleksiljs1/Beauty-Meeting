@@ -105,7 +105,8 @@ export async function finishFileUpload(admin: AppUser, fileId: string, parts?: {
       await completeMultipart(file.objectKey, file.uploadId, parts);
     } catch (error) {
       console.error("[materials] multipart completion failed", fileId, error);
-      await prisma.materialFile.update({ where: { id: fileId }, data: { status: "FAILED", uploadId: null } });
+      // Not over a parallel finish of the same upload that already succeeded.
+      await prisma.materialFile.updateMany({ where: { id: fileId, uploadId: file.uploadId, status: { not: "READY" } }, data: { status: "FAILED", uploadId: null } });
       await abortMultipart(file.objectKey, file.uploadId).catch(() => undefined);
       throw new ApiError("INTEGRATION_FAILED", "Ngarkimi nuk u përfundua. Provoni përsëri.");
     }

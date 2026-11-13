@@ -186,6 +186,16 @@ describe("Zoom cloud recordings into Regjistrimet", () => {
     expect(await catchUpMissedRecordings()).toBe(0); // already queued
   });
 
+  it("finds the recording of a class the site never heard start (offline for the whole class)", async () => {
+    const start = new Date(Date.now() - 3 * 60 * 60_000);
+    await prisma.lesson.update({
+      where: { id: lessonId },
+      data: { meetingStatus: "SCHEDULED", liveStartedAt: null, scheduledStartAt: start, scheduledEndAt: new Date(start.getTime() + 2 * 60 * 60_000) },
+    });
+    zoom.listed = [{ id: Number(MEETING), uuid: "abc==", recording_files: [recordingFile("f-late", "active_speaker", minutesAgo(180), minutesAgo(60))] }];
+    expect(await catchUpMissedRecordings()).toBe(1);
+  });
+
   it("never brings back a recording the admin deleted", async () => {
     await webhook(recordingCompleted());
     expect(await importNextZoomRecording()).toBe(true);

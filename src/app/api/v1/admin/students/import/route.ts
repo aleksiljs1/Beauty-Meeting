@@ -46,6 +46,8 @@ function emailFrom(value: unknown) {
   return String(value.email ?? "").trim().toLowerCase();
 }
 
+const INCOMPLETE_REASON = "Llogaria u krijua, por kurset ose të dhënat nuk u ruajtën. Plotësojini te studenti.";
+
 function normalizeCourseName(value: string) {
   return value.trim().normalize("NFKC").toLowerCase();
 }
@@ -89,11 +91,18 @@ export const POST = route(async (request) => {
       }
 
       const student = await createAccount({ name: row.emri, email: row.email, role: "student" }, admin.id);
-      if (row.profile) await saveImportedStudentProfile(student.id, row.profile, admin);
-      const courseIds = [...new Set(row.abonimi.map((name) => courseByName.get(normalizeCourseName(name))!.id))];
-      const courseResult = courseIds.length
-        ? await setStudentCourses(student.id, courseIds, admin, { addToUpcoming: input.addToUpcoming })
-        : null;
+      // From here the account exists: a later failure must not leave it without a setup email
+      // (a re-import would skip it as "already exists"), so report it and carry on.
+      let lessonsAdded = 0;
+      let incomplete: string | undefined;
+      try {
+        if (row.profile) await saveImportedStudentProfile(student.id, row.profile, admin);
+        const courseIds = [...new Set(row.abonimi.map((name) => courseByName.get(normalizeCourseName(name))!.id))];
+        if (courseIds.length) ({ lessonsAdded } = await setStudentCourses(student.id, courseIds, admin, { addToUpcoming: input.addToUpcoming }));
+      } catch (error) {
+        console.error("[students] import row created but not completed", rowNumber, error);
+        incomplete = INCOMPLETE_REASON;
+      }
 
       let mailSent = true;
       try {
@@ -103,7 +112,7 @@ export const POST = route(async (request) => {
         console.error("[mail] setup email failed during student import", student.id, error);
         mailSent = false;
       }
-      results.push({ row: rowNumber, email: student.email, status: "created", mailSent, lessonsAdded: courseResult?.lessonsAdded ?? 0 });
+      results.push({ row: rowNumber, email: student.email, status: "created", mailSent, lessonsAdded, ...(incomplete && { reason: incomplete }) });
     } catch (error) {
       console.error("[students] import row failed", rowNumber, error);
       results.push({ row: rowNumber, email: row.email, status: "failed", reason: "Rreshti nuk mund të importohej." });

@@ -11,6 +11,7 @@ import { env } from "@/server/env";
 import { ApiError } from "@/server/http";
 import { publishFeedChanged, publishLessonChanged } from "@/server/realtime/publish";
 import { deleteObject } from "@/server/storage/storage";
+import { zoomText } from "@/i18n/zoom";
 import { deleteZoomMeeting, syncZoomMeetingSchedule } from "@/server/zoom/meetings";
 import { audit } from "./audit";
 import { assertActiveStudents } from "./course-members";
@@ -85,6 +86,13 @@ async function assertCourse(courseId: string | null | undefined) {
   if (!course) throw new ApiError("VALIDATION_FAILED", "Kursi nuk u gjet.");
 }
 
+/** A photo deleted from the gallery while the lesson form was open: a clear message, not a 500. */
+async function assertImage(imageId: string | null | undefined) {
+  if (!imageId) return;
+  const image = await prisma.galleryItem.findUnique({ where: { id: imageId }, select: { id: true } });
+  if (!image) throw new ApiError("VALIDATION_FAILED", "Fotoja nuk u gjet në galeri. Zgjidhni një tjetër.");
+}
+
 function assertDemoAllowed(isDemo: boolean | undefined) {
   // A demo classroom only makes sense while Zoom runs in demo mode; never mix it into live Zoom.
   if (isDemo && env.ZOOM_MODE !== "demo") throw new ApiError("VALIDATION_FAILED", "Klasat demo lejohen vetëm në modalitetin demo.");
@@ -111,6 +119,7 @@ export async function createRepeatingLesson(input: LessonInput, repeat: RepeatRu
 async function createLessons(input: LessonInput, schedules: LessonSchedule[], confirmEarlyDeadline: boolean, admin: AppUser, studentIds: string[]) {
   assertSchedules(schedules, confirmEarlyDeadline);
   await assertCourse(input.courseId);
+  await assertImage(input.imageId);
   assertDemoAllowed(input.isDemo);
   const ids = [...new Set(studentIds)];
   await assertActiveStudents(ids);
@@ -177,6 +186,7 @@ export async function updateLesson(lessonId: string, patch: LessonPatch, confirm
   };
   throwScheduleIssues(validateLessonSchedule(schedule, confirmEarlyDeadline));
   if (patch.courseId !== undefined) await assertCourse(patch.courseId);
+  if (patch.imageId !== undefined) await assertImage(patch.imageId);
 
   let meetingStatus = current.meetingStatus;
   if (patch.isDemo !== undefined && patch.isDemo !== current.isDemo) {
@@ -293,8 +303,9 @@ export async function setLessonPublication(lessonId: string, publication: Public
 
 /** Deletes one lesson; see `deleteLessons`. */
 export async function deleteLesson(lessonId: string, admin: AppUser) {
-  const { count } = await deleteLessons([lessonId], admin);
+  const { count, zoomNotDeleted } = await deleteLessons([lessonId], admin);
   if (!count) throw new ApiError("NOT_FOUND", "Mësimi nuk u gjet.");
+  return { zoomNotDeleted };
 }
 
 /**
@@ -323,7 +334,13 @@ export async function deleteLessons(lessonIds: string[], admin: AppUser, now = n
   }
 
   const expecting = await studentsExpecting(lessons.filter((l) => l.publication === "PUBLISHED" && l.scheduledEndAt > now).map((l) => l.id), now);
-  for (const lesson of lessons) await deleteZoomMeeting(lesson.id, lesson.zoomMeetingNumber, admin.id);
+  // A meeting Zoom didn't delete would stay usable by anyone with its link: the admin is told
+  // its number (it is also in the audit log) to delete it in Zoom.
+  const zoomNotDeleted: string[] = [];
+  for (const lesson of lessons) {
+    const { deleted } = await deleteZoomMeeting(lesson.id, lesson.zoomMeetingNumber, admin.id);
+    if (!deleted && lesson.zoomMeetingNumber) zoomNotDeleted.push(lesson.zoomMeetingNumber);
+  }
   await prisma.lesson.deleteMany({ where: { id: { in: lessons.map((l) => l.id) } } });
   const seriesIds = [...new Set(lessons.flatMap((l) => (l.seriesId ? [l.seriesId] : [])))];
   await prisma.lessonSeries.deleteMany({ where: { id: { in: seriesIds }, lessons: { none: {} } } }); // its last date just went
@@ -335,7 +352,7 @@ export async function deleteLessons(lessonIds: string[], admin: AppUser, now = n
   });
   await publishFeedChanged(lessons.flatMap((l) => l.enrollments.map((e) => e.userId)));
   await notifyLessonsChanged("cancelled", expecting, { lessonsKept: false, now });
-  return { count: lessons.length };
+  return { count: lessons.length, zoomNotDeleted };
 }
 
 /**
@@ -353,8 +370,8 @@ export async function deleteFilteredLessons(filter: Omit<LessonListFilter, "page
     select: { id: true, meetingStatus: true, scheduledEndAt: true, _count: { select: { recordings: true } } },
   });
   const deletable = lessons.filter((l) => effectiveMeetingStatus(l, now) !== "LIVE" && !l._count.recordings);
-  const { count } = deletable.length ? await deleteLessons(deletable.map((l) => l.id), admin, now) : { count: 0 };
-  return { count, skipped: lessons.length - deletable.length };
+  const { count, zoomNotDeleted } = deletable.length ? await deleteLessons(deletable.map((l) => l.id), admin, now) : { count: 0, zoomNotDeleted: [] };
+  return { count, skipped: lessons.length - deletable.length, zoomWarning: zoomNotDeleted.length ? zoomText.warnings.meetingsNotDeleted(zoomNotDeleted) : null };
 }
 
 /**

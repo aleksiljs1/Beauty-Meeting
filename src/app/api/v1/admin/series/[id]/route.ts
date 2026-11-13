@@ -19,5 +19,6 @@ export const PATCH = route<Ctx>(async (request, ctx) => {
 export const DELETE = route<Ctx>(async (request, ctx) => {
   const admin = await requireApiUser(request, "admin");
   const upcomingOnly = new URL(request.url).searchParams.get("te-ardhshme") === "1";
-  return ok(await deleteSeries(await seriesId(ctx), admin, { upcomingOnly }));
+  const { count, zoomNotDeleted } = await deleteSeries(await seriesId(ctx), admin, { upcomingOnly });
+  return ok({ count, zoomWarning: zoomNotDeleted.length ? zoomText.warnings.meetingsNotDeleted(zoomNotDeleted) : null });
 });

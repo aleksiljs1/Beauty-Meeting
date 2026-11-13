@@ -330,6 +330,8 @@ function ClassroomStageImpl(props: StageProps) {
         title={t.notOpenTitle}
       >
         <Countdown
+          // A moved opening time starts a fresh countdown (and its one refresh at the new time).
+          key={props.joinOpensAt}
           startAt={props.scheduledStartAt}
           opensAt={props.joinOpensAt}
           serverTime={props.serverTime}

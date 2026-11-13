@@ -86,7 +86,7 @@ export async function completeRecordingUpload(admin: AppUser, recordingId: strin
     await completeMultipart(recording.objectKey, recording.uploadId, parts);
   } catch (error) {
     console.error("[recordings] multipart completion failed", recordingId, error);
-    await fail(recordingId, "Ngarkimi nuk u përfundua. Provoni përsëri.");
+    await fail(recordingId, recording.uploadId, "Ngarkimi nuk u përfundua. Provoni përsëri.");
     await abortMultipart(recording.objectKey, recording.uploadId).catch(() => undefined);
     throw new ApiError("INTEGRATION_FAILED", "Ngarkimi nuk u përfundua. Provoni përsëri.");
   }
@@ -98,12 +98,20 @@ export async function completeRecordingUpload(admin: AppUser, recordingId: strin
     BigInt(head.size) === recording.sizeBytes &&
     bytesMatch("recording", recording.mimeType ?? "", await readObjectHead(recording.objectKey, SNIFF_BYTES));
   if (!valid) {
-    await fail(recordingId, "Skedari nuk është video MP4 e vlefshme.");
+    await fail(recordingId, recording.uploadId, "Skedari nuk është video MP4 e vlefshme.");
     if (head) await deleteObject(recording.objectKey);
     throw new ApiError("VALIDATION_FAILED", "Skedari nuk është video MP4 e vlefshme.");
   }
 
-  await prisma.recording.update({ where: { id: recordingId }, data: { status: "READY", uploadId: null, readyAt: new Date(), errorMessage: null } });
+  // Only this upload, still running: the admin may have cancelled it while it was finishing.
+  const finished = await prisma.recording.updateMany({
+    where: { id: recordingId, uploadId: recording.uploadId, status: "IMPORTING" },
+    data: { status: "READY", uploadId: null, readyAt: new Date(), errorMessage: null },
+  });
+  if (!finished.count) {
+    await deleteObject(recording.objectKey).catch((error) => console.error("[storage] orphan recording object", recording.objectKey, error));
+    throw new ApiError("CONFLICT", "Ky ngarkim nuk është më aktiv.");
+  }
   await audit(admin.id, "recording.upload", "lesson", recording.lessonId, { recordingId });
   await notifyRecordingReady(recording.lessonId, recordingId);
   return { status: "READY" as const };
@@ -116,8 +124,9 @@ export async function abortRecordingUpload(admin: AppUser, recordingId: string) 
   await audit(admin.id, "recording.upload_abort", "lesson", recording.lessonId, { recordingId });
 }
 
-async function fail(recordingId: string, message: string) {
-  await prisma.recording.update({ where: { id: recordingId }, data: { status: "FAILED", uploadId: null, errorMessage: message } });
+/** Marks this upload failed, unless it has meanwhile finished, been cancelled or replaced. */
+async function fail(recordingId: string, uploadId: string, message: string) {
+  await prisma.recording.updateMany({ where: { id: recordingId, uploadId, status: "IMPORTING" }, data: { status: "FAILED", uploadId: null, errorMessage: message } });
 }
 
 export async function deleteRecording(admin: AppUser, recordingId: string) {
@@ -130,6 +139,38 @@ export async function deleteRecording(admin: AppUser, recordingId: string) {
   }
   await audit(admin.id, "recording.delete", "lesson", recording.lessonId, { recordingId });
   await publishLessonChanged(recording.lessonId);
+}
+
+/**
+ * Recordings are kept only while students can watch them. A day after a lesson's access deadline
+ * (a student's own deadline can't be later than the lesson's), its recordings are deleted from
+ * storage and from the lesson, with any upload or import still pending. The day lets the admin
+ * notice and extend a deadline that was set too early. Returns how many were deleted.
+ */
+export const RECORDING_KEEP_AFTER_EXPIRY_MS = 24 * 60 * 60_000;
+const CLEANUP_BATCH = 50;
+
+export async function deleteExpiredRecordings(now = new Date()): Promise<number> {
+  const expired = await prisma.recording.findMany({
+    where: {
+      lesson: { accessExpiresAt: { lte: new Date(now.getTime() - RECORDING_KEEP_AFTER_EXPIRY_MS) } },
+      // A Zoom file being copied right now is left to finish; the next run deletes it.
+      NOT: { source: "ZOOM", status: "IMPORTING" },
+    },
+    select: { id: true, lessonId: true, objectKey: true, uploadId: true },
+    take: CLEANUP_BATCH,
+  });
+  for (const recording of expired) {
+    if (recording.objectKey && recording.uploadId) await abortMultipart(recording.objectKey, recording.uploadId).catch(() => undefined);
+    // The row goes first: a file left behind is only wasted space, a row without its file is broken.
+    await prisma.recording.deleteMany({ where: { id: recording.id } });
+    if (recording.objectKey) {
+      await deleteObject(recording.objectKey).catch((error) => console.error("[storage] orphan recording object", recording.objectKey, error));
+    }
+    await audit(null, "recording.expired_delete", "lesson", recording.lessonId, { recordingId: recording.id });
+  }
+  for (const lessonId of new Set(expired.map((r) => r.lessonId))) await publishLessonChanged(lessonId);
+  return expired.length;
 }
 
 /** Students see READY recordings only; admins also see processing/failed ones with their state. */

@@ -6,6 +6,7 @@ import { prisma } from "@/server/db";
 import { ApiError } from "@/server/http";
 import { publishFeedChanged } from "@/server/realtime/publish";
 import { audit } from "./audit";
+import { notifyIfLive } from "./live";
 
 /**
  * Course membership ("which course a student attends") and adding a course's students to its
@@ -79,6 +80,7 @@ export async function enrollStudents(lessonId: string, userIds: string[], admin:
   for (const userId of toCreate) await audit(admin.id, "enrollment.grant", "lesson", lessonId, { userId, via: memberIds.has(userId) ? "course" : "admin" });
   for (const e of toRestore) await audit(admin.id, "enrollment.regrant", "lesson", lessonId, { enrollmentId: e.id, userId: e.userId });
   await publishFeedChanged([...toCreate, ...toRestore.map((e) => e.userId)]);
+  if (toCreate.length || toRestore.length) await notifyIfLive([lessonId]);
   return { added: toCreate.length, restored: toRestore.length };
 }
 

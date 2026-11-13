@@ -126,11 +126,11 @@ describe("bulk delete from the lessons list", () => {
     await setLessonPublication(published.id, "PUBLISHED", admin);
     await createLesson({ title: "E kaluar", ...schedule(-2 * DAY) }, false, admin);
 
-    expect(await deleteFilteredLessons({}, "drafts", admin)).toEqual({ count: 2, skipped: 0 });
+    expect(await deleteFilteredLessons({}, "drafts", admin)).toEqual({ count: 2, skipped: 0, zoomWarning: null });
     expect(await prisma.lesson.findMany({ select: { id: true } })).toEqual([{ id: published.id }]);
 
     await createLesson({ title: "E kaluar 2", ...schedule(-2 * DAY) }, false, admin);
-    expect(await deleteFilteredLessons({ when: "upcoming" }, "all", admin)).toEqual({ count: 1, skipped: 0 });
+    expect(await deleteFilteredLessons({ when: "upcoming" }, "all", admin)).toEqual({ count: 1, skipped: 0, zoomWarning: null });
     expect(await prisma.lesson.count()).toBe(1); // the past one stays
   });
 
@@ -139,7 +139,7 @@ describe("bulk delete from the lessons list", () => {
     await prisma.recording.create({ data: { lessonId: past.id, source: "UPLOAD", status: "READY", displayName: "Klasa.mp4" } });
     await createLesson({ title: "Pa regjistrim", ...schedule(-2 * DAY) }, false, admin);
 
-    expect(await deleteFilteredLessons({}, "all", admin)).toEqual({ count: 1, skipped: 1 });
+    expect(await deleteFilteredLessons({}, "all", admin)).toEqual({ count: 1, skipped: 1, zoomWarning: null });
     expect(await prisma.lesson.findMany({ select: { id: true } })).toEqual([{ id: past.id }]);
   });
 });

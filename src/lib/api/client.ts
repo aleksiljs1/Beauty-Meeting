@@ -82,6 +82,10 @@ export async function apiGet<T>(url: string, params?: Record<string, unknown>): 
   return (await api.get<{ data: T }>(url, { params })).data.data;
 }
 
-export async function apiSend<T>(method: "post" | "put" | "patch" | "delete", url: string, body?: unknown): Promise<T> {
-  return (await api.request<{ data: T }>({ method, url, data: body })).data.data;
+/** `timeoutMs` for the few slow calls (finishing a large upload is checked on the server). */
+export async function apiSend<T>(method: "post" | "put" | "patch" | "delete", url: string, body?: unknown, { timeoutMs }: { timeoutMs?: number } = {}): Promise<T> {
+  return (await api.request<{ data: T }>({ method, url, data: body, ...(timeoutMs && { timeout: timeoutMs }) })).data.data;
 }
+
+/** Finishing a multi-GB upload: storage assembles the parts and the server checks the file. */
+export const UPLOAD_FINISH_TIMEOUT_MS = 5 * 60_000;

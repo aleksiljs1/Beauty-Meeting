@@ -32,8 +32,9 @@ export function BulkDeleteLessons({
     const query = new URLSearchParams({ scope });
     if (filter.publication) query.set("publication", filter.publication);
     if (filter.when) query.set("when", filter.when);
-    const result = await run(() => apiSend<{ count: number; skipped: number }>("delete", `/admin/lessons?${query}`));
+    const result = await run(() => apiSend<{ count: number; skipped: number; zoomWarning: string | null }>("delete", `/admin/lessons?${query}`));
     if (result) (result.skipped ? toast.warning : toast.success)(t.done(result.count, result.skipped));
+    if (result?.zoomWarning) toast.warning(result.zoomWarning, { duration: 15_000 });
   }
 
   const filtered = !!filter.publication || !!filter.when;

@@ -26,6 +26,6 @@ export const PATCH = route<Ctx>(async (request, ctx) => {
 /** Any lesson that isn't live; its students lose access (see deleteLessons). */
 export const DELETE = route<Ctx>(async (request, ctx) => {
   const admin = await requireApiUser(request, "admin");
-  await deleteLesson(await lessonId(ctx), admin);
-  return ok({ deleted: true });
+  const { zoomNotDeleted } = await deleteLesson(await lessonId(ctx), admin);
+  return ok({ deleted: true, zoomWarning: zoomNotDeleted.length ? zoomText.warnings.meetingsNotDeleted(zoomNotDeleted) : null });
 });

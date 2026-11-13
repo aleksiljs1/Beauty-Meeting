@@ -59,14 +59,16 @@ export function ClassSessionProvider({ children }: { children: ReactNode }) {
   // When the teacher ends the class, Zoom waits for an "OK" that the corner player can't take.
   const { feed } = useLiveFeed();
   const isLive = open && !!feed?.notifications.some((n) => n.lessonId === lessonId && n.type === "LESSON_LIVE" && n.active);
-  const wasLive = useRef(false);
+  // The lesson seen live in this session: only its end closes the class, so joining another lesson
+  // (not live yet in the feed) doesn't close the new one straight away.
+  const liveLessonId = useRef<string | null>(null);
   useEffect(() => {
-    if (isLive) wasLive.current = true;
-    else if (wasLive.current) {
-      wasLive.current = false;
+    if (isLive) liveLessonId.current = lessonId;
+    else if (open && lessonId && liveLessonId.current === lessonId) {
+      liveLessonId.current = null;
       close();
     }
-  }, [isLive, close]);
+  }, [isLive, open, lessonId, close]);
 
   const start = useCallback(
     (config: ZoomJoinConfig) => {

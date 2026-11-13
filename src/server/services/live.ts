@@ -78,7 +78,14 @@ export async function applyMeetingStarted(lessonId: string, startedAt: Date): Pr
     },
     data: { meetingStatus: "LIVE", liveStartedAt: startedAt, liveEndedAt: null },
   });
-  if (updated.count === 0) return "stale";
+  if (updated.count === 0) {
+    // Zoom's retry of an event whose first try set the lesson live but failed to tell everyone:
+    // finish the telling (it only reaches students who don't have the notice yet).
+    const sameSession = await prisma.lesson.count({ where: { id: lessonId, meetingStatus: "LIVE", liveStartedAt: startedAt } });
+    if (!sameSession) return "stale";
+    await notifyLessonLive(lessonId, startedAt);
+    return "applied";
+  }
   await notifyLessonLive(lessonId, startedAt);
   await audit(null, "lesson.live", "lesson", lessonId, { source: "zoom" });
   return "applied";
@@ -161,24 +168,47 @@ async function closeNotices(lessonIds: string[], types: ("LESSON_LIVE" | "LESSON
   });
 }
 
-/** Deduplicated per live occurrence; runs once per occurrence (the caller's state change is the guard). */
+/**
+ * Tells the lesson's students that it is live. Safe to repeat for the same occurrence: only students
+ * without this occurrence's notice get one (and the email), e.g. on a retry or a mid-class enrolment.
+ */
 async function notifyLessonLive(lessonId: string, startedAt: Date) {
   const recipients = await eligibleRecipients(lessonId, new Date());
-  const rows = recipients.map((r) => ({
-    userId: r.userId,
-    lessonId,
-    type: "LESSON_LIVE" as const,
-    dedupeKey: `LESSON_LIVE:${lessonId}:${startedAt.toISOString()}`,
-    validUntil: r.deadline,
-  }));
-  if (rows.length) await prisma.notification.createMany({ data: rows, skipDuplicates: true });
-  await publishFeedChanged(rows.map((r) => r.userId));
-  if (!rows.length) return;
+  if (!recipients.length) return;
+  const created = await prisma.notification.createManyAndReturn({
+    data: recipients.map((r) => ({
+      userId: r.userId,
+      lessonId,
+      type: "LESSON_LIVE" as const,
+      dedupeKey: `LESSON_LIVE:${lessonId}:${startedAt.toISOString()}`,
+      validUntil: r.deadline,
+    })),
+    skipDuplicates: true,
+    select: { userId: true },
+  });
+  const userIds = created.map((r) => r.userId);
+  if (!userIds.length) return;
+  await publishFeedChanged(userIds);
   // "The class has started", with a link that opens the lesson and joins automatically.
   const lesson = await prisma.lesson.findUniqueOrThrow({ where: { id: lessonId }, select: { title: true } });
-  emailInBackground("lesson-live", rows.map((r) => r.userId), (to, academyName) =>
+  emailInBackground("lesson-live", userIds, (to, academyName) =>
     lessonLiveEmail({ to: to.email, name: to.name, lessonTitle: lesson.title, url: lessonUrl(lessonId, "?bashkohu=1"), academyName }),
   );
+}
+
+/** After students were enrolled: those joining a class already in progress get its live notice too. */
+export async function notifyIfLive(lessonIds: string[]) {
+  if (!lessonIds.length) return;
+  const live = await prisma.lesson.findMany({
+    where: { id: { in: [...new Set(lessonIds)] }, meetingStatus: "LIVE", publication: "PUBLISHED", liveStartedAt: { not: null } },
+    select: { id: true, liveStartedAt: true },
+  });
+  for (const lesson of live) {
+    // The enrolment already happened; a failed notice must not turn it into an error.
+    await notifyLessonLive(lesson.id, lesson.liveStartedAt!).catch((error) =>
+      console.error("[live] live notice for a new enrolment failed", lesson.id, (error as Error).message),
+    );
+  }
 }
 
 export async function notifyRecordingReady(lessonId: string, recordingId: string) {
@@ -354,6 +384,8 @@ async function ensureStartingSoonNotices(user: AppUser, now: Date) {
     where: {
       userId: user.id,
       revokedAt: null,
+      // The student's own deadline too, not only the lesson's.
+      OR: [{ accessExpiresAt: null }, { accessExpiresAt: { gt: now } }],
       lesson: {
         publication: "PUBLISHED",
         meetingStatus: { in: ["NOT_PROVISIONED", "SCHEDULED"] },

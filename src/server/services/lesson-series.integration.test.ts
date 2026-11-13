@@ -76,9 +76,9 @@ describe("lesson series", () => {
 
   it("deletes the upcoming dates or the whole series", async () => {
     const { id, lessons } = await series();
-    expect(await deleteSeries(id, admin, { upcomingOnly: true })).toEqual({ count: 6 });
+    expect(await deleteSeries(id, admin, { upcomingOnly: true })).toEqual({ count: 6, zoomNotDeleted: [] });
     expect(await prisma.lesson.findMany({ where: { seriesId: id }, select: { id: true } })).toEqual([{ id: lessons[0].id }]);
-    expect(await deleteSeries(id, admin)).toEqual({ count: 1 });
+    expect(await deleteSeries(id, admin)).toEqual({ count: 1, zoomNotDeleted: [] });
     expect(await prisma.lessonSeries.findUnique({ where: { id } })).toBeNull();
   });
 });

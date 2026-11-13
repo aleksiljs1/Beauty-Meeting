@@ -3,6 +3,8 @@ export const zoomText = {
   warnings: {
     syncFailed: "Mësimi u ruajt, por takimi në Zoom nuk u përditësua. Kontrolloni orarin në Zoom ose provoni përsëri.",
     deleteFailed: "Mësimi u anulua, por takimi në Zoom nuk u fshi. Fshijeni manualisht në Zoom.",
+    meetingsNotDeleted: (numbers: string[]) =>
+      `Zoom nuk u përgjigj, ndaj ${numbers.length === 1 ? "takimi" : "takimet"} ${numbers.join(", ")} ${numbers.length === 1 ? "mbeti" : "mbetën"} në Zoom. Fshijini manualisht atje.`,
   },
   admin: {
     sectionTitle: "Klasa live në Zoom",

@@ -13,7 +13,8 @@ const t = portalText.materials;
 
 export type MaterialItem = { id: string; displayName: string; mimeType: string; sizeBytes: number; viewable: boolean };
 
-type Viewer = { id: string; name: string; kind: "pdf" | "image" | "video"; grant: VideoGrant };
+/** `lost`: the admin removed the material while it was open (it stays closed even if attached again). */
+type Viewer = { id: string; name: string; kind: "pdf" | "image" | "video"; grant: VideoGrant; lost?: boolean };
 
 function formatSize(bytes: number) {
   if (bytes < 1024 * 1024) return t.sizeKb(Math.max(1, Math.round(bytes / 1024)));
@@ -64,9 +65,12 @@ export function MaterialsPanel({
   const [opened, setViewer] = useState<Viewer | null>(null);
   const [pending, setPending] = useState<string | null>(null);
   const viewerRef = useRef<HTMLDivElement>(null);
-  // A material the admin removed (the list refreshes live) closes for the student too.
-  const viewer = opened && materials.some((m) => m.id === opened.id) ? opened : null;
-  const lostViewer = !!opened && !viewer;
+  // A material the admin removed (the list refreshes live) closes for the student too, for good:
+  // attached again later, it must not reopen by itself with its long-expired link.
+  const present = !!opened && materials.some((m) => m.id === opened.id);
+  if (opened && !opened.lost && !present) setViewer({ ...opened, lost: true });
+  const viewer = opened && !opened.lost && present ? opened : null;
+  const lostViewer = !!opened?.lost;
   useEffect(() => {
     if (lostViewer) onViewerChange?.(false);
   }, [lostViewer, onViewerChange]);

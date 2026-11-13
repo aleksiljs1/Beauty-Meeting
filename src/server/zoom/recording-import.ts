@@ -244,9 +244,14 @@ export async function catchUpMissedRecordings(now = new Date()): Promise<number>
     where: {
       zoomMeetingNumber: { not: null },
       zoomRecordingsQueuedAt: null,
-      liveStartedAt: { gte: since },
-      // Over: Zoom said so, or the schedule says so (in case the "ended" event was lost too).
-      OR: [{ meetingStatus: "ENDED" }, { scheduledEndAt: { lt: now } }],
+      isDemo: false,
+      AND: [
+        // Held in the last week: Zoom said it started, or it was scheduled then (the "started"
+        // event is lost too when the site was down for the whole class).
+        { OR: [{ liveStartedAt: { gte: since } }, { scheduledStartAt: { gte: since, lte: now }, publication: { not: "CANCELLED" } }] },
+        // Over: Zoom said so, or the schedule says so (in case the "ended" event was lost too).
+        { OR: [{ meetingStatus: "ENDED" }, { scheduledEndAt: { lt: now } }] },
+      ],
     },
     select: { id: true, zoomMeetingNumber: true },
   });

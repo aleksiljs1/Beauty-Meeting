@@ -90,6 +90,7 @@ export const admin = {
       submit: "Krijo dhe dërgo emailin",
       success: (email: string) => `Llogaria u krijua. Emaili për fjalëkalimin u dërgua te ${email}.`,
       mailFailed: "Llogaria u krijua, por emaili nuk u dërgua. Provoni “Dërgo përsëri emailin e fjalëkalimit”.",
+      incomplete: "Llogaria u krijua, por kurset ose të dhënat nuk u ruajtën. Plotësojini te studenti.",
       lessonsAdded: (count: number) => `U shtua edhe në ${count} ${count === 1 ? "mësim të ardhshëm" : "mësime të ardhshme"} të kursit.`,
     },
     courses: {
@@ -659,7 +660,7 @@ export const admin = {
   recordings: {
     title: "Regjistrimet",
     intro:
-      "Kur klasa regjistrohet në Zoom, videoja shfaqet këtu vetë, pak minuta pasi Zoom e përpunon. Mund të ngarkoni edhe një video MP4 me dorë. Studentët e shohin deri në afatin e tyre.",
+      "Kur klasa regjistrohet në Zoom, videoja shfaqet këtu vetë, pak minuta pasi Zoom e përpunon. Mund të ngarkoni edhe një video MP4 me dorë. Studentët e shohin deri në afatin e tyre. Një ditë pas afatit të aksesit të mësimit, regjistrimet fshihen vetë.",
     choose: "Ngarko regjistrim (MP4)",
     uploading: (name: string) => `Duke ngarkuar ${name}…`,
     finishing: "Duke përfunduar dhe verifikuar videon…",

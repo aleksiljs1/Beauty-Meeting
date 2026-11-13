@@ -55,9 +55,10 @@ export function CreateStudentDialog({ defaultOpen = false, courses }: { defaultO
 
   const submit = form.handleSubmit(async (values) => {
     const body = { ...values, courseIds: [...courseIds], addToUpcoming };
-    const result = await run(() => apiSend<{ student: { email: string }; mailSent: boolean; lessonsAdded: number }>("post", "/admin/students", body));
+    const result = await run(() => apiSend<{ student: { email: string }; mailSent: boolean; lessonsAdded: number; incomplete?: boolean }>("post", "/admin/students", body));
     if (!result) return;
     const lessons = result.lessonsAdded ? ` ${t.create.lessonsAdded(result.lessonsAdded)}` : "";
+    if (result.incomplete) toast.warning(t.create.incomplete);
     if (result.mailSent) toast.success(t.create.success(result.student.email) + lessons);
     else toast.warning(t.create.mailFailed + lessons);
     form.reset();

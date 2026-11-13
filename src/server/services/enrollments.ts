@@ -5,6 +5,7 @@ import { prisma } from "@/server/db";
 import { ApiError } from "@/server/http";
 import { publishFeedChanged } from "@/server/realtime/publish";
 import { audit } from "./audit";
+import { notifyIfLive } from "./live";
 
 /**
  * Administrator enrolment management. Access itself is always decided by the central policy
@@ -52,6 +53,7 @@ export async function grantEnrollment(lessonId: string, userId: string, admin: A
     });
     await audit(admin.id, "enrollment.grant", "lesson", lessonId, { enrollmentId: created.id, userId });
     await publishFeedChanged([userId]);
+    await notifyIfLive([lessonId]);
     return created;
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
@@ -80,6 +82,7 @@ export async function restoreEnrollment(enrollmentId: string, admin: AppUser) {
   if (result.count === 0) return { id: enrollmentId };
   await audit(admin.id, "enrollment.regrant", "lesson", enrollment.lessonId, { enrollmentId, userId: enrollment.userId });
   await publishFeedChanged([enrollment.userId]);
+  await notifyIfLive([enrollment.lessonId]);
   return { id: enrollmentId };
 }
 

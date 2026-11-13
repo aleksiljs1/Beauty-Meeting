@@ -20,8 +20,17 @@ export const POST = route(async (request) => {
   const { courseIds = [], addToUpcoming = false, profile, ...account } = input;
   await assertCoursesExist([...new Set(courseIds)]); // before the account exists, so a bad id leaves nothing behind
   const student = await createAccount({ ...account, role: "student" }, admin.id);
-  if (profile) await saveStudentProfile(student.id, profile, admin);
-  const courses = courseIds.length ? await setStudentCourses(student.id, courseIds, admin, { addToUpcoming }) : null;
+  // The account exists from here: a later failure still sends the setup email and is reported,
+  // instead of a 500 that leaves a student with no courses and no way in.
+  let lessonsAdded = 0;
+  let incomplete = false;
+  try {
+    if (profile) await saveStudentProfile(student.id, profile, admin);
+    if (courseIds.length) ({ lessonsAdded } = await setStudentCourses(student.id, courseIds, admin, { addToUpcoming }));
+  } catch (error) {
+    console.error("[students] created but not completed", student.id, error);
+    incomplete = true;
+  }
   let mailSent = true;
   try {
     await sendAccountSetupEmail(student);
@@ -31,5 +40,5 @@ export const POST = route(async (request) => {
     console.error("[mail] setup email failed", student.id, error);
     mailSent = false;
   }
-  return ok({ student, mailSent, lessonsAdded: courses?.lessonsAdded ?? 0 }, { status: 201 });
+  return ok({ student, mailSent, lessonsAdded, incomplete }, { status: 201 });
 });

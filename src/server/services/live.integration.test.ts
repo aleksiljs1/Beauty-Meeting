@@ -1,8 +1,10 @@
 import "dotenv/config";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createLesson, createUser, resetDatabase } from "@/test/fixtures";
 
-const { dismissNotification, getLiveFeed, markLessonEnded, markLessonLive, markNotificationsRead } = await import("./live");
+const { applyMeetingStarted, dismissNotification, getLiveFeed, markLessonEnded, markLessonLive, markNotificationsRead } = await import("./live");
+const { grantEnrollment } = await import("./enrollments");
+const { enrollStudents } = await import("./course-members");
 const { endLiveLesson, setLessonPublication } = await import("./lessons");
 const { getAdminDashboard, getAdminLesson } = await import("@/server/queries/admin");
 const { getClassroom } = await import("@/server/queries/portal");
@@ -81,6 +83,40 @@ describe("live lesson alerts", () => {
     await new Promise((resolve) => setTimeout(resolve, 500));
     expect(await inbox(enrolled.email)).toHaveLength(1);
     expect(await inbox(revoked.email)).toHaveLength(0);
+  });
+
+  it("tells a student enrolled during the class, without telling the others twice", async () => {
+    const lesson = await demoLessonStartingNow();
+    const [early, late, viaRoster] = await Promise.all([1, 2, 3].map(() => createUser("student")));
+    await enroll(lesson.id, early.id);
+    await markLessonLive(lesson.id, "demo", admin.id);
+
+    await grantEnrollment(lesson.id, late.id, admin);
+    await enrollStudents(lesson.id, [viaRoster.id], admin);
+
+    const notices = await prisma.notification.findMany({ where: { lessonId: lesson.id, type: "LESSON_LIVE" }, select: { userId: true } });
+    expect(notices.map((n) => n.userId).sort()).toEqual([early.id, late.id, viaRoster.id].sort());
+    expect((await getLiveFeed(late)).notifications[0]).toMatchObject({ type: "LESSON_LIVE", active: true });
+  });
+
+  it("finishes telling the students when Zoom retries a 'started' event that failed halfway", async () => {
+    const lesson = await createLesson(admin.id, { scheduledStartAt: new Date(Date.now() - MIN), meetingStatus: "SCHEDULED" });
+    const student = await createUser("student");
+    await enroll(lesson.id, student.id);
+    const startedAt = new Date();
+
+    // First delivery: the lesson goes live, then telling the students fails.
+    const spy = vi.spyOn(prisma.notification, "createManyAndReturn").mockRejectedValueOnce(new Error("database hiccup"));
+    await expect(applyMeetingStarted(lesson.id, startedAt)).rejects.toThrow("database hiccup");
+    spy.mockRestore();
+    expect(await prisma.notification.count({ where: { type: "LESSON_LIVE" } })).toBe(0);
+
+    // Zoom's retry: the lesson is already live, but the students are told now.
+    expect(await applyMeetingStarted(lesson.id, startedAt)).toBe("applied");
+    expect(await prisma.notification.count({ where: { userId: student.id, type: "LESSON_LIVE" } })).toBe(1);
+    // A later duplicate changes nothing.
+    await applyMeetingStarted(lesson.id, startedAt);
+    expect(await prisma.notification.count({ where: { type: "LESSON_LIVE" } })).toBe(1);
   });
 
   it("catches up after login: a student who signs in mid-lesson still sees the live alert", async () => {

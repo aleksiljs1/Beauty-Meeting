@@ -48,6 +48,8 @@ export function ProtectedVideo({
   const stale = useRef(false);
   const loadRef = useRef<(preserve: boolean) => Promise<void>>(async () => undefined);
   const requestRef = useRef(requestGrant);
+  /** Gone from the page: a grant that comes back late must not schedule renewals forever. */
+  const unmounted = useRef(false);
 
   useEffect(() => {
     requestRef.current = requestGrant;
@@ -55,6 +57,7 @@ export function ProtectedVideo({
 
   /** Renews now when nothing is playing, otherwise when the viewer next pauses. */
   const markStale = () => {
+    if (unmounted.current) return;
     stale.current = true;
     const video = videoRef.current;
     if (!video || video.paused || video.ended) void loadRef.current(true);
@@ -72,11 +75,13 @@ export function ProtectedVideo({
       if (!preserve) setStatus("loading");
       try {
         const grant = await requestRef.current();
+        if (unmounted.current) return;
         stale.current = false;
         setSrc(grant.url);
         setStatus("ready");
         renewTimer.current = setTimeout(markStale, grantRenewDelayMs(grant.expiresInSeconds));
       } catch (error) {
+        if (unmounted.current) return;
         const code = error instanceof ApiClientError ? error.code : null;
         if (code === "LESSON_ACCESS_EXPIRED" || code === "LESSON_NOT_AVAILABLE" || code === "NOT_FOUND") {
           setStatus("expired");
@@ -97,8 +102,12 @@ export function ProtectedVideo({
 
   // A grant handed in by the caller is renewed on the same schedule as one fetched here.
   useEffect(() => {
+    unmounted.current = false;
     if (initialGrant) renewTimer.current = setTimeout(markStale, grantRenewDelayMs(initialGrant.expiresInSeconds));
-    return () => clearTimeout(renewTimer.current);
+    return () => {
+      unmounted.current = true;
+      clearTimeout(renewTimer.current);
+    };
     // Only the grant present at mount; later grants are scheduled by `load`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

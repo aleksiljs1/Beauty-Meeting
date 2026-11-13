@@ -131,9 +131,10 @@ export function SeriesActions({
   const url = `/admin/series/${seriesId}`;
 
   async function remove(upcomingOnly: boolean) {
-    const result = await run(() => apiSend<{ count: number }>("delete", upcomingOnly ? `${url}?te-ardhshme=1` : url), { refresh: upcomingOnly && upcoming < total });
+    const result = await run(() => apiSend<{ count: number; zoomWarning: string | null }>("delete", upcomingOnly ? `${url}?te-ardhshme=1` : url), { refresh: upcomingOnly && upcoming < total });
     if (!result) return;
     toast.success(t.deleted(result.count));
+    if (result.zoomWarning) toast.warning(result.zoomWarning, { duration: 15_000 });
     if (!upcomingOnly || upcoming === total) router.push("/admin/mesimet");
   }
 

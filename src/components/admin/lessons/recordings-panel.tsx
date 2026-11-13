@@ -10,7 +10,7 @@ import { formatBytes, UploadAbortedError, uploadParts } from "@/components/admin
 import { errorMessage, useApiAction } from "@/components/admin/use-api-action";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ApiClientError, apiSend } from "@/lib/api/client";
+import { ApiClientError, apiSend, UPLOAD_FINISH_TIMEOUT_MS } from "@/lib/api/client";
 import { formatDateTime } from "@/lib/datetime";
 import { admin } from "@/i18n/admin";
 import { declaredMimeFor } from "@/server/storage/file-types";
@@ -49,7 +49,7 @@ async function uploadRecording(lessonId: string, file: File, signal: AbortSignal
     signal,
     onProgress,
   });
-  return apiSend<{ status: "READY" }>("post", `/admin/recordings/${started.recordingId}/complete`, { parts });
+  return apiSend<{ status: "READY" }>("post", `/admin/recordings/${started.recordingId}/complete`, { parts }, { timeoutMs: UPLOAD_FINISH_TIMEOUT_MS });
 }
 
 type Progress = { name: string; loaded: number; total: number; phase: "upload" | "finish" };

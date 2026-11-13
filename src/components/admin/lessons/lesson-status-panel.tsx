@@ -151,7 +151,8 @@ export function LessonStatusPanel({
             confirmLabel={t.deleteLesson}
             destructive
             onConfirm={async () => {
-              const done = await run(() => apiSend("delete", `/admin/lessons/${lesson.id}`), { success: t.deleted, refresh: false });
+              const done = await run(() => apiSend<{ zoomWarning: string | null }>("delete", `/admin/lessons/${lesson.id}`), { success: t.deleted, refresh: false });
+              if (done?.zoomWarning) toast.warning(done.zoomWarning, { duration: 15_000 });
               if (done) router.push("/admin/mesimet");
             }}
           />

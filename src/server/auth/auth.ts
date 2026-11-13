@@ -3,6 +3,7 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
 import { APIError, createAuthMiddleware } from "better-auth/api";
+import { getIP } from "@better-auth/core/utils/ip";
 import { admin, jwt } from "better-auth/plugins";
 import { prisma } from "@/server/db";
 import { env, isProduction } from "@/server/env";
@@ -85,7 +86,8 @@ export const auth = betterAuth({
       const scope = ctx.path === "/sign-in/email" ? "sign-in" : ctx.path === "/request-password-reset" ? "reset" : null;
       const email: unknown = ctx.body?.email;
       if (!scope || typeof email !== "string") return;
-      if (!(await allowEmailAttempt(scope, email))) {
+      const ip = getIP(ctx.request ?? ctx.headers ?? new Headers(), ctx.context.options);
+      if (!(await allowEmailAttempt(scope, email, ip))) {
         throw new APIError("TOO_MANY_REQUESTS", { message: "Too many attempts for this account. Try again later." });
       }
     }),
