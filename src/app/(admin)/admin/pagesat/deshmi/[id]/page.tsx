@@ -47,7 +47,9 @@ export default async function ReceiptPage({ params }: PageProps<"/admin/pagesat/
         <PrintButton label={t.print} />
       </div>
 
-      <article className="space-y-8 rounded-md border bg-card p-8 print:border-0 print:p-0">
+      {/* On paper: black on white, whatever the screen theme (the site is dark). */}
+      <article className="space-y-8 rounded-md border bg-card p-8 print:border-0 print:bg-white print:p-0 print:text-black print:[&_*]:border-black/30 print:[&_*]:text-black">
+
         <header className="flex flex-wrap items-start justify-between gap-4 border-b pb-6">
           <div>
             <p className="font-heading text-2xl">{academy.name}</p>

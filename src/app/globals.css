@@ -192,6 +192,14 @@
  */
 
 /* Warm light behind the top of the page; stays put while scrolling. */
+/* Paper is white: a printed page (e.g. a payment confirmation) drops the dark theme's background. */
+@media print {
+  html,
+  body {
+    background: #fff !important;
+  }
+}
+
 @utility ambient-glow {
   background-image:
     radial-gradient(70rem 32rem at 50% -12rem, rgb(216 175 80 / 0.1), transparent 70%),
