@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { BarChart3, BookOpen, CalendarDays, CircleHelp, FolderOpen, History, LayoutDashboard, LogOut, Menu, PanelsTopLeft, Plug, Settings, Star, UserRound, Users, Wallet } from "lucide-react";
+import { ChatButton, ChatSidebar } from "@/components/chat/chat-sidebar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -132,7 +133,10 @@ export function AdminShell({ user, children }: { user: { name: string; email: st
         <nav aria-label={admin.shell.navLabel} className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
           <NavLinks />
         </nav>
-        <div className="border-t pt-3">{userMenu}</div>
+        <div className="grid gap-1 border-t pt-3">
+          <ChatButton withLabel />
+          {userMenu}
+        </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -155,13 +159,17 @@ export function AdminShell({ user, children }: { user: { name: string; email: st
             </SheetContent>
           </Sheet>
           {SHOW_BRAND_NAME && <span className="font-heading text-lg">{common.brandFallback}</span>}
-          {userMenu}
+          <div className="flex items-center gap-1">
+            <ChatButton />
+            {userMenu}
+          </div>
         </header>
         <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
           <ClassAlertBanner />
           {children}
         </main>
       </div>
+      <ChatSidebar />
     </div>
   );
 }

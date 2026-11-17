@@ -79,7 +79,7 @@ Original brief: `c:\Users\aleksiljs\Downloads\Beauty_Academy_Zoom_Claude_Megapro
 
   token re-sent before expiry, expired sockets disconnected. Fan-in via Postgres LISTEN/NOTIFY (no Redis).
 
-  Events carry no data ("feed:changed"); clients refetch the policy-checked API. Resync on (re)connect + slow safety poll.
+  Events carry no data ("feed:changed", and since 2026-11-17 "chat:changed" for the chat); clients refetch the policy-checked API. Resync on (re)connect + slow safety poll.
 
   Open student lesson pages also re-render on any signal (user request, 2026-10-27): uploading, renaming,
 
@@ -476,3 +476,40 @@ From a full read-only review (student journey, admin workflows, structure, secur
   on phones a PDF opens in a new browser tab whose save option can't be hidden. **Word/PowerPoint files have no
   in-page viewer**, so with downloads off students can't open them at all (they see a message): upload such
   materials as PDF. Lesson recordings were already view-only (`controlsList="nodownload"`) and are unchanged.
+
+## In-page chat (client request, 2026-11-17)
+
+- **Why:** the client wants to stop using WhatsApp. Designed by the client: **everyone can message everyone**
+  (students ↔ students ↔ admins), text only (no calls, no media), real time. Scoping/monitoring may come later.
+- **UI:** plane icon (✈) with an unread badge. Portal: next to the bell. Admin: "Mesazhet" in the side menu (desktop),
+  icon in the top bar (phones). It opens a **sidebar** (full screen on phones) with the chat list (pinned first,
+  then newest), "Bisedë e re" (search every active account by name), and the open chat: bubbles, date lines,
+  "Parë" under my last message once read, older messages on demand, Enter sends / Shift+Enter new line.
+  Toast "Mesazh i ri nga …" with "Hap" for a message in a chat that isn't open. Code: `components/chat/`,
+  shared store `hooks/use-chat.ts`, texts `i18n/chat.ts`.
+- **Database** (migration `20261117175006_chat_tables`): `Conversation` (type DIRECT/GROUP, `directKey` = the two
+  user ids sorted and joined, unique → one chat per pair even if both start it at once; `lastMessageAt` sorts the
+  list), `ConversationMember` (per person: `lastReadAt` → unread counts and "Parë"; `pinnedAt`; `hiddenAt` +
+  `clearedAt` → "delete for me"; `joinedAt`/`leftAt`/`role` for groups later), `Message` (text, `deletedAt` and
+  `editedAt` ready but unused). GROUP chats exist in the schema only; the UI and API do direct chats.
+- **Rules** (`services/chat.ts`, `queries/chat.ts`): only members read/write a chat (others get the same
+  "Biseda nuk u gjet." as for a missing chat); deactivated accounts can't be found or messaged; messages 1–2,000
+  characters (`lib/chat.ts`, shared with the composer's counter); max 30 messages/minute per person.
+  "Delete for me" hides the chat and its history for that person only; a new message brings the chat back with
+  the new messages only. A deleted account's messages stay, shown as "Përdorues i fshirë".
+- **API** (`/api/v1/chats`): `GET` list + unread total · `POST` start/open a chat · `GET people?q=` ·
+  `PATCH [id]` pin/unpin/delete for me · `GET|POST [id]/messages` (paged with `?before=`) · `POST [id]/read`.
+- **Real time — the realtime service must be running** (`npm run realtime` in a second terminal next to
+  `npm run dev`; health check http://localhost:3100/health). It is both a **WebSocket server** for the browsers
+  (Socket.IO, port 3100) and a **listener on the database** (Postgres LISTEN on channel `academy_realtime`).
+  After every message/read/pin the API publishes a "chat" signal with the affected user ids (pg_notify); the
+  service pushes `chat:changed` to those users' sockets; their open chat and badge refetch through the API
+  (~0.05–0.2 s end to end locally). Chat signals are separate from `feed:changed` on purpose: the portal
+  re-renders pages on feed signals, which a chat message must not do. Without the service, chat still works
+  but only updates on focus, after sending, or every 60 s. Browsers opened before it started: reload them.
+  No Redis needed (one service instance; Postgres does the fan-in). Redis would only matter with several
+  realtime instances behind a load balancer.
+- **Open questions (client):** keep or remove a deleted account's messages (kept for now); "delete a message for
+  everyone" (not built); group chats; email for unread messages; chat items in the bell's list (not linked).
+- **Tests:** `services/chat.integration.test.ts` (14), realtime delivery test in `realtime.integration.test.ts`.
+  Run tests from `C:\…` (uppercase drive), not `c:\…` — see IMPLEMENTATION_STATUS.md.

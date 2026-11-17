@@ -24,7 +24,9 @@ export type TokenClaims = { userId: string; exp: number };
 export type VerifyToken = (token: string) => Promise<TokenClaims | null>;
 
 type SocketData = { userId: string; exp: number };
-type ServerToClient = { "feed:changed": () => void };
+/** "feed": lessons/notifications changed. "chat": a chat changed (new message, read, pin…). */
+type ServerToClient = { "feed:changed": () => void; "chat:changed": () => void };
+export type SignalKind = "feed" | "chat";
 type ClientToServer = { reauth: (token: unknown, ack?: (ok: boolean) => void) => void };
 type AppSocket = Socket<ClientToServer, ServerToClient, Record<string, never>, SocketData>;
 
@@ -37,14 +39,14 @@ export type RealtimeOptions = {
   expirySweepMs?: number;
 };
 
-export function parseNotification(payload: string | undefined): string[] | "all" | null {
+export function parseNotification(payload: string | undefined): { kind: SignalKind; users: string[] } | "all" | null {
   if (!payload) return null;
   try {
     const message = JSON.parse(payload) as { type?: unknown; users?: unknown };
     if (message.type === "resync") return "all";
-    if (message.type !== "feed" || !Array.isArray(message.users)) return null;
+    if ((message.type !== "feed" && message.type !== "chat") || !Array.isArray(message.users)) return null;
     const users = message.users.filter((u): u is string => typeof u === "string" && u.length > 0 && u.length <= 64);
-    return users.length ? users.slice(0, 500) : null;
+    return users.length ? { kind: message.type, users: users.slice(0, 500) } : null;
   } catch {
     return null;
   }
@@ -115,9 +117,13 @@ export function createRealtimeServer(options: RealtimeOptions) {
   let hasConnectedBefore = false;
   let reconnectTimer: NodeJS.Timeout | null = null;
 
-  function dispatch(target: string[] | "all") {
-    if (target === "all") io.emit("feed:changed");
-    else io.to(target.map((id) => `user:${id}`)).emit("feed:changed");
+  function dispatch(target: { kind: SignalKind; users: string[] } | "all") {
+    if (target === "all") {
+      io.emit("feed:changed");
+      io.emit("chat:changed");
+    } else {
+      io.to(target.users.map((id) => `user:${id}`)).emit(target.kind === "chat" ? "chat:changed" : "feed:changed");
+    }
   }
 
   function scheduleReconnect() {

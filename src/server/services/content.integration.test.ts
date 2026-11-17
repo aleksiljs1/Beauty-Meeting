@@ -106,11 +106,28 @@ describe("lesson materials", () => {
   });
 });
 
+describe("downloads switch", () => {
+  it("refuses student downloads while the lesson's switch is off; admins can always download", async () => {
+    const { fileId, materialId } = await uploadMaterial(pdf);
+    await files.finishFileUpload(admin, fileId);
+
+    // Off by default: viewing still works, downloading doesn't.
+    expect(await materials.listMaterials(student, lesson.id)).toMatchObject([{ downloadable: false }]);
+    await expect(materials.grantMaterialAccess(student, lesson.id, materialId, "view")).resolves.toHaveProperty("url");
+    await expect(materials.grantMaterialAccess(student, lesson.id, materialId, "download")).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(materials.grantMaterialAccess(admin, lesson.id, materialId, "download")).resolves.toHaveProperty("url");
+
+    await prisma.lesson.update({ where: { id: lesson.id }, data: { allowDownloads: true } });
+    expect(await materials.listMaterials(student, lesson.id)).toMatchObject([{ downloadable: true }]);
+    await expect(materials.grantMaterialAccess(student, lesson.id, materialId, "download")).resolves.toHaveProperty("url");
+  });
+});
+
 describe("materials library", () => {
   it("reuses one uploaded file in another lesson without uploading it again", async () => {
     const { fileId } = await uploadMaterial(pdf);
     await files.finishFileUpload(admin, fileId);
-    const next = await createLesson(admin.id);
+    const next = await createLesson(admin.id, { allowDownloads: true });
     await prisma.lessonEnrollment.create({ data: { lessonId: next.id, userId: student.id, source: "ADMIN" } });
 
     await materials.attachFiles(admin, next.id, [fileId]);
@@ -210,8 +227,9 @@ describe("video materials (MP4, multipart)", () => {
     expect(range.headers.get("content-disposition")).toMatch(/^inline/);
     expect(new TextDecoder().decode(await range.arrayBuffer())).toBe("ftypisom");
 
-    // Downloading: an attachment with the usual 60 s grant.
-    const download = await materials.grantMaterialAccess(student, lesson.id, materialId, "download");
+    // Downloading (the lesson allows it): an attachment with the usual 60 s grant.
+    await prisma.lesson.update({ where: { id: lesson.id }, data: { allowDownloads: true } });
+    const download =await materials.grantMaterialAccess(student, lesson.id, materialId, "download");
     expect(new URL(download.url).searchParams.get("X-Amz-Expires")).toBe("60");
     const file = await fetch(download.url);
     expect(file.headers.get("content-disposition")).toMatch(/^attachment/);

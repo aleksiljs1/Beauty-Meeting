@@ -5,7 +5,8 @@ import { onSignedOut } from "@/lib/api/auth-events";
 
 /**
  * One Socket.IO connection per tab, shared by every component that needs live updates.
- * The server only sends "feed:changed" signals; listeners refetch through the normal API.
+ * The server only sends "feed:changed" and "chat:changed" signals (no data); listeners refetch
+ * through the normal API.
  * The connection authenticates with the in-memory access token and re-sends a fresh one
  * before it expires (the server disconnects sockets with expired tokens).
  */
@@ -24,11 +25,17 @@ let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let retryDelay = MIN_RETRY_MS;
 let lastToken: string | null = null;
 const listeners = new Set<Listener>();
+/** Chat listeners are separate: chat signals must not trigger the feed's page refreshes. */
+const chatListeners = new Set<Listener>();
 
 function notify(reason: "connected" | "changed") {
   // Spread refetches when a whole class receives the same signal at once.
   const delay = reason === "changed" ? Math.random() * MAX_JITTER_MS : 0;
   setTimeout(() => listeners.forEach((listener) => listener(reason)), delay);
+}
+
+function notifyChat(reason: "connected" | "changed") {
+  chatListeners.forEach((listener) => listener(reason));
 }
 
 function connect() {
@@ -52,8 +59,10 @@ function connect() {
   socket.on("connect", () => {
     retryDelay = MIN_RETRY_MS;
     notify("connected");
+    notifyChat("connected");
   });
   socket.on("feed:changed", () => notify("changed"));
+  socket.on("chat:changed", () => notifyChat("changed"));
   // Socket.IO only retries by itself after network drops. When the server closes the socket
   // (expired token, failed reauth) or rejects the handshake, it stays down: retry ourselves.
   socket.on("disconnect", (reason) => {
@@ -110,8 +119,22 @@ export function subscribeRealtime(listener: Listener): () => void {
   connect();
   return () => {
     listeners.delete(listener);
-    if (listeners.size === 0) disconnectRealtime();
+    disconnectIfUnused();
   };
+}
+
+/** Subscribe to chat signals ("a chat of mine changed"); shares the tab's one connection. */
+export function subscribeChat(listener: Listener): () => void {
+  chatListeners.add(listener);
+  connect();
+  return () => {
+    chatListeners.delete(listener);
+    disconnectIfUnused();
+  };
+}
+
+function disconnectIfUnused() {
+  if (listeners.size === 0 && chatListeners.size === 0) disconnectRealtime();
 }
 
 export function isRealtimeConnected() {

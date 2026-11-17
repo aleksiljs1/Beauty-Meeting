@@ -47,6 +47,9 @@ model User {
   lessonReminders    AdminLessonReminder[]
   attendance         LessonAttendance[]
   feedback           Feedback[]
+  conversationsStarted Conversation[]       @relation("ConversationCreator")
+  conversationMembers  ConversationMember[]
+  messagesSent         Message[]            @relation("MessageSender")
 
   @@unique([email])
   @@map("user")
@@ -739,4 +742,82 @@ model Feedback {
   @@index([lessonId])
   @@index([courseId])
   @@index([topic, createdAt])
+}
+
+// --- Chat --------------------------------------------------------------------------------------
+
+enum ConversationType {
+  DIRECT
+  GROUP
+}
+
+/// Only used by group chats (who can rename the group or add/remove people).
+enum MemberRole {
+  OWNER
+  MEMBER
+}
+
+///This table will be used to house conversations and conversation meta-data
+model Conversation {
+  id            String           @id @default(uuid(7)) @db.Uuid
+  type          ConversationType
+  /// Direct chats only: the two user ids sorted and joined ("idA:idB"), so a pair has one chat.
+  directKey     String?          @unique
+  /// Group name; empty for direct chats (they show the other person's name).
+  title         String?
+  createdById   String?
+  createdBy     User?            @relation("ConversationCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  /// Newest message time: sorts the chat list without scanning messages.
+  lastMessageAt DateTime?        @db.Timestamptz(3)
+  createdAt     DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime         @updatedAt @db.Timestamptz(3)
+
+  members  ConversationMember[]
+  messages Message[]
+
+  @@index([lastMessageAt])
+}
+
+///This table will keep the Conversation Members and keep track of relations
+model ConversationMember {
+  id             String       @id @default(uuid(7)) @db.Uuid
+  conversationId String       @db.Uuid
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           MemberRole   @default(MEMBER)
+  /// Read receipts and unread counts: messages older than this have been seen by this member.
+  lastReadAt     DateTime?    @db.Timestamptz(3)
+  /// Set = pinned (for this member only).
+  pinnedAt       DateTime?    @db.Timestamptz(3)
+  /// "Delete for me": hidden from this member's list until a newer message arrives.
+  hiddenAt       DateTime?    @db.Timestamptz(3)
+  /// "Delete for me": messages older than this stay hidden for this member.
+  clearedAt      DateTime?    @db.Timestamptz(3)
+  joinedAt       DateTime     @default(now()) @db.Timestamptz(3)
+  /// Group chats only: left or removed.
+  leftAt         DateTime?    @db.Timestamptz(3)
+
+  @@unique([conversationId, userId])
+  @@index([userId, hiddenAt])
+}
+
+///This table will keep every message sent in a conversation
+model Message {
+  id             String       @id @default(uuid(7)) @db.Uuid
+  conversationId String       @db.Uuid
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  /// Null when the sender's account was deleted (shown as a deleted user).
+  senderId       String?
+  sender         User?        @relation("MessageSender", fields: [senderId], references: [id], onDelete: SetNull)
+  /// Text only; the maximum length is enforced by the API.
+  body           String
+  createdAt      DateTime     @default(now()) @db.Timestamptz(3)
+  /// Not used by the MVP: ready for editing later.
+  editedAt       DateTime?    @db.Timestamptz(3)
+  /// "Delete for everyone": the text is no longer shown.
+  deletedAt      DateTime?    @db.Timestamptz(3)
+
+  @@index([conversationId, createdAt])
+  @@index([senderId, createdAt])
 }

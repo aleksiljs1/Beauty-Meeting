@@ -12,9 +12,21 @@ const USERS_PER_MESSAGE = 150;
  * so a failure here never fails the business operation that triggered it.
  */
 export async function publishFeedChanged(userIds: Iterable<string>) {
+  await publish("feed", userIds);
+}
+
+/**
+ * Tells these users that one of their chats changed (new message, read receipt, pin…). A separate
+ * signal from the feed: the portal re-renders pages on feed signals, which a chat message must not do.
+ */
+export async function publishChatChanged(userIds: Iterable<string>) {
+  await publish("chat", userIds);
+}
+
+async function publish(type: "feed" | "chat", userIds: Iterable<string>) {
   const unique = [...new Set(userIds)];
   for (let i = 0; i < unique.length; i += USERS_PER_MESSAGE) {
-    const payload = JSON.stringify({ type: "feed", users: unique.slice(i, i + USERS_PER_MESSAGE) });
+    const payload = JSON.stringify({ type, users: unique.slice(i, i + USERS_PER_MESSAGE) });
     try {
       await prisma.$queryRaw`SELECT pg_notify(${CHANNEL}, ${payload})::text`;
     } catch (error) {

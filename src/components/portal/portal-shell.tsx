@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useSignOut } from "@/components/auth/use-sign-out";
+import { ChatButton, ChatSidebar } from "@/components/chat/chat-sidebar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -143,6 +144,7 @@ export function PortalShell({ user, academyName, children }: { user: { name: str
                 <House className="size-5" />
               </Link>
             </Button>
+            <ChatButton />
             <Button asChild variant="ghost" size="icon-lg" className="relative">
               <Link href="/portal/njoftimet" aria-label={t.notificationsLabel(unread)}>
                 <Bell className="size-5" />
@@ -235,6 +237,7 @@ export function PortalShell({ user, academyName, children }: { user: { name: str
 
       <LiveClassAlert aboveBottomNav />
       <Toaster position="top-center" />
+      <ChatSidebar />
     </div>
   );
 }

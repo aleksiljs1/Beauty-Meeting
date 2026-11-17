@@ -3,7 +3,11 @@ import { parseNotification } from "./server";
 
 describe("parseNotification", () => {
   it("accepts feed messages with user ids", () => {
-    expect(parseNotification(JSON.stringify({ type: "feed", users: ["a", "b"] }))).toEqual(["a", "b"]);
+    expect(parseNotification(JSON.stringify({ type: "feed", users: ["a", "b"] }))).toEqual({ kind: "feed", users: ["a", "b"] });
+  });
+
+  it("accepts chat messages with user ids", () => {
+    expect(parseNotification(JSON.stringify({ type: "chat", users: ["a"] }))).toEqual({ kind: "chat", users: ["a"] });
   });
 
   it("accepts resync broadcasts", () => {

@@ -37,6 +37,7 @@ How to run: `README.md` · How to test: `docs/testing.md` · Decisions: `NOTES.m
 - ✅ Live-class pop-up on public pages for signed-in students (lazy-loaded; anonymous visitors don't download it)
 - ✅ Admin portal: dashboard, students (create + setup email, Excel bulk import, deactivate/reactivate, resend), lessons CRUD/publish/cancel/archive/restore, roster & per-student deadlines, shared invitation links, material & multipart recording uploads, demo go-live/end/reset, integrations status, audit history (56 live API checks)
 - ✅ Excel student onboarding from the **Student i ri** dialog: in-memory `.xlsx` preview, required/unknown-column and row validation, duplicate-email checks, course-title matching, course membership/upcoming lesson assignment, and password setup emails; browser-tested by the user
+- ✅ In-page chat (everyone ↔ everyone, text only): sidebar from the ✈ icon (portal + admin), start/open chats, real-time delivery over the realtime service (`chat:changed`, needs `npm run realtime`), unread badge + toasts, "Parë", pin, delete for me — 14 integration tests + realtime test; browser-tested by the user 2026-11-17. See NOTES.md "In-page chat"
 - ✅ Material downloads switch per lesson ("Lejo shkarkimin e materialeve", off by default, existing lessons included): students view only, the server refuses download links; admins always download — verified against the local DB; browser QA pending (docs/testing.md). See NOTES.md "Material downloads switch"
 - ✅ Materials library (`/admin/materialet`): upload once, reuse in any lesson ("Nga materialet"); removing from a lesson keeps the file; existing materials migrated
 - ✅ Optional student details (phone, birth date → age, gender, city, private admin notes) on create and edit; shown in the list; search by phone
@@ -50,7 +51,7 @@ How to run: `README.md` · How to test: `docs/testing.md` · Decisions: `NOTES.m
   gallery cache shortened to 1 h. Verified live.
 
 ### Known issues / small follow-ups
-- ⬜ `npm test`: every unit test file fails before running ("Cannot read properties of undefined (reading 'config')" at the first `describe`), on unchanged code too (seen 2026-11-17) — cause not found yet
+- ⬜ Windows: tests crash before running ("Cannot read properties of undefined (reading 'config')" / "Vitest failed to find the runner") when started from a lowercase drive path (`c:\…`, e.g. VS Code's terminal), because vitest gets loaded twice. Run them from `C:\…` (e.g. `cd C:\Users\…\Beauty-Meeting` first) — they pass (found 2026-11-17)
 - ⬜ Integration tests share one `academy_test` DB → random failures if two runs overlap (give each worktree its own DB)
 - ⬜ Pages for lessons a student can't see return HTTP 200 with not-found content (streaming starts first); content is non-disclosing
 - ⬜ Shared `Sheet` close button has an English screen-reader label ("Close") — translate in `src/components/ui/sheet.tsx`

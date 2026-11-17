@@ -7,6 +7,7 @@ import { createRealtimeServer, REALTIME_PATH, type TokenClaims } from "./server"
 const { publishFeedChanged } = await import("@/server/realtime/publish");
 const { markLessonLive } = await import("@/server/services/live");
 const { removeMaterial } = await import("@/server/services/materials");
+const { sendMessage, startDirectChat } = await import("@/server/services/chat");
 const { prisma } = await import("@/server/db");
 
 const PORT = 3199;
@@ -110,6 +111,25 @@ describe("realtime service", () => {
     const strangerGot = nextEvent(strangerSocket, "feed:changed", 600);
     await removeMaterial(admin, material.id);
     expect(await got).toBe(true);
+    expect(await strangerGot).toBe(false);
+  });
+
+  it("delivers a chat message as 'chat:changed' to the chat's members only, never as a feed signal", async () => {
+    const [ana, besa, stranger] = [await createUser("student"), await createUser("student"), await createUser("student")];
+    const { id } = await startDirectChat(ana, { userId: besa.id });
+
+    tokens.set("besa", { userId: besa.id, exp: future() });
+    tokens.set("stranger", { userId: stranger.id, exp: future() });
+    const [besaSocket, strangerSocket] = [connect("besa"), connect("stranger")];
+    await Promise.all([connected(besaSocket), connected(strangerSocket)]);
+
+    const chatSignal = nextEvent(besaSocket, "chat:changed");
+    // A feed signal would make the portal re-render the page on every chat message.
+    const feedSignal = nextEvent(besaSocket, "feed:changed", 600);
+    const strangerGot = nextEvent(strangerSocket, "chat:changed", 600);
+    await sendMessage(ana, id, { body: "Përshëndetje!" });
+    expect(await chatSignal).toBe(true);
+    expect(await feedSignal).toBe(false);
     expect(await strangerGot).toBe(false);
   });
 
