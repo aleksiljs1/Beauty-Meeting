@@ -57,7 +57,7 @@ Emails (password setup/reset) arrive in **Mailpit: http://localhost:8025**.
 ### C. Student portal (as Ana)
 - [ ] Dashboard shows upcoming lessons and recent replays.
 - [ ] `Mësimet` filters: Të ardhshme / Live / Regjistrime / Skaduar. The expired lesson is listed but opens only as history (no materials).
-- [ ] Open the replay lesson → Materialet → "Shiko" opens the sample PDF inside the panel; "Shkarko" downloads it.
+- [ ] Open the replay lesson → Materialet → "Shiko" opens the sample PDF inside the panel. "Shkarko" downloads it only if the lesson's "Lejo shkarkimin e materialeve" switch is on (off by default; see "Material downloads switch" below).
 - [ ] Times show Tirana time with the zone (CET/CEST) and "Aksesi deri më …".
 - [ ] Profili → change password works; other sessions get signed out.
 
@@ -142,13 +142,25 @@ video (e.g. a large PDF), and a disallowed file (e.g. `.exe`, `.mov` or `.zip`).
 - [ ] Larger video (a few hundred MB): the upload continues if the Wi-Fi blips for a few seconds (parts are
       retried). In DevTools → Network you see several PUTs to `…partNumber=…`, not one huge PUT.
 - [ ] As Ana (enrolled) open the lesson → Materialet → "Shiko" on the video → it plays inside the panel;
-      seeking works. "Shkarko" downloads the `.mp4`.
+      seeking works. With the lesson's download switch on, "Shkarko" downloads the `.mp4`.
 - [ ] During a demo live class (`npm run demo -- live`, "Bashkohu"), play the video in the panel → the class
       stage does not reload. Switch to Info/Regjistrimet (or the "Klasa" tab on a phone) → the video pauses.
 - [ ] Leave the video paused/playing for more than 5 minutes → it keeps working (the URL is renewed in the
       background; DevTools shows a new `…/access` request before expiry).
 - [ ] As Sara (personal deadline): after her deadline passes, "Shiko"/"Shkarko" refuse with an Albanian
       message and an open video stops at its next renewal.
+
+### Material downloads switch (2026-11-17)
+Prepare: a lesson with a PDF and a Word file attached, published, with an enrolled student.
+- [ ] Admin → Mësimet → I ri: the switch "Lejo shkarkimin e materialeve" is there and **off**. The edit page
+      shows the saved position.
+- [ ] Student, switch off: "Shkarko" is dimmed, darker and can't be clicked; hovering shows "Shkarkimi nuk
+      lejohet për këtë mësim." "Shiko" still opens the PDF, with no save button in the viewer (desktop
+      Chrome/Edge). The Word file says it can't be opened. The PDF row says "Ky skedar shihet vetëm në faqe."
+- [ ] Admin turns the switch on and saves → student refreshes → "Shkarko" looks normal and both files download.
+- [ ] Switch off again → the admin can still download (lesson page Materialet, and the class page `/klasa/<id>`).
+- [ ] Optional, terminal: with the switch off, a student's
+      `POST /api/v1/lessons/<id>/materials/<materialId>/access` with `{"mode":"download"}` → 403 FORBIDDEN.
 
 ### G. Security spot checks (optional, terminal)
 ```bash

@@ -408,14 +408,16 @@ export const helpText = {
       id: "materialet",
       category: "files",
       title: "Ngarkoni materiale (PDF, foto, video)",
-      keywords: ["material", "pdf", "skedar", "dokument", "powerpoint", "word", "ngarko"],
+      keywords: ["material", "pdf", "skedar", "dokument", "powerpoint", "word", "ngarko", "shkarko", "shkarkim"],
       steps: [
         "Hapni mësimin → skeda “Materialet” → “Ngarko materiale” (ose tërhiqni skedarët aty).",
         "Prisni “Gati”: studentët shohin vetëm materialet e verifikuara.",
         "Renditini me shigjetat dhe riemërtojini që të jenë të qarta.",
+        "Që studentët t'i shkarkojnë, ndizni “Lejo shkarkimin e materialeve” te të dhënat e mësimit. Përndryshe i shohin vetëm në faqe.",
       ],
       tips: [
         { text: "PDF, PowerPoint, Word deri në 100 MB, foto deri në 50 MB, video MP4 deri në 4 GB." },
+        { text: "Pa shkarkim, Word dhe PowerPoint nuk hapen dot nga studentët: ngarkojini si PDF." },
         { text: "Të gjitha materialet e ngarkuara, nga çdo mësim, i gjeni te “Materialet” në menu." },
       ],
       link: { href: "/admin/mesimet", label: "Hap mësimet" },

@@ -80,7 +80,8 @@ ftesat, materialet, regjistrimet), `/admin/permbajtja/**`, `/admin/integrimet`, 
 - Live: `markLessonLive`/`markLessonEnded` (demo source only for `isDemo` lessons), `getLiveFeed`,
   `dismissNotification`, `markNotificationsRead` (`services/live.ts`).
 - Materials: `startMaterialUpload` → browser PUT to `uploadUrl` with `headers` → `finishMaterialUpload`;
-  `listMaterials`, `grantMaterialAccess`, `deleteMaterial`.
+  `listMaterials`, `grantMaterialAccess`, `deleteMaterial`. Student downloads only when the lesson's
+  `allowDownloads` is on (otherwise `grantMaterialAccess` with `mode: "download"` → `FORBIDDEN`); admins always.
 - Recordings: `startRecordingUpload` → `presignRecordingParts` → browser PUT each part (collect
   `ETag` response header) → `completeRecordingUpload` / `abortRecordingUpload`; `listRecordings`,
   `grantRecordingPlayback` (5-min URL: the player must request a new grant before expiry or on error,

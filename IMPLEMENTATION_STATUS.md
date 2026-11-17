@@ -1,7 +1,7 @@
 # Implementation status
 
 Single source of truth for progress. Update at the end of every work session / stage.
-Last updated: 2026-10-28
+Last updated: 2026-11-17
 Legend: ✅ done & verified · 🟡 in progress · ⬜ not started · ⛔ blocked (reason)
 
 How to run: `README.md` · How to test: `docs/testing.md` · Decisions: `NOTES.md`
@@ -37,6 +37,7 @@ How to run: `README.md` · How to test: `docs/testing.md` · Decisions: `NOTES.m
 - ✅ Live-class pop-up on public pages for signed-in students (lazy-loaded; anonymous visitors don't download it)
 - ✅ Admin portal: dashboard, students (create + setup email, Excel bulk import, deactivate/reactivate, resend), lessons CRUD/publish/cancel/archive/restore, roster & per-student deadlines, shared invitation links, material & multipart recording uploads, demo go-live/end/reset, integrations status, audit history (56 live API checks)
 - ✅ Excel student onboarding from the **Student i ri** dialog: in-memory `.xlsx` preview, required/unknown-column and row validation, duplicate-email checks, course-title matching, course membership/upcoming lesson assignment, and password setup emails; browser-tested by the user
+- ✅ Material downloads switch per lesson ("Lejo shkarkimin e materialeve", off by default, existing lessons included): students view only, the server refuses download links; admins always download — verified against the local DB; browser QA pending (docs/testing.md). See NOTES.md "Material downloads switch"
 - ✅ Materials library (`/admin/materialet`): upload once, reuse in any lesson ("Nga materialet"); removing from a lesson keeps the file; existing materials migrated
 - ✅ Optional student details (phone, birth date → age, gender, city, private admin notes) on create and edit; shown in the list; search by phone
 - ✅ Repeating lessons: one form creates the same lesson (and students) on chosen weekdays until a date, keeping the Tirana clock time across DST; max 100
@@ -49,6 +50,7 @@ How to run: `README.md` · How to test: `docs/testing.md` · Decisions: `NOTES.m
   gallery cache shortened to 1 h. Verified live.
 
 ### Known issues / small follow-ups
+- ⬜ `npm test`: every unit test file fails before running ("Cannot read properties of undefined (reading 'config')" at the first `describe`), on unchanged code too (seen 2026-11-17) — cause not found yet
 - ⬜ Integration tests share one `academy_test` DB → random failures if two runs overlap (give each worktree its own DB)
 - ⬜ Pages for lessons a student can't see return HTTP 200 with not-found content (streaming starts first); content is non-disclosing
 - ⬜ Shared `Sheet` close button has an English screen-reader label ("Close") — translate in `src/components/ui/sheet.tsx`

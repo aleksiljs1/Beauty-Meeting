@@ -456,3 +456,23 @@ From a full read-only review (student journey, admin workflows, structure, secur
     recording-file delete scope only if `ZOOM_RECORDINGS_AFTER_IMPORT=trash`. Names as listed in Zoom's scope picker.
 - Migration `20261105150000_zoom_recordings_attendance`. Tests: `zoom/recording-files.test.ts`,
   `lib/attendance.test.ts`, `zoom/zoom-recordings.integration.test.ts` (fake Zoom, real storage).
+
+## Material downloads switch per lesson (client request, 2026-11-17)
+
+- **Why:** the client doesn't want the course to work "offline-ish": students downloading what they need and
+  leaving. Downloads are now a per-lesson choice, **off by default**.
+- **Lesson form** (create and edit): switch **"Lejo shkarkimin e materialeve"** → `Lesson.allowDownloads`
+  (migration `20261117143230_lesson_allow_downloads`, `BOOLEAN NOT NULL DEFAULT false`). Existing lessons
+  were migrated to **off** too: to give students downloads on one, edit it and turn the switch on.
+  Repeating lessons take the value chosen at creation; the series edit page has no switch (edit each date).
+- **Enforced on the server, not only in the UI:** `grantMaterialAccess(…, "download")` throws `FORBIDDEN`
+  ("Shkarkimi i materialeve nuk lejohet për këtë mësim.") for a student when the lesson's switch is off, so
+  calling the API directly doesn't get around the disabled button. Admins can always download.
+  `listMaterials` returns `downloadable` per material for the UI.
+- **Student UI** (`materials-panel.tsx`): "Shkarko" stays visible but switched off (dimmed, darker, greyed,
+  "not allowed" tooltip). "Shiko" still works for PDF, images and MP4. The PDF viewer opens with
+  `#toolbar=0` (hides the browser's save button in desktop Chrome/Edge).
+- **Limits (told to the client):** viewing is still possible, so screenshots/screen recording can't be stopped;
+  on phones a PDF opens in a new browser tab whose save option can't be hidden. **Word/PowerPoint files have no
+  in-page viewer**, so with downloads off students can't open them at all (they see a message): upload such
+  materials as PDF. Lesson recordings were already view-only (`controlsList="nodownload"`) and are unchanged.
