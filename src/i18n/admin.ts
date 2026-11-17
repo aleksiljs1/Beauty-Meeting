@@ -438,6 +438,9 @@ export const admin = {
     isDemo: "Klasë demo (pa Zoom)",
     isDemoHint: "Mësim i shënuar qartë si demo, me simulim të fillimit dhe përfundimit.",
     isDemoLocked: "Nuk mund të ndryshohet ndërsa mësimi është live.",
+    allowDownloads: "Lejo shkarkimin e materialeve",
+    allowDownloadsHint:
+      "Kur është fikur, studentët i shohin materialet vetëm në faqe (PDF, foto, video) dhe nuk mund t'i shkarkojnë. Skedarët Word dhe PowerPoint nuk mund të hapen pa shkarkim.",
     create: "Krijo mësimin",
     save: "Ruaj ndryshimet",
     created: "Mësimi u krijua si draft.",

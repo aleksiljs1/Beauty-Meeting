@@ -17,9 +17,17 @@ import { PLAYBACK_URL_TTL_SECONDS } from "./recordings";
  * keeps the file in the library.
  */
 
+/** Admins can always download; students only when the lesson allows it. */
+async function canDownload(user: AppUser, lessonId: string) {
+  if (user.role === "admin") return true;
+  const lesson = await prisma.lesson.findUnique({ where: { id: lessonId }, select: { allowDownloads: true } });
+  return lesson?.allowDownloads ?? false;
+}
+
 /** Students (and admins): a lesson's materials. Students see READY files only. */
 export async function listMaterials(user: AppUser, lessonId: string) {
   await requireLessonCapability(user, lessonId, "VIEW_CONTENT");
+  const downloadable = await canDownload(user, lessonId);
   const rows = await prisma.lessonMaterial.findMany({
     where: { lessonId, ...(user.role === "admin" ? {} : { file: { status: "READY" } }) },
     orderBy: [{ position: "asc" }, { createdAt: "asc" }],
@@ -34,6 +42,7 @@ export async function listMaterials(user: AppUser, lessonId: string) {
     status: file.status,
     createdAt,
     viewable: isInlineSafe("material", file.mimeType),
+    downloadable,
   }));
 }
 
@@ -67,7 +76,11 @@ const isVideo = (mime: string) => mime.startsWith("video/");
  */
 export async function grantMaterialAccess(user: AppUser, lessonId: string, materialId: string, mode: "view" | "download", now = new Date()) {
   const { access } = await requireLessonCapability(user, lessonId, "VIEW_CONTENT", now);
-  const material = await prisma.lessonMaterial.findFirst({ where: { id: materialId, lessonId, file: { status: "READY" } }, select: { file: true } });
+  // The real lock: a disabled button alone could be bypassed by calling this endpoint directly.
+  if (mode === "download" && !(await canDownload(user, lessonId))) {
+    throw new ApiError("FORBIDDEN", "Shkarkimi i materialeve nuk lejohet për këtë mësim.");
+  }
+  const material =await prisma.lessonMaterial.findFirst({ where: { id: materialId, lessonId, file: { status: "READY" } }, select: { file: true } });
   if (!material) throw new ApiError("NOT_FOUND", "Materiali nuk u gjet.");
   const { file } = material;
 

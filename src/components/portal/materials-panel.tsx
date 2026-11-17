@@ -11,7 +11,8 @@ import { ProtectedVideo, type VideoGrant } from "./protected-video";
 
 const t = portalText.materials;
 
-export type MaterialItem = { id: string; displayName: string; mimeType: string; sizeBytes: number; viewable: boolean };
+/** `downloadable`: the lesson allows downloads (always true for admins). The server enforces it too. */
+export type MaterialItem = { id: string; displayName: string; mimeType: string; sizeBytes: number; viewable: boolean; downloadable: boolean };
 
 /** `lost`: the admin removed the material while it was open (it stays closed even if attached again). */
 type Viewer = { id: string; name: string; kind: "pdf" | "image" | "video"; grant: VideoGrant; lost?: boolean };
@@ -133,6 +134,7 @@ export function MaterialsPanel({
   }, [viewerId]);
 
   if (!materials.length) return <EmptyState icon={FileText} title={t.empty} />;
+  const downloadsAllowed = materials.every((m) => m.downloadable);
 
   return (
     <div className="grid gap-4">
@@ -150,7 +152,8 @@ export function MaterialsPanel({
           ) : viewer.kind === "pdf" ? (
             <iframe
               key={viewer.grant.url}
-              src={viewer.grant.url}
+              // No downloads: hide the browser's PDF toolbar (its save button). A deterrent only.
+              src={downloadsAllowed ? viewer.grant.url : `${viewer.grant.url}#toolbar=0`}
               title={t.viewerTitle(viewer.name)}
               className="h-[65vh] min-h-96 w-full rounded-md border bg-muted"
             />
@@ -159,7 +162,7 @@ export function MaterialsPanel({
             // eslint-disable-next-line @next/next/no-img-element
             <img src={viewer.grant.url} alt={viewer.name} className="max-h-[65vh] w-full rounded-md border bg-muted object-contain" />
           )}
-          <p className="text-xs text-muted-foreground">{t.viewerFallback}</p>
+          <p className="text-xs text-muted-foreground">{downloadsAllowed ? t.viewerFallback : t.viewerFallbackNoDownload}</p>
         </div>
       ) : null}
 
@@ -175,7 +178,7 @@ export function MaterialsPanel({
                 <p className="truncate text-sm font-medium">{material.displayName}</p>
                 <p className="text-xs text-muted-foreground">
                   {formatSize(material.sizeBytes)}
-                  {!canView ? ` · ${t.officeHint}` : null}
+                  {!canView ? ` · ${material.downloadable ? t.officeHint : t.officeNoDownload}` : !material.downloadable ? ` · ${t.viewOnlyHint}` : null}
                 </p>
               </div>
               <div className="flex gap-1.5">
@@ -185,10 +188,20 @@ export function MaterialsPanel({
                     {t.view}
                   </Button>
                 ) : null}
-                <Button variant="outline" size="lg" disabled={pending !== null} onClick={() => void download(material)}>
-                  {pending === `${material.id}:download` ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Download aria-hidden="true" />}
-                  {t.download}
-                </Button>
+                {material.downloadable ? (
+                  <Button variant="outline" size="lg" disabled={pending !== null} onClick={() => void download(material)}>
+                    {pending === `${material.id}:download` ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Download aria-hidden="true" />}
+                    {t.download}
+                  </Button>
+                ) : (
+                  // Shown switched off (dimmed and darker) so students see downloading is turned off.
+                  <span title={t.downloadDisabled} className="inline-flex cursor-not-allowed">
+                    <Button variant="outline" size="lg" disabled aria-label={`${t.download}: ${t.downloadDisabled}`} className="bg-muted text-muted-foreground opacity-40 grayscale disabled:opacity-40">
+                      <Download aria-hidden="true" />
+                      {t.download}
+                    </Button>
+                  </span>
+                )}
               </div>
             </li>
           );

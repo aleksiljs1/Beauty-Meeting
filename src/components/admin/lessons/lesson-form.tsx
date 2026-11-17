@@ -59,6 +59,7 @@ const schema = z.object({
   courseId: z.string(),
   imageId: z.string().nullable(),
   isDemo: z.boolean(),
+  allowDownloads: z.boolean(),
   scheduledStartAt: dateField,
   scheduledEndAt: dateField,
   joinOpensAt: dateField,
@@ -74,11 +75,12 @@ export type LessonFormLesson = {
   courseId: string | null;
   imageId: string | null;
   isDemo: boolean;
+  allowDownloads: boolean;
   publication: "DRAFT" | "PUBLISHED" | "ARCHIVED" | "CANCELLED";
   meetingStatus: string;
 } & LessonSchedule;
 
-function toValues(source: LessonSchedule & { title?: string; summary?: string | null; details?: string | null; courseId?: string | null; imageId?: string | null; isDemo?: boolean }): Values {
+function toValues(source: LessonSchedule & { title?: string; summary?: string | null; details?: string | null; courseId?: string | null; imageId?: string | null; isDemo?: boolean; allowDownloads?: boolean }): Values {
   return {
     title: source.title ?? "",
     summary: source.summary ?? "",
@@ -86,6 +88,7 @@ function toValues(source: LessonSchedule & { title?: string; summary?: string | 
     courseId: source.courseId ?? NO_COURSE,
     imageId: source.imageId ?? null,
     isDemo: source.isDemo ?? false,
+    allowDownloads: source.allowDownloads ?? false,
     scheduledStartAt: toZonedInputValue(source.scheduledStartAt),
     scheduledEndAt: toZonedInputValue(source.scheduledEndAt),
     joinOpensAt: toZonedInputValue(source.joinOpensAt),
@@ -174,6 +177,7 @@ export function LessonForm({
       courseId: values.courseId === NO_COURSE ? null : values.courseId,
       imageId: values.imageId,
       ...(demoAllowed || isEdit ? { isDemo: values.isDemo } : {}),
+      allowDownloads: values.allowDownloads,
       scheduledStartAt: schedule.scheduledStartAt.toISOString(),
       scheduledEndAt: schedule.scheduledEndAt.toISOString(),
       joinOpensAt: schedule.joinOpensAt.toISOString(),
@@ -305,6 +309,22 @@ export function LessonForm({
           )}
         </div>
       </fieldset>
+
+      <Controller
+        control={form.control}
+        name="allowDownloads"
+        render={({ field }) => (
+          <div className="flex items-start justify-between gap-4 rounded-md border p-4">
+            <div className="space-y-1">
+              <label htmlFor="lesson-allow-downloads" className="text-sm font-medium">
+                {t.allowDownloads}
+              </label>
+              <p className="text-xs text-muted-foreground">{t.allowDownloadsHint}</p>
+            </div>
+            <Switch id="lesson-allow-downloads" checked={field.value} onCheckedChange={field.onChange} />
+          </div>
+        )}
+      />
 
       {(demoAllowed || lesson?.isDemo) && (
         <Controller

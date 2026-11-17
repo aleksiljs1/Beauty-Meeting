@@ -243,6 +243,9 @@ model Lesson {
   liveEndedAt   DateTime?         @db.Timestamptz(3)
   /// True when the meeting is the clearly labelled demo classroom (ZOOM_MODE=demo).
   isDemo        Boolean           @default(false)
+  /// Whether students may download this lesson's materials. Off: they can still view what the
+  /// browser shows inline (PDF, images, video), but the server refuses download links.
+  allowDownloads Boolean          @default(false)
   /// The lesson's own photo from the gallery; without one it shows its course's photo.
   imageId       String?           @db.Uuid
   image         GalleryItem?      @relation("LessonImage", fields: [imageId], references: [id], onDelete: SetNull)

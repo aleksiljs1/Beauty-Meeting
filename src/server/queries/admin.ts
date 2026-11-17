@@ -427,6 +427,7 @@ export async function getAdminLesson(lessonId: string, now = new Date()) {
       liveStartedAt: true,
       liveEndedAt: true,
       isDemo: true,
+      allowDownloads: true,
       zoomMeetingNumber: true,
       createdAt: true,
       updatedAt: true,

@@ -61,6 +61,8 @@ const lessonFields = {
   /** Gallery photo; null shows the course photo (or the default cover). */
   imageId: z.uuid().nullish(),
   isDemo: z.boolean().optional(),
+  /** Students may download the lesson's materials (off: view only). */
+  allowDownloads: z.boolean().optional(),
   scheduledStartAt: isoDate,
   scheduledEndAt: isoDate,
   joinOpensAt: isoDate,
@@ -82,6 +84,7 @@ export const updateLessonSchema = z.object({
   courseId: lessonFields.courseId,
   imageId: lessonFields.imageId,
   isDemo: lessonFields.isDemo,
+  allowDownloads: lessonFields.allowDownloads,
   scheduledStartAt: isoDate.optional(),
   scheduledEndAt: isoDate.optional(),
   joinOpensAt: isoDate.optional(),

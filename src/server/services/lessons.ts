@@ -31,6 +31,7 @@ export type LessonInput = {
   courseId?: string | null;
   imageId?: string | null;
   isDemo?: boolean;
+  allowDownloads?: boolean;
 } & LessonSchedule;
 
 export type LessonPatch = Partial<LessonInput>;
@@ -146,6 +147,7 @@ async function createLessons(input: LessonInput, schedules: LessonSchedule[], co
         joinOpensAt,
         accessExpiresAt,
         isDemo,
+        allowDownloads: input.allowDownloads ?? false,
         // The demo classroom is always "provisioned"; real Zoom meetings are created in Phase 2.
         meetingStatus: isDemo ? "SCHEDULED" : "NOT_PROVISIONED",
         publication: "DRAFT",
@@ -220,6 +222,7 @@ export async function updateLesson(lessonId: string, patch: LessonPatch, confirm
       ...(patch.courseId !== undefined ? { courseId: patch.courseId || null } : {}),
       ...(patch.imageId !== undefined ? { imageId: patch.imageId || null } : {}),
       ...(patch.isDemo !== undefined ? { isDemo: patch.isDemo } : {}),
+      ...(patch.allowDownloads !== undefined ? { allowDownloads: patch.allowDownloads } : {}),
       ...schedule,
       meetingStatus,
     },
