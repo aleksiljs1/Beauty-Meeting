@@ -24,6 +24,8 @@ export type ChatPage = {
   messages: ChatMessageItem[];
   hasMore: boolean;
   readBy: { userId: string; name: string; lastReadAt: string | null }[];
+  /** A block in either direction stops sending in this chat. `byMe`: I can lift it by unblocking. */
+  blocked: { byMe: boolean; byThem: boolean };
 };
 
 export type ChatPerson = { id: string; name: string; role: string };

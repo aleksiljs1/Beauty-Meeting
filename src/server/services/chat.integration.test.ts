@@ -2,7 +2,7 @@ import "dotenv/config";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createUser, resetDatabase } from "@/test/fixtures";
 
-const { markChatRead, sendMessage, startDirectChat, updateChat } = await import("./chat");
+const { blockUser, markChatRead, sendMessage, startDirectChat, unblockUser, updateChat } = await import("./chat");
 const { DELETED_USER_NAME, getMessages, listChats, searchPeople } = await import("@/server/queries/chat");
 const { MAX_MESSAGE_LENGTH, MESSAGES_PAGE_SIZE, sendMessageSchema } = await import("@/server/validation/chat");
 const { prisma } = await import("@/server/db");
@@ -169,6 +169,50 @@ describe("chat list", () => {
     const [chat] = (await listChats(ana)).chats;
     expect(chat).toMatchObject({ title: DELETED_USER_NAME, otherUser: null });
     expect((await page(ana, id)).messages[0]).toMatchObject({ body: "mirupafshim", senderId: null, mine: false });
+  });
+});
+
+describe("blocking", () => {
+  it("a block either way stops both people from sending, but the history stays readable", async () => {
+    const { id } = await startDirectChat(ana, { userId: besa.id });
+    await say(besa, id, "para bllokimit");
+    await blockUser(ana, besa.id);
+
+    await expect(say(ana, id, "a")).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(say(besa, id, "b")).rejects.toMatchObject({ code: "FORBIDDEN" });
+
+    const mine = await page(ana, id);
+    expect(mine.blocked).toEqual({ byMe: true, byThem: false });
+    expect(mine.messages.map((m) => m.body)).toEqual(["para bllokimit"]);
+    expect((await page(besa, id)).blocked).toEqual({ byMe: false, byThem: true });
+  });
+
+  it("unblocking lets the chat continue, unless the other person blocked too", async () => {
+    const { id } = await startDirectChat(ana, { userId: besa.id });
+    await blockUser(ana, besa.id);
+    await blockUser(besa, ana.id);
+
+    await unblockUser(ana, besa.id);
+    await expect(say(ana, id, "ende jo")).rejects.toMatchObject({ code: "FORBIDDEN" }); // Besa's block still holds
+
+    await unblockUser(besa, ana.id);
+    await expect(say(ana, id, "vazhdojmë")).resolves.toHaveProperty("id");
+    await expect(say(besa, id, "po")).resolves.toHaveProperty("id");
+    expect((await page(ana, id)).blocked).toEqual({ byMe: false, byThem: false });
+  });
+
+  it("refuses blocking yourself or an unknown account; blocking twice is harmless", async () => {
+    await expect(blockUser(ana, ana.id)).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+    await expect(blockUser(ana, "nobody")).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await blockUser(ana, besa.id);
+    await blockUser(ana, besa.id);
+    expect(await prisma.userBlock.count()).toBe(1);
+  });
+
+  it("doesn't affect the blocker's chats with other people", async () => {
+    await blockUser(ana, besa.id);
+    const { id } = await startDirectChat(ana, { userId: admin.id });
+    await expect(say(ana, id, "me administratorin")).resolves.toHaveProperty("id");
   });
 });
 

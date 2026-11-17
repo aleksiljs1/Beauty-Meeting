@@ -513,3 +513,13 @@ From a full read-only review (student journey, admin workflows, structure, secur
   everyone" (not built); group chats; email for unread messages; chat items in the bell's list (not linked).
 - **Tests:** `services/chat.integration.test.ts` (14), realtime delivery test in `realtime.integration.test.ts`.
   Run tests from `C:\…` (uppercase drive), not `c:\…` — see IMPLEMENTATION_STATUS.md.
+- **Blocking** (user request, 2026-11-17; migration `20261117195436_user_blocks`): table `UserBlock` = each user's
+  block list (one row per blocker → blocked, unique pair, removed with either account). A block in **either
+  direction** stops **both** people from sending (`sendMessage` checks on every send → FORBIDDEN "Nuk mund të
+  dërgoni më mesazhe në këtë bisedë."); the history stays readable; chats with other people are unaffected.
+  Unblocking lets the chat continue, unless the other person has blocked too. API: `POST|DELETE
+  /api/v1/chats/blocks/[userId]`. The block state comes with every message load (`blocked: { byMe, byThem }`, no
+  extra call), and block/unblock sends `chat:changed` to both people, so an open chat locks/unlocks mid-conversation.
+  UI: "Blloko"/"Zhblloko" in the chat's ⋮ menu; when blocked the composer becomes the notice above, and only the
+  blocker sees "Ju e keni bllokuar këtë person." with an "Zhblloko" button (the blocked person isn't told who).
+  Not decided: hiding blocked people from search/the chat list, and a separate "blocked people" list.

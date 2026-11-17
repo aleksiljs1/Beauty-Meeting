@@ -95,9 +95,28 @@ export async function listChats(user: AppUser): Promise<{ chats: ChatListItem[];
 export type ChatMessage = { id: string; senderId: string | null; body: string | null; createdAt: Date; mine: boolean };
 
 /**
+ * Blocks between me and these people, in either direction. `byMe`: I blocked one of them;
+ * `byThem`: one of them blocked me. Either one stops messages both ways.
+ */
+export async function blockStatus(userId: string, otherUserIds: string[]) {
+  if (!otherUserIds.length) return { byMe: false, byThem: false };
+  const rows = await prisma.userBlock.findMany({
+    where: {
+      OR: [
+        { blockerId: userId, blockedId: { in: otherUserIds } },
+        { blockerId: { in: otherUserIds }, blockedId: userId },
+      ],
+    },
+    select: { blockerId: true },
+  });
+  return { byMe: rows.some((r) => r.blockerId === userId), byThem: rows.some((r) => r.blockerId !== userId) };
+}
+
+/**
  * One page of a chat's messages, oldest first, for display. `before` (a message id) loads the
  * page before that message when scrolling back. Also returns the other members' read times, for
- * "Parë" under my messages.
+ * "Parë" under my messages, and whether a block stops sending in this chat (it comes with every
+ * load, so a block made mid-chat shows as soon as the chat refetches on its realtime signal).
  */
 export async function getMessages(user: AppUser, conversationId: string, options: { before: string | null; limit: number }) {
   const me = await prisma.conversationMember.findUnique({
@@ -120,11 +139,16 @@ export async function getMessages(user: AppUser, conversationId: string, options
     where: { conversationId, userId: { not: user.id }, leftAt: null },
     select: { lastReadAt: true, user: { select: { id: true, name: true } } },
   });
+  const blocked = await blockStatus(
+    user.id,
+    others.map((o) => o.user.id),
+  );
 
   return {
     messages: page.map((m): ChatMessage => ({ id: m.id, senderId: m.senderId, body: m.deletedAt ? null : m.body, createdAt: m.createdAt, mine: m.senderId === user.id })),
     hasMore: rows.length > options.limit,
     readBy: others.map((o) => ({ userId: o.user.id, name: o.user.name, lastReadAt: o.lastReadAt })),
+    blocked,
   };
 }
 

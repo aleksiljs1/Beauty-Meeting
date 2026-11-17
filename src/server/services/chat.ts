@@ -3,6 +3,7 @@ import { Prisma } from "@/generated/prisma/client";
 import type { AppUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
 import { ApiError } from "@/server/http";
+import { blockStatus } from "@/server/queries/chat";
 import { publishChatChanged } from "@/server/realtime/publish";
 import type { SendMessageInput, StartChatInput, UpdateChatInput } from "@/server/validation/chat";
 
@@ -14,6 +15,9 @@ import type { SendMessageInput, StartChatInput, UpdateChatInput } from "@/server
  * Live delivery: after each change the affected people get a "chat changed" signal through the
  * realtime service (no data travels with it); their open chats refetch through the API.
  *
+ * Blocking: a block in either direction stops both people from sending; unblocking lets the chat
+ * continue. Both are signalled, so an open chat locks or unlocks mid-conversation.
+ *
  * Not here yet: "delete a message for everyone" (waiting on the client's answer).
  */
 
@@ -22,6 +26,8 @@ const MESSAGES_PER_MINUTE = 30;
 
 /** Same reply for "no such chat" and "not your chat", so nobody can probe other people's chats. */
 const CHAT_NOT_FOUND = "Biseda nuk u gjet.";
+/** Same wording whoever blocked whom: the blocked person isn't told who did it. */
+const CHAT_BLOCKED = "Nuk mund të dërgoni më mesazhe në këtë bisedë.";
 
 /** My membership row in this chat, or a "not found" error if I'm not (or no longer) in it. */
 async function requireMembership(user: AppUser, conversationId: string) {
@@ -105,6 +111,18 @@ export async function startDirectChat(user: AppUser, input: StartChatInput, now 
 export async function sendMessage(user: AppUser, conversationId: string, input: SendMessageInput, now = new Date()) {
   await requireMembership(user, conversationId);
 
+  // A block between me and the other person, in either direction, stops the message. Checked here
+  // on every send, so a screen that hasn't caught up with a new block can't get around it.
+  const others = await prisma.conversationMember.findMany({
+    where: { conversationId, userId: { not: user.id }, leftAt: null },
+    select: { userId: true },
+  });
+  const blocked = await blockStatus(
+    user.id,
+    others.map((o) => o.userId),
+  );
+  if (blocked.byMe || blocked.byThem) throw new ApiError("FORBIDDEN", CHAT_BLOCKED);
+
   // Rate limit: count what I sent in the last minute.
   const sentLastMinute = await prisma.message.count({
     where: { senderId: user.id, createdAt: { gt: new Date(now.getTime() - 60_000) } },
@@ -164,4 +182,22 @@ export async function updateChat(user: AppUser, conversationId: string, input: U
   });
   if (count === 0) throw new ApiError("NOT_FOUND", CHAT_NOT_FOUND);
   await publishChatChanged([user.id]); // pins and deletions are mine only
+}
+
+/**
+ * Blocks this person: from now on neither of us can send to the other, until I unblock. Blocking
+ * twice is harmless. Both of us are signalled, so an open chat locks immediately on both sides.
+ */
+export async function blockUser(user: AppUser, otherUserId: string) {
+  if (otherUserId === user.id) throw new ApiError("VALIDATION_FAILED", "Nuk mund të bllokoni veten.");
+  const other = await prisma.user.findUnique({ where: { id: otherUserId }, select: { id: true } });
+  if (!other) throw new ApiError("NOT_FOUND", "Ky person nuk u gjet.");
+  await prisma.userBlock.createMany({ data: [{ blockerId: user.id, blockedId: otherUserId }], skipDuplicates: true });
+  await publishChatChanged([user.id, otherUserId]);
+}
+
+/** Removes my block on this person. If they haven't blocked me too, the chat can continue. */
+export async function unblockUser(user: AppUser, otherUserId: string) {
+  await prisma.userBlock.deleteMany({ where: { blockerId: user.id, blockedId: otherUserId } });
+  await publishChatChanged([user.id, otherUserId]);
 }

@@ -50,6 +50,10 @@ model User {
   conversationsStarted Conversation[]       @relation("ConversationCreator")
   conversationMembers  ConversationMember[]
   messagesSent         Message[]            @relation("MessageSender")
+  /// People this user has blocked.
+  blocksMade           UserBlock[]          @relation("BlockBlocker")
+  /// People who have blocked this user.
+  blockedBy            UserBlock[]          @relation("BlockBlocked")
 
   @@unique([email])
   @@map("user")
@@ -820,4 +824,21 @@ model Message {
 
   @@index([conversationId, createdAt])
   @@index([senderId, createdAt])
+}
+
+///This table keeps each user's block list: one row per "blocker blocked this person".
+model UserBlock {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  /// The person who blocked.
+  blockerId String
+  blocker   User     @relation("BlockBlocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  /// The person who was blocked.
+  blockedId String
+  blocked   User     @relation("BlockBlocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  /// Each person appears at most once in someone's block list.
+  @@unique([blockerId, blockedId])
+  /// "Who has blocked me?" (checked when sending a message or searching people).
+  @@index([blockedId])
 }

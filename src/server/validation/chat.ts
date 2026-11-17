@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { MAX_MESSAGE_LENGTH } from "@/lib/chat";
+import { ApiError } from "@/server/http";
 import { uuidParam } from "./admin";
 
 /** Zod schemas and param helpers shared by the /api/v1/chats route handlers. */
@@ -12,6 +13,12 @@ export const MESSAGES_PAGE_SIZE = 50;
 
 /** Chat ids are UUIDs; anything else is simply "not found". */
 export const chatIdParam = (value: string) => uuidParam(value, "Biseda nuk u gjet.");
+
+/** A person's id in the URL (blocking). Better Auth ids are opaque strings. */
+export function personIdParam(value: string) {
+  if (!/^[A-Za-z0-9_-]{1,100}$/.test(value)) throw new ApiError("NOT_FOUND", "Ky person nuk u gjet.");
+  return value;
+}
 
 /** POST /chats: start (or reopen) a direct chat with this person. */
 export const startChatSchema = z.object({

@@ -91,11 +91,13 @@ export function ChatSidebar() {
   const { inbox, error, open, activeChatId } = useChat();
   const [view, setView] = useState<"list" | "people">("list");
   /** Name of a chat just started from the people search (not on the list until its first message). */
-  const [startedTitle, setStartedTitle] = useState<{ id: string; title: string } | null>(null);
+  const [startedChat, setStartedChat] = useState<{ id: string; title: string; personId: string } | null>(null);
   const [toDelete, setToDelete] = useState<{ id: string; title: string } | null>(null);
 
   const active = activeChatId ? inbox?.chats.find((c) => c.id === activeChatId) : undefined;
-  const activeTitle = active?.title ?? (startedTitle?.id === activeChatId ? startedTitle.title : "");
+  const started = startedChat?.id === activeChatId ? startedChat : null;
+  const activeTitle = active?.title ?? started?.title ?? "";
+  const activeOtherUserId = active ? (active.otherUser?.id ?? null) : (started?.personId ?? null);
 
   async function togglePin(chat: { id: string; pinned: boolean }) {
     try {
@@ -123,7 +125,7 @@ export function ChatSidebar() {
   async function startWith(person: ChatPerson) {
     try {
       const { id } = await apiSend<{ id: string }>("post", "/chats", { userId: person.id });
-      setStartedTitle({ id, title: person.name });
+      setStartedChat({ id, title: person.name, personId: person.id });
       setView("list");
       showChat(id);
       void refreshChats();
@@ -153,6 +155,7 @@ export function ChatSidebar() {
               key={activeChatId}
               chatId={activeChatId}
               title={activeTitle}
+              otherUserId={activeOtherUserId}
               pinned={active?.pinned ?? false}
               onBack={() => showChat(null)}
               onTogglePin={() => void togglePin({ id: activeChatId, pinned: active?.pinned ?? false })}

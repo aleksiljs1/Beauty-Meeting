@@ -13,12 +13,16 @@ Two kinds of testing: **automated** (commands, run before every commit) and a **
 | Command | What it checks | Needs |
 |---|---|---|
 | `npm run check` | TypeScript, lint, unit tests (access rules, deadlines, timezone/DST, file-type checks, safe redirects, polling backoff…) | nothing |
-| `npm run test:integration` | real database + storage + realtime: invitations (incl. 6 students racing for 3 spots), live alerts, materials (incl. multipart MP4 videos, per-type size limits, deadline-bound grants)/recordings upload & access, Socket.IO delivery, gallery uploads | `docker compose up -d` |
+| `npm run test:integration` | real database + storage + realtime: invitations (incl. 6 students racing for 3 spots), live alerts, materials (incl. multipart MP4 videos, per-type size limits, deadline-bound grants, downloads switch)/recordings upload & access, chat (one chat per pair, membership, limits, unread/"Parë", pin, delete for me, blocking), Socket.IO delivery (incl. `chat:changed`), gallery uploads | `docker compose up -d` |
 | `npm run build` | production build succeeds | database running |
 
 All three must be green before committing. Integration tests use a separate database
 (`academy_test`) and never touch your development data. Don't run two integration runs at the
 same time — they share that database.
+
+**Windows:** run the tests from a terminal opened at `C:\…` (uppercase drive letter). From `c:\…`
+(VS Code's default) vitest loads itself twice and every file fails before running with "Cannot read
+properties of undefined (reading 'config')" / "Vitest failed to find the runner". It's not a code bug.
 
 ---
 
@@ -161,6 +165,27 @@ Prepare: a lesson with a PDF and a Word file attached, published, with an enroll
 - [ ] Switch off again → the admin can still download (lesson page Materialet, and the class page `/klasa/<id>`).
 - [ ] Optional, terminal: with the switch off, a student's
       `POST /api/v1/lessons/<id>/materials/<materialId>/access` with `{"mode":"download"}` → 403 FORBIDDEN.
+
+### Chat (2026-11-17)
+Prepare: `npm run realtime` running (http://localhost:3100/health → `{"ok":true}`), two students and the
+admin, each in its own browser window (e.g. normal + incognito + another browser). Reload windows opened
+before the realtime service started.
+- [ ] The ✈ icon is next to the bell in the portal, and "Mesazhet" is in the admin side menu (an icon in the
+      top bar on phones). It opens the sidebar (full screen on a phone).
+- [ ] "Bisedë e re" lists everyone active except me, with "Student"/"Administrator"; searching by name works.
+      Picking someone already chatted with opens the same chat (never a second one).
+- [ ] Student ↔ student, student ↔ admin: messages arrive instantly in the other window; Enter sends,
+      Shift+Enter makes a new line; a counter appears near 2,000 characters.
+- [ ] With the sidebar closed, a new message raises the ✈ badge and shows "Mesazh i ri nga …" with "Hap".
+- [ ] "Parë" appears under my last message once the other person opens the chat.
+- [ ] Pin a chat → it moves to the top for me only. Delete it for me → it's gone for me, the other person
+      still has it; when they write again it comes back with only the new message.
+- [ ] Scroll back in a long chat → "Mesazhet e mëparshme" loads older messages without jumping.
+- [ ] Blocking: ⋮ → "Blloko" in an open chat → both windows switch to "Nuk mund të dërgoni më mesazhe në këtë
+      bisedë." within a moment; only the blocker sees "Ju e keni bllokuar këtë person." and "Zhblloko".
+      Old messages stay visible; chats with other people still work. "Zhblloko" → both can write again.
+- [ ] If both have blocked each other, the chat stays locked until both have unblocked.
+- [ ] Stop `npm run realtime` → messages still arrive, but only on focus/after sending/within 60 s.
 
 ### G. Security spot checks (optional, terminal)
 ```bash

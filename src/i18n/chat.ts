@@ -38,6 +38,13 @@ export const chatText = {
   send: "Dërgo",
   charsLeft: (left: number) => `${left} karaktere të mbetura`,
 
+  block: "Blloko",
+  unblock: "Zhblloko",
+  blockedToast: (name: string) => `${name} u bllokua.`,
+  unblockedToast: (name: string) => `${name} u zhbllokua.`,
+  cantSend: "Nuk mund të dërgoni më mesazhe në këtë bisedë.",
+  youBlocked: "Ju e keni bllokuar këtë person.",
+
   newMessageFrom: (name: string) => `Mesazh i ri nga ${name}`,
   openChat: "Hap",
 };

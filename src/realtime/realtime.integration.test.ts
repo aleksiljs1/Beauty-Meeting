@@ -7,7 +7,7 @@ import { createRealtimeServer, REALTIME_PATH, type TokenClaims } from "./server"
 const { publishFeedChanged } = await import("@/server/realtime/publish");
 const { markLessonLive } = await import("@/server/services/live");
 const { removeMaterial } = await import("@/server/services/materials");
-const { sendMessage, startDirectChat } = await import("@/server/services/chat");
+const { blockUser, sendMessage, startDirectChat } = await import("@/server/services/chat");
 const { prisma } = await import("@/server/db");
 
 const PORT = 3199;
@@ -131,6 +131,17 @@ describe("realtime service", () => {
     expect(await chatSignal).toBe(true);
     expect(await feedSignal).toBe(false);
     expect(await strangerGot).toBe(false);
+  });
+
+  it("tells the blocked person's open chat about a block made mid-conversation", async () => {
+    const [ana, besa] = [await createUser("student"), await createUser("student")];
+    tokens.set("besa", { userId: besa.id, exp: future() });
+    const besaSocket = connect("besa");
+    await connected(besaSocket);
+
+    const got = nextEvent(besaSocket, "chat:changed");
+    await blockUser(ana, besa.id);
+    expect(await got).toBe(true);
   });
 
   it("disconnects a socket that tries to re-authenticate as someone else", async () => {

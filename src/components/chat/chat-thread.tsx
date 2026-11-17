@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Loader2, MoreVertical, Pin, PinOff, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, Ban, Loader2, MoreVertical, Pin, PinOff, Send, Trash2, Unlock } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -25,10 +25,16 @@ function merge(current: ChatMessageItem[], incoming: ChatMessageItem[]) {
   return [...byId.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
 }
 
-/** One open chat: messages, "Parë", load older, composer, and pin/delete in the header menu. */
+/**
+ * One open chat: messages, "Parë", load older, composer, and pin/delete/block in the header menu.
+ * When either person has blocked the other, the composer is replaced by a notice. The block state
+ * comes with every load of the messages, so a block or unblock made mid-chat (by either side)
+ * shows as soon as the chat refetches on its realtime signal.
+ */
 export function ChatThread({
   chatId,
   title,
+  otherUserId,
   pinned,
   onBack,
   onTogglePin,
@@ -36,6 +42,8 @@ export function ChatThread({
 }: {
   chatId: string;
   title: string;
+  /** The other person in this direct chat (null once their account is deleted: nothing to block). */
+  otherUserId: string | null;
   pinned: boolean;
   onBack: () => void;
   onTogglePin: () => void;
@@ -43,6 +51,8 @@ export function ChatThread({
 }) {
   const [messages, setMessages] = useState<ChatMessageItem[]>([]);
   const [readBy, setReadBy] = useState<ChatPage["readBy"]>([]);
+  const [blocked, setBlocked] = useState<ChatPage["blocked"]>({ byMe: false, byThem: false });
+  const [blocking, setBlocking] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -59,6 +69,7 @@ export function ChatThread({
   const applyPage = useCallback((page: ChatPage, first: boolean) => {
     setMessages((current) => merge(first ? [] : current, page.messages));
     setReadBy(page.readBy);
+    setBlocked(page.blocked);
     if (first) setHasMore(page.hasMore);
     setStatus("ready");
   }, []);
@@ -148,8 +159,26 @@ export function ChatThread({
       void refreshChats();
     } catch (error) {
       toast.error(errorMessage(error));
+      // Blocked a moment ago (before this screen caught up): reload so the notice replaces the composer.
+      if (error instanceof ApiClientError && error.code === "FORBIDDEN") void loadLatest();
     } finally {
       setSending(false);
+    }
+  }
+
+  /** Block or unblock the other person. Both screens update through the realtime signal. */
+  async function toggleBlock() {
+    if (!otherUserId || blocking) return;
+    const unblocking = blocked.byMe;
+    setBlocking(true);
+    try {
+      await apiSend(unblocking ? "delete" : "post", `/chats/blocks/${otherUserId}`);
+      toast.success(unblocking ? t.unblockedToast(title) : t.blockedToast(title));
+      await loadLatest();
+    } catch (error) {
+      toast.error(errorMessage(error));
+    } finally {
+      setBlocking(false);
     }
   }
 
@@ -183,6 +212,11 @@ export function ChatThread({
             <DropdownMenuItem onSelect={onTogglePin}>
               {pinned ? <PinOff aria-hidden /> : <Pin aria-hidden />} {pinned ? t.unpin : t.pin}
             </DropdownMenuItem>
+            {otherUserId ? (
+              <DropdownMenuItem onSelect={() => void toggleBlock()} disabled={blocking}>
+                {blocked.byMe ? <Unlock aria-hidden /> : <Ban aria-hidden />} {blocked.byMe ? t.unblock : t.block}
+              </DropdownMenuItem>
+            ) : null}
             <DropdownMenuItem onSelect={onDelete} className="text-destructive focus:text-destructive">
               <Trash2 aria-hidden /> {t.delete}
             </DropdownMenuItem>
@@ -245,30 +279,47 @@ export function ChatThread({
         )}
       </div>
 
-      <form
-        className="flex items-end gap-2 border-t p-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void send();
-        }}
-      >
-        <div className="grid min-w-0 flex-1 gap-1">
-          <Textarea
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={onComposerKey}
-            placeholder={t.composerPlaceholder}
-            aria-label={t.composerLabel}
-            maxLength={MAX_MESSAGE_LENGTH}
-            rows={1}
-            className="max-h-32 min-h-10 resize-none"
-          />
-          {left <= 200 ? <p className="text-right text-[11px] text-muted-foreground">{t.charsLeft(left)}</p> : null}
+      {blocked.byMe || blocked.byThem ? (
+        // Blocked either way: no composer. Only the one who blocked is told, and offered to unblock.
+        <div className="grid justify-items-center gap-2 border-t bg-muted/40 p-4 text-center text-sm" role="status">
+          <p className="flex items-center gap-2 text-muted-foreground">
+            <Ban className="size-4" aria-hidden /> {t.cantSend}
+          </p>
+          {blocked.byMe ? (
+            <>
+              <p className="text-xs text-muted-foreground">{t.youBlocked}</p>
+              <Button variant="outline" size="sm" onClick={() => void toggleBlock()} disabled={blocking}>
+                {blocking ? <Loader2 className="animate-spin" aria-hidden /> : <Unlock aria-hidden />} {t.unblock}
+              </Button>
+            </>
+          ) : null}
         </div>
-        <Button type="submit" size="icon-lg" aria-label={t.send} disabled={sending || !draft.trim()}>
-          {sending ? <Loader2 className="animate-spin" aria-hidden /> : <Send aria-hidden />}
-        </Button>
-      </form>
+      ) : (
+        <form
+          className="flex items-end gap-2 border-t p-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void send();
+          }}
+        >
+          <div className="grid min-w-0 flex-1 gap-1">
+            <Textarea
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={onComposerKey}
+              placeholder={t.composerPlaceholder}
+              aria-label={t.composerLabel}
+              maxLength={MAX_MESSAGE_LENGTH}
+              rows={1}
+              className="max-h-32 min-h-10 resize-none"
+            />
+            {left <= 200 ? <p className="text-right text-[11px] text-muted-foreground">{t.charsLeft(left)}</p> : null}
+          </div>
+          <Button type="submit" size="icon-lg" aria-label={t.send} disabled={sending || !draft.trim()}>
+            {sending ? <Loader2 className="animate-spin" aria-hidden /> : <Send aria-hidden />}
+          </Button>
+        </form>
+      )}
     </div>
   );
 }
