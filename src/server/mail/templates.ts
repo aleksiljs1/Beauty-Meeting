@@ -30,6 +30,25 @@ export function accountSetupEmail(params: { to: string; name: string; url: strin
   };
 }
 
+/** Someone has unread chat messages. The message text is left out on purpose (it's private). */
+export function chatUnreadEmail(params: { to: string; name: string; senders: string[]; url: string; academyName: string }): MailMessage {
+  const shown = params.senders.slice(0, 3).join(", ");
+  const from = !params.senders.length ? "" : params.senders.length > 3 ? ` nga ${shown} dhe të tjerë` : ` nga ${shown}`;
+  const heading = "Keni mesazhe të reja";
+  const paragraphs = [
+    `Përshëndetje ${params.name},`,
+    `Keni mesazhe të palexuara${from} në ${params.academyName}.`,
+    "Hapni lidhjen më poshtë dhe hyni për t'i lexuar dhe për t'u përgjigjur.",
+  ];
+  const footnote = "Dërgojmë vetëm një email për bisedë, derisa t'i lexoni mesazhet. Teksti i mesazheve nuk përfshihet në email.";
+  return {
+    to: params.to,
+    subject: heading,
+    text: `${paragraphs.join("\n\n")}\n\n${params.url}\n\n${footnote}`,
+    html: layout(heading, paragraphs, { label: "Lexo mesazhet", url: params.url }, footnote),
+  };
+}
+
 export function lessonLiveEmail(params: { to: string; name: string; lessonTitle: string; url: string; academyName: string }): MailMessage {
   const heading = `Mësimi ka filluar: ${params.lessonTitle}`;
   const paragraphs = [

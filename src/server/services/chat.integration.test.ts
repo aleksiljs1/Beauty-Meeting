@@ -5,6 +5,7 @@ import { createUser, resetDatabase } from "@/test/fixtures";
 const { blockUser, markChatRead, sendMessage, startDirectChat, unblockUser, updateChat } = await import("./chat");
 const { DELETED_USER_NAME, getMessages, listChats, searchPeople } = await import("@/server/queries/chat");
 const { MAX_MESSAGE_LENGTH, MESSAGES_PAGE_SIZE, sendMessageSchema } = await import("@/server/validation/chat");
+const { CHAT_EMAIL_DELAY_MS, sendUnreadChatEmails } = await import("./chat-emails");
 const { prisma } = await import("@/server/db");
 
 type User = Awaited<ReturnType<typeof createUser>>;
@@ -57,6 +58,13 @@ describe("messages", () => {
     await expect(page(admin, id)).rejects.toMatchObject({ code: "NOT_FOUND" });
     await expect(markChatRead(admin, id)).rejects.toMatchObject({ code: "NOT_FOUND" });
     await expect(updateChat(admin, id, { pinned: true })).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("refuses sending to someone whose account was deactivated", async () => {
+    const { id } = await startDirectChat(ana, { userId: besa.id });
+    await prisma.user.update({ where: { id: besa.id }, data: { banned: true } });
+    await expect(say(ana, id, "a je aty?")).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(await prisma.message.count()).toBe(0);
   });
 
   it("rejects empty and too long messages before they reach the service", () => {
@@ -209,10 +217,78 @@ describe("blocking", () => {
     expect(await prisma.userBlock.count()).toBe(1);
   });
 
+  it("can't block the academy: administrators stay reachable, even with an older block", async () => {
+    const { id } = await startDirectChat(ana, { userId: admin.id });
+    await expect(blockUser(ana, admin.id)).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+    expect(await prisma.userBlock.count()).toBe(0);
+
+    // A block row made before this rule existed is ignored.
+    await prisma.userBlock.create({ data: { blockerId: ana.id, blockedId: admin.id } });
+    expect((await page(admin, id)).blocked).toEqual({ byMe: false, byThem: false });
+    await expect(say(admin, id, "Nesër kemi mësim.")).resolves.toHaveProperty("id");
+    await expect(say(ana, id, "Faleminderit")).resolves.toHaveProperty("id");
+
+    // An administrator can still block a student.
+    await blockUser(admin, ana.id);
+    await expect(say(ana, id, "?")).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
   it("doesn't affect the blocker's chats with other people", async () => {
     await blockUser(ana, besa.id);
     const { id } = await startDirectChat(ana, { userId: admin.id });
     await expect(say(ana, id, "me administratorin")).resolves.toHaveProperty("id");
+  });
+});
+
+describe("email for unread messages", () => {
+  /** Lets time pass past the email delay; returns "now". */
+  const later = () => new Date((tick += CHAT_EMAIL_DELAY_MS + 60_000));
+
+  it("emails a message left unread, once per chat until the chat is read", async () => {
+    const { id } = await startDirectChat(ana, { userId: besa.id });
+    await say(ana, id, "A vjen nesër?");
+    expect(await sendUnreadChatEmails(new Date(tick + 60_000))).toBe(0); // still fresh: she may read it live
+
+    expect(await sendUnreadChatEmails(later())).toBe(1); // Besa only: Ana sent it
+    const members = await prisma.conversationMember.findMany({ where: { conversationId: id }, select: { userId: true, emailedAt: true } });
+    expect(members.find((m) => m.userId === ana.id)?.emailedAt).toBeNull();
+
+    await say(ana, id, "Më thuaj!");
+    expect(await sendUnreadChatEmails(later())).toBe(0); // no second email before she reads
+
+    await markChatRead(besa, id, at());
+    expect(await sendUnreadChatEmails(later())).toBe(0); // nothing unread
+    await say(ana, id, "Faleminderit");
+    expect(await sendUnreadChatEmails(later())).toBe(1); // read since: a new unread message counts again
+  });
+
+  it("treats deleting the chat like reading it, and skips people the reader has blocked", async () => {
+    const { id } = await startDirectChat(ana, { userId: besa.id });
+    await say(ana, id, "1");
+    expect(await sendUnreadChatEmails(later())).toBe(1);
+    await updateChat(besa, id, { hidden: true }, at()); // deleted without reading
+    await say(ana, id, "2");
+    expect(await sendUnreadChatEmails(later())).toBe(1); // a new message after deleting: email again
+
+    await updateChat(besa, id, { hidden: true }, at());
+    await say(ana, id, "3");
+    await blockUser(besa, ana.id); // blocked after the message arrived
+    expect(await sendUnreadChatEmails(later())).toBe(0);
+  });
+
+  it("sends one email for several chats, and none to deactivated accounts", async () => {
+    const fromAna = await startDirectChat(ana, { userId: besa.id });
+    const fromAdmin = await startDirectChat(admin, { userId: besa.id });
+    await say(ana, fromAna.id, "1");
+    await say(admin, fromAdmin.id, "2");
+    const gone = await createUser("student");
+    const toGone = await startDirectChat(ana, { userId: gone.id });
+    await say(ana, toGone.id, "3");
+    await prisma.user.update({ where: { id: gone.id }, data: { banned: true } });
+
+    expect(await sendUnreadChatEmails(later())).toBe(1); // Besa, about both chats
+    const besaRows = await prisma.conversationMember.findMany({ where: { userId: besa.id } });
+    expect(besaRows.every((row) => row.emailedAt)).toBe(true);
   });
 });
 

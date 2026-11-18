@@ -99,6 +99,7 @@ export const updateSeriesSchema = z.object({
   details: lessonFields.details,
   courseId: lessonFields.courseId,
   imageId: lessonFields.imageId,
+  allowDownloads: lessonFields.allowDownloads,
   time: z
     .object({ start: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Ora nuk është e vlefshme."), durationMinutes: z.number().int().min(15).max(12 * 60) })
     .optional(),

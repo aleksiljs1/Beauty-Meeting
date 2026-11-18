@@ -91,13 +91,23 @@ export function ChatSidebar() {
   const { inbox, error, open, activeChatId } = useChat();
   const [view, setView] = useState<"list" | "people">("list");
   /** Name of a chat just started from the people search (not on the list until its first message). */
-  const [startedChat, setStartedChat] = useState<{ id: string; title: string; personId: string } | null>(null);
+  const [startedChat, setStartedChat] = useState<{ id: string; title: string; personId: string; role: string } | null>(null);
   const [toDelete, setToDelete] = useState<{ id: string; title: string } | null>(null);
 
   const active = activeChatId ? inbox?.chats.find((c) => c.id === activeChatId) : undefined;
   const started = startedChat?.id === activeChatId ? startedChat : null;
   const activeTitle = active?.title ?? started?.title ?? "";
   const activeOtherUserId = active ? (active.otherUser?.id ?? null) : (started?.personId ?? null);
+  const activeOtherRole = active ? (active.otherUser?.role ?? null) : (started?.role ?? null);
+
+  // The "you have new messages" email links to ?mesazhet=1: open the chats, then tidy the address.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("mesazhet")) return;
+    url.searchParams.delete("mesazhet");
+    window.history.replaceState(window.history.state, "", url);
+    openChats();
+  }, []);
 
   async function togglePin(chat: { id: string; pinned: boolean }) {
     try {
@@ -125,7 +135,7 @@ export function ChatSidebar() {
   async function startWith(person: ChatPerson) {
     try {
       const { id } = await apiSend<{ id: string }>("post", "/chats", { userId: person.id });
-      setStartedChat({ id, title: person.name, personId: person.id });
+      setStartedChat({ id, title: person.name, personId: person.id, role: person.role });
       setView("list");
       showChat(id);
       void refreshChats();
@@ -144,7 +154,8 @@ export function ChatSidebar() {
           setView("list");
         }}
       >
-        <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-md">
+        {/* Full screen on phones. The sheet's own side rules (3/4 width, max-w-sm) are more specific, so override those. */}
+        <SheetContent side="right" className="gap-0 p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-md">
           <SheetHeader className="sr-only">
             <SheetTitle>{t.title}</SheetTitle>
             <SheetDescription>{t.description}</SheetDescription>
@@ -156,6 +167,7 @@ export function ChatSidebar() {
               chatId={activeChatId}
               title={activeTitle}
               otherUserId={activeOtherUserId}
+              canBlock={activeOtherRole !== "admin"}
               pinned={active?.pinned ?? false}
               onBack={() => showChat(null)}
               onTogglePin={() => void togglePin({ id: activeChatId, pinned: active?.pinned ?? false })}

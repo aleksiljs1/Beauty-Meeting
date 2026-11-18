@@ -122,7 +122,7 @@ export default async function LessonDetailPage({ params, searchParams }: PagePro
           ),
           materialet: (
             <SectionCard title={admin.materials.title}>
-              <MaterialsPanel lessonId={lesson.id} materials={materials} />
+              <MaterialsPanel lessonId={lesson.id} materials={materials} downloadsOff={!lesson.allowDownloads} />
             </SectionCard>
           ),
           regjistrimet: (

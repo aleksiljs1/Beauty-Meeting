@@ -35,6 +35,7 @@ export function ChatThread({
   chatId,
   title,
   otherUserId,
+  canBlock,
   pinned,
   onBack,
   onTogglePin,
@@ -44,6 +45,8 @@ export function ChatThread({
   title: string;
   /** The other person in this direct chat (null once their account is deleted: nothing to block). */
   otherUserId: string | null;
+  /** False when the other person is an administrator (the academy can't be blocked). */
+  canBlock: boolean;
   pinned: boolean;
   onBack: () => void;
   onTogglePin: () => void;
@@ -212,7 +215,7 @@ export function ChatThread({
             <DropdownMenuItem onSelect={onTogglePin}>
               {pinned ? <PinOff aria-hidden /> : <Pin aria-hidden />} {pinned ? t.unpin : t.pin}
             </DropdownMenuItem>
-            {otherUserId ? (
+            {otherUserId && canBlock ? (
               <DropdownMenuItem onSelect={() => void toggleBlock()} disabled={blocking}>
                 {blocked.byMe ? <Unlock aria-hidden /> : <Ban aria-hidden />} {blocked.byMe ? t.unblock : t.block}
               </DropdownMenuItem>

@@ -347,10 +347,10 @@ function toSeriesEntry(id: string, lessons: LessonRow[], now: Date): SeriesEntry
 export async function getLessonSeries(seriesId: string, now = new Date()) {
   const series = await prisma.lessonSeries.findUnique({
     where: { id: seriesId },
-    select: { id: true, createdAt: true, lessons: { orderBy: { scheduledStartAt: "asc" }, select: { ...lessonRowSelect, summary: true, details: true, courseId: true, joinOpensAt: true } } },
+    select: { id: true, createdAt: true, lessons: { orderBy: { scheduledStartAt: "asc" }, select: { ...lessonRowSelect, summary: true, details: true, courseId: true, joinOpensAt: true, allowDownloads: true } } },
   });
   if (!series) return null;
-  const lessons = series.lessons.map((lesson) => ({ ...toLessonRow(lesson, now), summary: lesson.summary, details: lesson.details, courseId: lesson.courseId, joinOpensAt: lesson.joinOpensAt }));
+  const lessons = series.lessons.map((lesson) => ({ ...toLessonRow(lesson, now), summary: lesson.summary, details: lesson.details, courseId: lesson.courseId, joinOpensAt: lesson.joinOpensAt, allowDownloads: lesson.allowDownloads }));
   const upcoming = lessons.filter((l) => l.scheduledEndAt > now && (l.publication === "DRAFT" || l.publication === "PUBLISHED"));
   const enrollments = await prisma.lessonEnrollment.findMany({
     where: { lessonId: { in: upcoming.map((l) => l.id) }, revokedAt: null },

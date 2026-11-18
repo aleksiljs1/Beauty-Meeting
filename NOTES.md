@@ -510,7 +510,9 @@ From a full read-only review (student journey, admin workflows, structure, secur
   No Redis needed (one service instance; Postgres does the fan-in). Redis would only matter with several
   realtime instances behind a load balancer.
 - **Open questions (client):** keep or remove a deleted account's messages (kept for now); "delete a message for
-  everyone" (not built); group chats; email for unread messages; chat items in the bell's list (not linked).
+  everyone" (not built); group chats; chat items in the bell's list (not linked); a "report" button and whether
+  the academy may read students' chats with each other (not built: nobody but the two people can read a chat).
+  Email for unread messages: built 2026-11-18 (see "Review improvements" below).
 - **Tests:** `services/chat.integration.test.ts` (14), realtime delivery test in `realtime.integration.test.ts`.
   Run tests from `C:\…` (uppercase drive), not `c:\…` — see IMPLEMENTATION_STATUS.md.
 - **Blocking** (user request, 2026-11-17; migration `20261117195436_user_blocks`): table `UserBlock` = each user's
@@ -523,3 +525,44 @@ From a full read-only review (student journey, admin workflows, structure, secur
   UI: "Blloko"/"Zhblloko" in the chat's ⋮ menu; when blocked the composer becomes the notice above, and only the
   blocker sees "Ju e keni bllokuar këtë person." with an "Zhblloko" button (the blocked person isn't told who).
   Not decided: hiding blocked people from search/the chat list, and a separate "blocked people" list.
+
+## Review improvements to the chat and the downloads switch (2026-11-18)
+
+Tested end to end (two students on desktop and phone + the admin, against a separate `academy_review` database)
+and fixed what the review found. 5 new integration tests; all 205 integration tests pass.
+
+- **The academy can't be blocked.** A student who blocked the admin would cut the academy off from them.
+  `blockUser` now refuses an administrator ("Akademia nuk mund të bllokohet.", 422), `blockStatus` ignores any older
+  block row against one, and the chat menu has no "Blloko" in a chat with an administrator (`canBlock` on
+  `ChatThread`). Administrators can still block a student.
+- **Email for unread messages** (the chat can't replace WhatsApp if people who aren't on the site never hear of a
+  message). `services/chat-emails.ts`, run every 5 min by `jobs/chat-emails.ts` (started in `instrumentation.ts`
+  like the other jobs, so it needs the always-on server): a message still unread after **15 minutes** earns the
+  reader **one** email "Keni mesazhe të reja" (names of the senders, **not** the text) with a link to
+  `/portal?mesazhet=1` or `/admin?mesazhet=1`, which opens the chat sidebar (`chat-sidebar.tsx` reads and removes
+  the parameter). No further email about that chat until they have read it; several chats due together go into one
+  email per person; deactivated accounts get none. New column `ConversationMember.emailedAt` (migration
+  `20261118090000_chat_unread_email`); each chat is claimed before sending (no double emails from overlapping runs)
+  and the claim is given back if sending fails.
+- **No messages to deactivated accounts:** `sendMessage` refuses with "Ky person nuk është më aktiv. Mesazhi nuk u
+  dërgua." instead of sending into the void.
+- **Chat list speed:** unread counts were one database query per chat; now one query for all chats
+  (`listChats`, same rules: others' messages after the latest of read time, "delete for me" and joining).
+- **Reconnect storm:** after a realtime restart every tab reconnects at once; their chat refetches are now spread
+  over ~3 s (`notifyChat` in `lib/realtime/client.ts`). New-message signals still go out immediately.
+- **Phones: pop-ups covered the header.** The "Mesazh i ri nga …" pop-up sat on top of the ✈ and 🔔 buttons for
+  several seconds, so tapping them did nothing. Portal and admin toasts now sit below the header on phones
+  (`mobileOffset={{ top: 72 }}`). They still slide in from the top edge for ~0.5 s (the library's animation).
+- **Phones: the chat panel was 3/4 wide, not full screen.** The sheet's own `data-[side=right]:w-3/4` and
+  `sm:max-w-sm` rules beat the chat's `w-full sm:max-w-md`; the chat now overrides them with the same variants.
+- **Downloads switch on lesson series:** the series edit page now has "Lejo shkarkimin e materialeve" too, applied
+  to every upcoming date (past dates untouched), so a repeating lesson no longer needs editing date by date.
+- **Admin warning for Word/PowerPoint:** with downloads off, the lesson's Materialet tab says so and marks each
+  Word/PowerPoint file in red ("Studentët nuk mund ta hapin këtë skedar pa shkarkim…"), since students can't open
+  those without downloading.
+- Small: `const material =await` spacing in `services/materials.ts`.
+- **Verified in the browser:** message delivered to the other person's phone in ~0.15 s; "Parë"; block/unblock
+  lock and unlock the other side live; the blocked person isn't told who; the server refuses messages while blocked
+  (403) and blocking the academy (422); no "Blloko" for the academy; `?mesazhet=1` opens the chats; series switch
+  saves; admin warnings show; student Shkarko buttons disabled and the server refuses the download (403); no page
+  errors. Emails checked in Mailpit (sender names, no message text).

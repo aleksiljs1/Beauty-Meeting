@@ -35,7 +35,10 @@ function notify(reason: "connected" | "changed") {
 }
 
 function notifyChat(reason: "connected" | "changed") {
-  chatListeners.forEach((listener) => listener(reason));
+  // New messages go out at once; a (re)connect, which every tab makes together after a server
+  // restart, is spread over a few seconds.
+  if (reason === "changed") chatListeners.forEach((listener) => listener(reason));
+  else setTimeout(() => chatListeners.forEach((listener) => listener(reason)), Math.random() * 3_000);
 }
 
 function connect() {

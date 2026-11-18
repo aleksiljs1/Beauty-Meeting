@@ -64,6 +64,15 @@ describe("lesson series", () => {
     expect(await notices(student.id, "LESSON_CANCELLED")).toBe(1);
   });
 
+  it("turns material downloads on for the upcoming dates only", async () => {
+    const { id } = await series();
+    expect((await getLessonSeries(id))?.upcoming[0].allowDownloads).toBe(false); // off by default
+    await updateSeries(id, { allowDownloads: true }, false, admin);
+    const after = await prisma.lesson.findMany({ where: { seriesId: id }, orderBy: { scheduledStartAt: "asc" } });
+    expect(after[0].allowDownloads).toBe(false); // the past date: untouched
+    expect(after.slice(1).every((lesson) => lesson.allowDownloads)).toBe(true);
+  });
+
   it("adds and removes a student on every upcoming date only", async () => {
     const [stays, leaves] = [await createUser("student"), await createUser("student")];
     const { id, lessons } = await series([leaves.id]);

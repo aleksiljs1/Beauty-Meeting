@@ -80,7 +80,7 @@ export async function grantMaterialAccess(user: AppUser, lessonId: string, mater
   if (mode === "download" && !(await canDownload(user, lessonId))) {
     throw new ApiError("FORBIDDEN", "Shkarkimi i materialeve nuk lejohet për këtë mësim.");
   }
-  const material =await prisma.lessonMaterial.findFirst({ where: { id: materialId, lessonId, file: { status: "READY" } }, select: { file: true } });
+  const material = await prisma.lessonMaterial.findFirst({ where: { id: materialId, lessonId, file: { status: "READY" } }, select: { file: true } });
   if (!material) throw new ApiError("NOT_FOUND", "Materiali nuk u gjet.");
   const { file } = material;
 

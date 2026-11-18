@@ -15,7 +15,8 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   return (
     <>
       <AdminShell user={{ name: user.name, email: user.email }}>{children}</AdminShell>
-      <Toaster position="top-center" />
+      {/* On phones, below the header: a pop-up must not cover the chat button and the menu. */}
+      <Toaster position="top-center" mobileOffset={{ top: 72 }} />
     </>
   );
 }

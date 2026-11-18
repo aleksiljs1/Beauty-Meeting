@@ -614,6 +614,8 @@ export const admin = {
 
   materials: {
     title: "Materialet",
+    downloadsOff: "Shkarkimi është i fikur për këtë mësim: studentët i shohin materialet vetëm në faqe. Ndryshojeni te “Detaje”.",
+    cantOpen: "Studentët nuk mund ta hapin këtë skedar pa shkarkim. Ngarkojeni si PDF ose lejoni shkarkimin.",
     intro:
       "PDF, PowerPoint dhe Word (deri në 100 MB), imazhe (deri në 50 MB) dhe video MP4 (deri në 4 GB). Mund të zgjidhni ose të tërhiqni këtu disa skedarë njëherësh. Studentët shohin vetëm materialet e verifikuara. Çdo skedar ruhet edhe te Materialet, për ta përdorur përsëri.",
     choose: "Ngarko materiale",

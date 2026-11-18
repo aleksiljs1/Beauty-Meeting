@@ -30,6 +30,7 @@ export type SeriesNext = {
   summary: string | null;
   details: string | null;
   courseId: string | null;
+  allowDownloads: boolean;
   scheduledStartAt: Date;
   scheduledEndAt: Date;
 };
@@ -45,6 +46,7 @@ export function SeriesEditForm({ seriesId, next, courses }: { seriesId: string; 
     duration: String(Math.round((next.scheduledEndAt.getTime() - next.scheduledStartAt.getTime()) / 60_000)),
   });
   const [changeTime, setChangeTime] = useState(false);
+  const [allowDownloads, setAllowDownloads] = useState(next.allowDownloads);
   const { run, pending } = useApiAction();
   const set = (key: keyof typeof values) => (value: string) => setValues((v) => ({ ...v, [key]: value }));
 
@@ -55,6 +57,7 @@ export function SeriesEditForm({ seriesId, next, courses }: { seriesId: string; 
       summary: values.summary || null,
       details: values.details || null,
       courseId: values.courseId === NO_COURSE ? null : values.courseId,
+      allowDownloads,
       ...(changeTime ? { time: { start: values.start, durationMinutes: Number(values.duration) } } : {}),
     };
     const result = await run(() => apiSend<{ count: number; zoomWarning: string | null }>("patch", `/admin/series/${seriesId}`, body));
@@ -89,6 +92,15 @@ export function SeriesEditForm({ seriesId, next, courses }: { seriesId: string; 
           </SelectContent>
         </Select>
       </FormField>
+      <div className="flex items-start justify-between gap-4 rounded-md border p-4">
+        <div className="space-y-1">
+          <label htmlFor="series-allow-downloads" className="text-sm font-medium">
+            {f.allowDownloads}
+          </label>
+          <p className="text-xs text-muted-foreground">{f.allowDownloadsHint}</p>
+        </div>
+        <Switch id="series-allow-downloads" checked={allowDownloads} onCheckedChange={setAllowDownloads} />
+      </div>
       <div className="space-y-3 border-t pt-4">
         <label className="flex items-center justify-between gap-4 text-sm font-medium">
           {t.changeTime}

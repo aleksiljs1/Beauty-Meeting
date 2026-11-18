@@ -61,30 +61,37 @@ export async function listChats(user: AppUser): Promise<{ chats: ChatListItem[];
     return !hiddenAt || c.lastMessageAt > hiddenAt;
   });
 
-  const rows = await Promise.all(
-    visible.map(async (m) => {
-      const c = m.conversation;
-      // Messages before I cleared the chat (or joined it) don't exist for me.
-      const visibleFrom = latest(m.clearedAt, m.joinedAt);
-      const readUpTo = latest(m.lastReadAt, visibleFrom);
-      const unread = await prisma.message.count({
-        where: { conversationId: c.id, createdAt: { gt: readUpTo }, deletedAt: null, OR: [{ senderId: { not: user.id } }, { senderId: null }] },
-      });
-      const last = c.messages[0];
-      const other = c.type === "DIRECT" ? (c.members[0]?.user ?? null) : null;
-      const chat: ChatListItem = {
-        id: c.id,
-        type: c.type,
-        title: c.type === "GROUP" ? (c.title ?? "") : (other?.name ?? DELETED_USER_NAME),
-        otherUser: other,
-        lastMessage:
-          last && last.createdAt > visibleFrom ? { body: last.deletedAt ? null : last.body, createdAt: last.createdAt, mine: last.senderId === user.id } : null,
-        unread,
-        pinned: !!m.pinnedAt,
-      };
-      return { chat, pinnedAt: m.pinnedAt?.getTime() ?? 0, activityAt: (c.lastMessageAt ?? c.createdAt).getTime() };
-    }),
-  );
+  // Unread per chat in one query: others' messages after the latest of my read time, my
+  // "delete for me" and my joining (GREATEST skips the empty ones).
+  const unreadRows = await prisma.$queryRaw<{ conversationId: string; unread: number }[]>`
+    SELECT m."conversationId", count(*)::int AS unread
+    FROM "Message" m
+    JOIN "ConversationMember" cm ON cm."conversationId" = m."conversationId" AND cm."userId" = ${user.id}
+    WHERE cm."leftAt" IS NULL
+      AND m."deletedAt" IS NULL
+      AND (m."senderId" IS NULL OR m."senderId" <> ${user.id})
+      AND m."createdAt" > GREATEST(cm."lastReadAt", cm."clearedAt", cm."joinedAt")
+    GROUP BY m."conversationId"`;
+  const unreadByChat = new Map(unreadRows.map((row) => [row.conversationId, row.unread]));
+
+  const rows = visible.map((m) => {
+    const c = m.conversation;
+    // Messages before I cleared the chat (or joined it) don't exist for me.
+    const visibleFrom = latest(m.clearedAt, m.joinedAt);
+    const last = c.messages[0];
+    const other = c.type === "DIRECT" ? (c.members[0]?.user ?? null) : null;
+    const chat: ChatListItem = {
+      id: c.id,
+      type: c.type,
+      title: c.type === "GROUP" ? (c.title ?? "") : (other?.name ?? DELETED_USER_NAME),
+      otherUser: other,
+      lastMessage:
+        last && last.createdAt > visibleFrom ? { body: last.deletedAt ? null : last.body, createdAt: last.createdAt, mine: last.senderId === user.id } : null,
+      unread: unreadByChat.get(c.id) ?? 0,
+      pinned: !!m.pinnedAt,
+    };
+    return { chat, pinnedAt: m.pinnedAt?.getTime() ?? 0, activityAt: (c.lastMessageAt ?? c.createdAt).getTime() };
+  });
 
   // Pinned chats first (most recently pinned on top), then everything else by newest message.
   rows.sort((a, b) => b.pinnedAt - a.pinnedAt || b.activityAt - a.activityAt);
@@ -102,6 +109,8 @@ export async function blockStatus(userId: string, otherUserIds: string[]) {
   if (!otherUserIds.length) return { byMe: false, byThem: false };
   const rows = await prisma.userBlock.findMany({
     where: {
+      // Administrators can't be blocked; an older block against one is ignored.
+      blocked: { role: { not: "admin" } },
       OR: [
         { blockerId: userId, blockedId: { in: otherUserIds } },
         { blockerId: { in: otherUserIds }, blockedId: userId },

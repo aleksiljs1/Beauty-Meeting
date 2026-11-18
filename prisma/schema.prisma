@@ -801,6 +801,9 @@ model ConversationMember {
   joinedAt       DateTime     @default(now()) @db.Timestamptz(3)
   /// Group chats only: left or removed.
   leftAt         DateTime?    @db.Timestamptz(3)
+  /// Last "you have unread messages" email about this chat. No new one until the member has read
+  /// the chat since (services/chat-emails.ts).
+  emailedAt      DateTime?    @db.Timestamptz(3)
 
   @@unique([conversationId, userId])
   @@index([userId, hiddenAt])

@@ -236,7 +236,8 @@ export function PortalShell({ user, academyName, children }: { user: { name: str
       </nav>
 
       <LiveClassAlert aboveBottomNav />
-      <Toaster position="top-center" />
+      {/* On phones, below the header: a pop-up must not cover the chat and notification buttons. */}
+      <Toaster position="top-center" mobileOffset={{ top: 72 }} />
       <ChatSidebar />
     </div>
   );

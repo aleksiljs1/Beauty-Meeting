@@ -16,7 +16,11 @@ import type { SendMessageInput, StartChatInput, UpdateChatInput } from "@/server
  * realtime service (no data travels with it); their open chats refetch through the API.
  *
  * Blocking: a block in either direction stops both people from sending; unblocking lets the chat
- * continue. Both are signalled, so an open chat locks or unlocks mid-conversation.
+ * continue. Both are signalled, so an open chat locks or unlocks mid-conversation. Administrators
+ * can't be blocked (the academy must always reach its students).
+ *
+ * Offline: someone who doesn't read a message within a few minutes gets one email about it
+ * (services/chat-emails.ts).
  *
  * Not here yet: "delete a message for everyone" (waiting on the client's answer).
  */
@@ -123,6 +127,10 @@ export async function sendMessage(user: AppUser, conversationId: string, input: 
   );
   if (blocked.byMe || blocked.byThem) throw new ApiError("FORBIDDEN", CHAT_BLOCKED);
 
+  // A deactivated account can't read anything: say so instead of sending into the void.
+  const inactive = await prisma.user.count({ where: { id: { in: others.map((o) => o.userId) }, banned: true } });
+  if (inactive) throw new ApiError("FORBIDDEN", "Ky person nuk është më aktiv. Mesazhi nuk u dërgua.");
+
   // Rate limit: count what I sent in the last minute.
   const sentLastMinute = await prisma.message.count({
     where: { senderId: user.id, createdAt: { gt: new Date(now.getTime() - 60_000) } },
@@ -190,8 +198,10 @@ export async function updateChat(user: AppUser, conversationId: string, input: U
  */
 export async function blockUser(user: AppUser, otherUserId: string) {
   if (otherUserId === user.id) throw new ApiError("VALIDATION_FAILED", "Nuk mund të bllokoni veten.");
-  const other = await prisma.user.findUnique({ where: { id: otherUserId }, select: { id: true } });
+  const other = await prisma.user.findUnique({ where: { id: otherUserId }, select: { id: true, role: true } });
   if (!other) throw new ApiError("NOT_FOUND", "Ky person nuk u gjet.");
+  // The academy must always be able to reach its students: administrators can't be blocked.
+  if (other.role === "admin") throw new ApiError("VALIDATION_FAILED", "Akademia nuk mund të bllokohet.");
   await prisma.userBlock.createMany({ data: [{ blockerId: user.id, blockedId: otherUserId }], skipDuplicates: true });
   await publishChatChanged([user.id, otherUserId]);
 }

@@ -19,17 +19,20 @@ import type { LibraryFile } from "@/server/queries/admin";
 
 const t = admin.materials;
 
-export type MaterialRow = FileInfo & { id: string };
+/** `viewable`: opens in the page (PDF, image, MP4); Word/PowerPoint don't. */
+export type MaterialRow = FileInfo & { id: string; viewable?: boolean };
 
-export function MaterialsPanel({ lessonId, materials }: { lessonId: string; materials: MaterialRow[] }) {
+/** `downloadsOff`: the lesson's download switch is off, so students can only view in the page. */
+export function MaterialsPanel({ lessonId, materials, downloadsOff = false }: { lessonId: string; materials: MaterialRow[]; downloadsOff?: boolean }) {
   return (
     <MaterialUploader lessonId={lessonId} intro={t.intro} actions={<LibraryPicker lessonId={lessonId} attached={materials.map((m) => m.fileId)} />}>
+      {downloadsOff && <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">{t.downloadsOff}</p>}
       {materials.length === 0 ? (
         <EmptyState>{t.empty}</EmptyState>
       ) : (
         <ul className="divide-y rounded-md border">
           {materials.map((material, index) => (
-            <MaterialItem key={material.id} material={material} first={index === 0} last={index === materials.length - 1} />
+            <MaterialItem key={material.id} material={material} first={index === 0} last={index === materials.length - 1} cantOpen={downloadsOff && material.status === "READY" && material.viewable === false} />
           ))}
         </ul>
       )}
@@ -37,7 +40,7 @@ export function MaterialsPanel({ lessonId, materials }: { lessonId: string; mate
   );
 }
 
-function MaterialItem({ material, first, last }: { material: MaterialRow; first: boolean; last: boolean }) {
+function MaterialItem({ material, first, last, cantOpen }: { material: MaterialRow; first: boolean; last: boolean; cantOpen: boolean }) {
   const { run, pending } = useApiAction();
   const url = `/admin/materials/${material.id}`;
   // A finished file is only taken off this lesson (it stays in the library); an unfinished
@@ -46,7 +49,7 @@ function MaterialItem({ material, first, last }: { material: MaterialRow; first:
 
   return (
     <li className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-      <FileSummary file={material} />
+      <FileSummary file={material} extra={cantOpen ? <p className="text-xs text-destructive">{t.cantOpen}</p> : undefined} />
       <div className="flex flex-wrap items-center gap-1 self-start sm:self-center">
         <OpenFileButton file={material} />
         <Button variant="ghost" size="icon-sm" aria-label={`${t.moveUp}: ${material.displayName}`} disabled={pending || first} onClick={() => run(() => apiSend("patch", url, { move: "up" }))}>

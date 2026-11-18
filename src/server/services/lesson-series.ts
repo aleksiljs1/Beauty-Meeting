@@ -53,6 +53,8 @@ export type SeriesPatch = {
   details?: string | null;
   courseId?: string | null;
   imageId?: string | null;
+  /** Students may download the materials (each upcoming date). */
+  allowDownloads?: boolean;
   /** New Tirana start time ("HH:MM") and length for every upcoming date (both or neither). */
   time?: { start: string; durationMinutes: number };
 };
