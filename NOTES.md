@@ -529,7 +529,7 @@ From a full read-only review (student journey, admin workflows, structure, secur
 ## Review improvements to the chat and the downloads switch (2026-11-18)
 
 Tested end to end (two students on desktop and phone + the admin, against a separate `academy_review` database)
-and fixed what the review found. 5 new integration tests; all 205 integration tests pass.
+and fixed what the review found. 6 new integration tests; the full integration suite passed.
 
 - **The academy can't be blocked.** A student who blocked the admin would cut the academy off from them.
   `blockUser` now refuses an administrator ("Akademia nuk mund të bllokohet.", 422), `blockStatus` ignores any older
@@ -541,7 +541,8 @@ and fixed what the review found. 5 new integration tests; all 205 integration te
   reader **one** email "Keni mesazhe të reja" (names of the senders, **not** the text) with a link to
   `/portal?mesazhet=1` or `/admin?mesazhet=1`, which opens the chat sidebar (`chat-sidebar.tsx` reads and removes
   the parameter). No further email about that chat until they have read it; several chats due together go into one
-  email per person; deactivated accounts get none. New column `ConversationMember.emailedAt` (migration
+  email per person; deactivated accounts get none. Deleting the chat for yourself counts like reading it, and
+  messages from someone the reader has blocked since never trigger an email. New column `ConversationMember.emailedAt` (migration
   `20261118090000_chat_unread_email`); each chat is claimed before sending (no double emails from overlapping runs)
   and the claim is given back if sending fails.
 - **No messages to deactivated accounts:** `sendMessage` refuses with "Ky person nuk është më aktiv. Mesazhi nuk u
@@ -555,6 +556,7 @@ and fixed what the review found. 5 new integration tests; all 205 integration te
   (`mobileOffset={{ top: 72 }}`). They still slide in from the top edge for ~0.5 s (the library's animation).
 - **Phones: the chat panel was 3/4 wide, not full screen.** The sheet's own `data-[side=right]:w-3/4` and
   `sm:max-w-sm` rules beat the chat's `w-full sm:max-w-md`; the chat now overrides them with the same variants.
+  (Type-checked, but not yet seen in a browser: the rebuild was stopped for lack of memory.)
 - **Downloads switch on lesson series:** the series edit page now has "Lejo shkarkimin e materialeve" too, applied
   to every upcoming date (past dates untouched), so a repeating lesson no longer needs editing date by date.
 - **Admin warning for Word/PowerPoint:** with downloads off, the lesson's Materialet tab says so and marks each
