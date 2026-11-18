@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Ban, Loader2, MoreVertical, Pin, PinOff, Send, Trash2, Unlock } from "lucide-react";
+import { ArrowLeft, Ban, Loader2, Minus, MoreVertical, Pin, PinOff, Send, Trash2, Unlock, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { MAX_MESSAGE_LENGTH, type ChatMessageItem, type ChatPage } from "@/lib/c
 import { academyDay, formatDate, formatTime } from "@/lib/datetime";
 import { subscribeChat } from "@/lib/realtime/client";
 import { cn } from "@/lib/utils";
+import { Avatar } from "./chat-common";
 
 const errorMessage = (error: unknown) => (error instanceof ApiClientError ? error.message : t.loadError);
 /** Within this distance of the bottom, new messages scroll into view by themselves. */
@@ -30,6 +31,9 @@ function merge(current: ChatMessageItem[], incoming: ChatMessageItem[]) {
  * When either person has blocked the other, the composer is replaced by a notice. The block state
  * comes with every load of the messages, so a block or unblock made mid-chat (by either side)
  * shows as soon as the chat refetches on its realtime signal.
+ *
+ * Two looks: full screen on phones (`onBack` to the list) and a docked window on computers
+ * (`dock` with minimize/close; the title minimizes too, as on Facebook).
  */
 export function ChatThread({
   chatId,
@@ -38,6 +42,9 @@ export function ChatThread({
   canBlock,
   pinned,
   onBack,
+  dock,
+  markRead = true,
+  autoFocus = false,
   onTogglePin,
   onDelete,
 }: {
@@ -48,7 +55,13 @@ export function ChatThread({
   /** False when the other person is an administrator (the academy can't be blocked). */
   canBlock: boolean;
   pinned: boolean;
-  onBack: () => void;
+  /** Full screen: back to the chat list. */
+  onBack?: () => void;
+  /** Docked window: its controls, and `highlight` (unread) tints the header. */
+  dock?: { onMinimize: () => void; onClose: () => void; highlight: boolean };
+  /** False while a window opened by an incoming message hasn't been touched: nothing is marked read. */
+  markRead?: boolean;
+  autoFocus?: boolean;
   onTogglePin: () => void;
   onDelete: () => void;
 }) {
@@ -109,14 +122,14 @@ export function ChatThread({
   // Read receipts: once the newest message from someone else is on screen, mark the chat read.
   const markIfNeeded = useCallback(() => {
     const last = messages.at(-1);
-    if (!last || last.mine || last.id === lastMarked.current || document.visibilityState !== "visible") return;
+    if (!markRead || !last || last.mine || last.id === lastMarked.current || document.visibilityState !== "visible") return;
     lastMarked.current = last.id;
     void apiSend("post", `/chats/${chatId}/read`)
       .then(() => refreshChats())
       .catch(() => {
         lastMarked.current = null; // try again on the next update
       });
-  }, [chatId, messages]);
+  }, [chatId, messages, markRead]);
 
   useEffect(() => {
     markIfNeeded();
@@ -200,15 +213,36 @@ export function ChatThread({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <header className="flex items-center gap-1 border-b px-2 py-2 pr-12">
-        <Button variant="ghost" size="icon-lg" aria-label={t.back} onClick={onBack}>
-          <ArrowLeft className="size-5" />
-        </Button>
-        <h3 className="min-w-0 flex-1 truncate font-heading text-lg">{title}</h3>
+      <header
+        className={cn(
+          "flex items-center gap-1 border-b",
+          dock ? cn("py-1 pr-1 pl-1.5 transition-colors", dock.highlight && "bg-rose-deep text-primary-foreground") : "px-2 py-2",
+          onBack && "pr-12",
+        )}
+      >
+        {onBack ? (
+          <Button variant="ghost" size="icon-lg" aria-label={t.back} onClick={onBack}>
+            <ArrowLeft className="size-5" />
+          </Button>
+        ) : null}
+        {dock ? (
+          <button
+            type="button"
+            onClick={dock.onMinimize}
+            title={t.minimize}
+            className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-1 text-left outline-none hover:bg-black/5 focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <Avatar name={title} className="size-8 text-[11px] text-foreground" />
+            <h3 className="min-w-0 truncate text-sm font-semibold">{title}</h3>
+            <span className="sr-only">{t.minimize}</span>
+          </button>
+        ) : (
+          <h3 className="min-w-0 flex-1 truncate font-heading text-lg">{title}</h3>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon-lg" aria-label={t.actions}>
-              <MoreVertical className="size-5" />
+            <Button variant="ghost" size={dock ? "icon-sm" : "icon-lg"} className={cn(dock?.highlight && "text-inherit hover:bg-black/10")} aria-label={t.actions}>
+              <MoreVertical className={dock ? "size-4" : "size-5"} />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
@@ -225,6 +259,16 @@ export function ChatThread({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        {dock ? (
+          <>
+            <Button variant="ghost" size="icon-sm" className={cn(dock.highlight && "text-inherit hover:bg-black/10")} aria-label={t.minimize} title={t.minimize} onClick={dock.onMinimize}>
+              <Minus className="size-4" />
+            </Button>
+            <Button variant="ghost" size="icon-sm" className={cn(dock.highlight && "text-inherit hover:bg-black/10")} aria-label={t.close} title={t.close} onClick={dock.onClose}>
+              <X className="size-4" />
+            </Button>
+          </>
+        ) : null}
       </header>
 
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto px-3 py-3" aria-live="polite">
@@ -310,6 +354,7 @@ export function ChatThread({
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={onComposerKey}
+              autoFocus={autoFocus}
               placeholder={t.composerPlaceholder}
               aria-label={t.composerLabel}
               maxLength={MAX_MESSAGE_LENGTH}

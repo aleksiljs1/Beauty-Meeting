@@ -1,4 +1,4 @@
-/** Chat sidebar texts (portal and admin). */
+/** Chat texts: chat list, windows and full-screen chats (portal and admin). */
 export const chatText = {
   open: (unread: number) => (unread > 0 ? `Mesazhet (${unread} të palexuara)` : "Mesazhet"),
   title: "Mesazhet",
@@ -6,7 +6,7 @@ export const chatText = {
   newChat: "Bisedë e re",
   back: "Kthehu",
   empty: "Nuk keni ende biseda.",
-  emptyHint: "Nisni një bisedë me “Bisedë e re”.",
+  emptyHint: "Shtypni ✎ për të nisur një bisedë.",
   loadError: "Bisedat nuk u ngarkuan. Provoni përsëri.",
   retry: "Provo përsëri",
 
@@ -46,5 +46,8 @@ export const chatText = {
   youBlocked: "Ju e keni bllokuar këtë person.",
 
   newMessageFrom: (name: string) => `Mesazh i ri nga ${name}`,
+  newMessage: "Mesazh i ri",
+  minimize: "Minimizo",
+  close: "Mbyll",
   openChat: "Hap",
 };

@@ -1,7 +1,7 @@
 # Implementation status
 
 Single source of truth for progress. Update at the end of every work session / stage.
-Last updated: 2026-11-17
+Last updated: 2026-11-18
 Legend: ✅ done & verified · 🟡 in progress · ⬜ not started · ⛔ blocked (reason)
 
 How to run: `README.md` · How to test: `docs/testing.md` · Decisions: `NOTES.md`
@@ -37,7 +37,7 @@ How to run: `README.md` · How to test: `docs/testing.md` · Decisions: `NOTES.m
 - ✅ Live-class pop-up on public pages for signed-in students (lazy-loaded; anonymous visitors don't download it)
 - ✅ Admin portal: dashboard, students (create + setup email, Excel bulk import, deactivate/reactivate, resend), lessons CRUD/publish/cancel/archive/restore, roster & per-student deadlines, shared invitation links, material & multipart recording uploads, demo go-live/end/reset, integrations status, audit history (56 live API checks)
 - ✅ Excel student onboarding from the **Student i ri** dialog: in-memory `.xlsx` preview, required/unknown-column and row validation, duplicate-email checks, course-title matching, course membership/upcoming lesson assignment, and password setup emails; browser-tested by the user
-- ✅ In-page chat (everyone ↔ everyone, text only): sidebar from the ✈ icon (portal + admin), start/open chats, real-time delivery over the realtime service (`chat:changed`, needs `npm run realtime`), unread badge + toasts, "Parë", pin, delete for me, blocking (either direction stops both; locks/unlocks live) — 18 integration tests + 2 realtime tests; chat browser-tested by the user 2026-11-17; blocking clicked through and the review fixes added 2026-11-18 (the academy can't be blocked, one email for unread messages, no messages to deactivated accounts, full-screen chat and pop-ups below the header on phones, downloads switch on series, admin warning for Word/PowerPoint with downloads off). See NOTES.md "In-page chat" and "Review improvements"
+- ✅ In-page chat (everyone ↔ everyone, text only): sidebar from the ✈ icon (portal + admin), start/open chats, real-time delivery over the realtime service (`chat:changed`, needs `npm run realtime`), unread badge + toasts, "Parë", pin, delete for me, blocking (either direction stops both; locks/unlocks live) — 18 integration tests + 2 realtime tests; chat browser-tested by the user 2026-11-17; blocking clicked through and the review fixes added 2026-11-18 (the academy can't be blocked, one email for unread messages, no messages to deactivated accounts, full-screen chat and pop-ups below the header on phones, downloads switch on series, admin warning for Word/PowerPoint with downloads off); Facebook-style on computers 2026-11-18 (drop-down list, docked chat windows, bubbles, a new message opens its window). See NOTES.md "In-page chat", "Review improvements" and "Facebook-style chat windows"
 - ⬜ Chat, waiting on the client: a "report" button / whether the academy may read students' chats with each other; group chats; "delete for everyone"
 - ✅ Material downloads switch per lesson ("Lejo shkarkimin e materialeve", off by default, existing lessons included): students view only, the server refuses download links; admins always download — verified against the local DB; browser QA pending (docs/testing.md). See NOTES.md "Material downloads switch"
 - ✅ Materials library (`/admin/materialet`): upload once, reuse in any lesson ("Nga materialet"); removing from a lesson keeps the file; existing materials migrated

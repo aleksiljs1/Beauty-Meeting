@@ -482,7 +482,8 @@ From a full read-only review (student journey, admin workflows, structure, secur
 - **Why:** the client wants to stop using WhatsApp. Designed by the client: **everyone can message everyone**
   (students ↔ students ↔ admins), text only (no calls, no media), real time. Scoping/monitoring may come later.
 - **UI:** plane icon (✈) with an unread badge. Portal: next to the bell. Admin: "Mesazhet" in the side menu (desktop),
-  icon in the top bar (phones). It opens a **sidebar** (full screen on phones) with the chat list (pinned first,
+  icon in the top bar (phones). Since 2026-11-18 it works like Facebook's chat on computers (see "Facebook-style
+  chat windows" below); on phones it opens full screen with the chat list (pinned first,
   then newest), "Bisedë e re" (search every active account by name), and the open chat: bubbles, date lines,
   "Parë" under my last message once read, older messages on demand, Enter sends / Shift+Enter new line.
   Toast "Mesazh i ri nga …" with "Hap" for a message in a chat that isn't open. Code: `components/chat/`,
@@ -556,7 +557,7 @@ and fixed what the review found. 6 new integration tests; the full integration s
   (`mobileOffset={{ top: 72 }}`). They still slide in from the top edge for ~0.5 s (the library's animation).
 - **Phones: the chat panel was 3/4 wide, not full screen.** The sheet's own `data-[side=right]:w-3/4` and
   `sm:max-w-sm` rules beat the chat's `w-full sm:max-w-md`; the chat now overrides them with the same variants.
-  (Type-checked, but not yet seen in a browser: the rebuild was stopped for lack of memory.)
+  (Seen in the browser later the same day: 390 px wide on a 390 px phone.)
 - **Downloads switch on lesson series:** the series edit page now has "Lejo shkarkimin e materialeve" too, applied
   to every upcoming date (past dates untouched), so a repeating lesson no longer needs editing date by date.
 - **Admin warning for Word/PowerPoint:** with downloads off, the lesson's Materialet tab says so and marks each
@@ -568,3 +569,36 @@ and fixed what the review found. 6 new integration tests; the full integration s
   (403) and blocking the academy (422); no "Blloko" for the academy; `?mesazhet=1` opens the chats; series switch
   saves; admin warnings show; student Shkarko buttons disabled and the server refuses the download (403); no page
   errors. Emails checked in Mailpit (sender names, no message text).
+
+## Facebook-style chat windows (user request, 2026-11-18)
+
+The user wanted the chat "like the Facebook chat pop-up". On computers (≥ 768 px, `DESKTOP_QUERY` in
+`hooks/use-chat.ts`):
+
+- **✈ drops down the chat list** under the button (admin: next to the side menu), ~340 px wide: avatar, name,
+  last message · time, a dot + bold for unread, "…" on hover for pin/delete, ✎ for a new chat. Picking a chat
+  closes the list and opens the chat in a window; the cursor goes straight to the message box.
+- **Chat windows docked at the bottom right**, 328 × 455 px, newest furthest right, up to 3 side by side (fewer on
+  narrower screens). Header: avatar + name (click = minimize), ⋮ (pin / block / delete), – minimize, ✕ close.
+- **Minimized chats are round bubbles** on the right edge with the unread count; hover shows ✕. Under them a ✎
+  "Mesazh i ri" button opens a people-search window that turns into the chat once a person is picked. The column
+  only shows while a window or bubble exists, so it never covers a page for nothing.
+- **A new message opens its chat's window by itself** (a minimized chat just counts up on its bubble). Such a window
+  has a tinted header and marks nothing read (no "Parë" for the sender) until the reader clicks or types in it;
+  a chat the reader opens themselves is marked read at once.
+- Windows squeezed into bubbles for lack of room come back when there is room again (a window closed, a wider
+  screen); ones the reader minimized stay minimized. Open windows survive a reload (sessionStorage, per tab).
+- **Phones keep the full-screen chats** (list → chat → back) and the "Mesazh i ri nga …" toast.
+- Code: `chat-sidebar.tsx` (✈ button + drop-down, phone sheet, delete dialog), `chat-dock.tsx` (windows, bubbles),
+  `chat-common.tsx` (list, people search, avatar, pin/delete), `chat-thread.tsx` (one chat, phone or window look),
+  window state in `hooks/use-chat.ts`.
+- **Browser-tested** (dev copy on port 3001 against `academy_review`; test script kept outside the repo): 33 of 36
+  checks passed; the 3 misses were the test's own (a phone user with no chat to open, the phone panel counted as a
+  window, and a 1.5 s wait while the dev server took 2.1 s to compile the delete request — the server log shows
+  the delete succeeded). Verified: drop-down position (portal and admin), window docking and size, cursor in the
+  box, incoming message opens the window highlighted and unread, read once touched, minimize/bubble/close, 3
+  windows side by side and 2 at 900 px, squeezed windows coming back, windows kept after reload, phone full
+  screen, no sideways scroll, no page errors. **Not yet re-run after the last test fixes:** "delete closes the
+  window" and opening a chat full screen on a phone (the dev copy was stopped). Live delivery between two people
+  wasn't part of this run (the dev copy's port isn't allowed by the realtime service); it uses the same signals
+  as before.
