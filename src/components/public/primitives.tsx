@@ -104,7 +104,7 @@ export function ArrowLink({ href, children }: { href: string; children: ReactNod
   return (
     <Link
       href={href}
-      className="group inline-flex items-center gap-2 self-start rounded-sm text-sm font-medium text-foreground underline decoration-rose/60 underline-offset-[6px] transition-[color,text-decoration-color] duration-300 hover:text-rose-deep hover:decoration-rose-deep focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:self-auto"
+      className="group relative touch-target inline-flex items-center gap-2 self-start rounded-sm text-sm font-medium text-foreground underline decoration-rose/60 underline-offset-[6px] transition-[color,text-decoration-color] duration-300 hover:text-rose-deep hover:decoration-rose-deep focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:self-auto"
     >
       {children}
       <span aria-hidden className="transition-transform duration-300 ease-out motion-safe:group-hover:translate-x-1">

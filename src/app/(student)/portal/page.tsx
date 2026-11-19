@@ -124,7 +124,7 @@ export default async function DashboardPage() {
               <h2 id="upcoming-heading" className="text-2xl">
                 {t.upcomingTitle}
               </h2>
-              <Link href="/portal/mesimet?filtri=te-ardhshme" className="text-sm text-rose-deep underline-offset-4 hover:underline">
+              <Link href="/portal/mesimet?filtri=te-ardhshme" className="relative inline-block touch-target text-sm text-rose-deep underline-offset-4 hover:underline">
                 {t.seeAll}
               </Link>
             </div>
@@ -144,7 +144,7 @@ export default async function DashboardPage() {
               <h2 id="replays-heading" className="text-2xl">
                 {t.replaysTitle}
               </h2>
-              <Link href="/portal/mesimet?filtri=te-perfunduara" className="text-sm text-rose-deep underline-offset-4 hover:underline">
+              <Link href="/portal/mesimet?filtri=te-perfunduara" className="relative inline-block touch-target text-sm text-rose-deep underline-offset-4 hover:underline">
                 {t.seeAll}
               </Link>
             </div>

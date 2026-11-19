@@ -32,7 +32,7 @@ export default async function ContentHomePage() {
         ))}
       </ul>
       <p className="mt-8 text-sm">
-        <a href="/" target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 underline underline-offset-4">
+        <a href="/" target="_blank" rel="noopener" className="relative inline-flex touch-target items-center gap-1.5 underline underline-offset-4">
           {adminContent.viewSite}
           <ExternalLinkIcon className="size-3.5" aria-hidden />
         </a>

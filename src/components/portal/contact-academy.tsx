@@ -26,7 +26,7 @@ export async function ContactAcademy({ showHelpLink = true }: { showHelpLink?: b
       </div>
       <ContactActions settings={settings} whatsappText={t.whatsappText} emailSubject={t.emailSubject} />
       {showHelpLink && (
-        <Link href="/portal/ndihme" className="text-sm text-rose-deep underline-offset-4 hover:underline">
+        <Link href="/portal/ndihme" className="relative inline-block touch-target text-sm text-rose-deep underline-offset-4 hover:underline">
           {t.helpLink}
         </Link>
       )}

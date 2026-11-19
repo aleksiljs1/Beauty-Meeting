@@ -93,7 +93,7 @@ export default async function StudentsPage({ searchParams }: PageProps<"/admin/s
           <ul className="divide-y">
             {result.items.map((student) => (
               <li key={student.id} className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-4 py-3 md:grid-cols-[2fr_2fr_1.5fr_1fr_9rem_3rem]">
-                <Link href={`/admin/studentet/${student.id}`} className="justify-self-start rounded-sm font-medium underline-offset-4 outline-none hover:text-rose-deep hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">
+                <Link href={`/admin/studentet/${student.id}`} className="relative touch-target justify-self-start rounded-sm font-medium underline-offset-4 outline-none hover:text-rose-deep hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">
                   {student.name}
                 </Link>
                 <span className="col-start-1 min-w-0 text-sm text-muted-foreground md:col-start-auto">

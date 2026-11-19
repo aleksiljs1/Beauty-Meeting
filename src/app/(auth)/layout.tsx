@@ -20,7 +20,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
         </header>
         <main className="rounded-xl border bg-card p-6 shadow-sm sm:p-8">{children}</main>
         <p className="mt-6 text-center text-xs">
-          <Link href="/" className="text-muted-foreground underline-offset-4 hover:underline">
+          <Link href="/" className="relative inline-block touch-target text-muted-foreground underline-offset-4 hover:underline">
             {authText.layout.backHome}
           </Link>
         </p>

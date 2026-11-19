@@ -67,7 +67,7 @@ export function ForgotPasswordForm({ next }: { next: string | null }) {
         {isSubmitting ? t.forgot.submitting : t.forgot.submit}
       </Button>
       <p className="text-center text-sm">
-        <Link href={withNext("/hyr", next)} className="text-rose-deep underline-offset-4 hover:underline">
+        <Link href={withNext("/hyr", next)} className="relative inline-block touch-target text-rose-deep underline-offset-4 hover:underline">
           {t.forgot.backToLogin}
         </Link>
       </p>

@@ -86,7 +86,7 @@ export function ZoomHostPanel({ lessonId, zoomLive, meetingNumber, publication, 
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">{t.note}</p>
-        <Link href="/admin/ndihme" className="inline-flex items-center gap-1.5 text-sm text-rose-deep underline-offset-4 hover:underline">
+        <Link href="/admin/ndihme" className="relative inline-flex touch-target items-center gap-1.5 text-sm text-rose-deep underline-offset-4 hover:underline">
           <CircleHelp className="size-4" aria-hidden />
           {t.helpLink}
         </Link>

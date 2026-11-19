@@ -82,7 +82,7 @@ export function LoginForm({ next }: { next: string | null }) {
         {busy ? t.login.submitting : t.login.submit}
       </Button>
       <p className="text-center text-sm">
-        <Link href={withNext("/fjalekalimi/harruar", next)} className="text-rose-deep underline-offset-4 hover:underline">
+        <Link href={withNext("/fjalekalimi/harruar", next)} className="relative inline-block touch-target text-rose-deep underline-offset-4 hover:underline">
           {t.login.forgot}
         </Link>
       </p>

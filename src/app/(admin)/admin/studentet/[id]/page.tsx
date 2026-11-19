@@ -125,7 +125,7 @@ export default async function StudentPage({ params }: PageProps<"/admin/studente
             ))}
           </ul>
         )}
-        <Link href={`/admin/pagesat?q=${encodeURIComponent(student.email)}`} className="text-sm text-rose-deep underline-offset-4 hover:underline">
+        <Link href={`/admin/pagesat?q=${encodeURIComponent(student.email)}`} className="relative inline-block touch-target text-sm text-rose-deep underline-offset-4 hover:underline">
           {t.paymentsAll}
         </Link>
       </SectionCard>
