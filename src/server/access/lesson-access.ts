@@ -7,6 +7,7 @@ import { checkCapability, evaluateLessonAccess, type Capability, type LessonAcce
 const lessonAccessSelect = {
   id: true,
   title: true,
+  format: true,
   publication: true,
   meetingStatus: true,
   scheduledStartAt: true,

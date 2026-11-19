@@ -30,6 +30,7 @@ export const common = {
     ENDED: "Përfunduar",
     EXPIRED: "Skaduar",
     CANCELLED: "Anuluar",
+    SELF_STUDY: "Offline · Për studim",
   },
   publication: {
     DRAFT: "Draft",

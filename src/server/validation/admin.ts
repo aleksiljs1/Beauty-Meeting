@@ -63,6 +63,13 @@ const lessonFields = {
   isDemo: z.boolean().optional(),
   /** Students may download the lesson's materials (off: view only). */
   allowDownloads: z.boolean().optional(),
+  /**
+   * OFFLINE: self-study, materials only. Its `scheduledStartAt` is when students see it and
+   * `accessExpiresAt` its deadline; the other two times are derived on the server.
+   */
+  format: z.enum(["LIVE", "OFFLINE"]).optional(),
+  /** Offline only: visible right away (the server's now replaces `scheduledStartAt`). */
+  availableNow: z.boolean().optional(),
   scheduledStartAt: isoDate,
   scheduledEndAt: isoDate,
   joinOpensAt: isoDate,
@@ -85,6 +92,7 @@ export const updateLessonSchema = z.object({
   imageId: lessonFields.imageId,
   isDemo: lessonFields.isDemo,
   allowDownloads: lessonFields.allowDownloads,
+  availableNow: lessonFields.availableNow,
   scheduledStartAt: isoDate.optional(),
   scheduledEndAt: isoDate.optional(),
   joinOpensAt: isoDate.optional(),

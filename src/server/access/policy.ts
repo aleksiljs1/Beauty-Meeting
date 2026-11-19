@@ -11,13 +11,17 @@
  *  - Effective deadline = the earlier of the lesson deadline and the student's own deadline.
  *  - Meeting state comes from provider events, but never outlives the schedule: see
  *    `effectiveMeetingStatus`. Decisions use that, never the stored `meetingStatus` directly.
+ *  - An offline (self-study) lesson has no meeting: students see it from `joinOpensAt` (its
+ *    "available from", hidden before) until its deadline, and can never join anything.
  */
-import type { MeetingStatus, PublicationStatus } from "@/generated/prisma/enums";
+import type { LessonFormat, MeetingStatus, PublicationStatus } from "@/generated/prisma/enums";
 import type { ApiErrorCode } from "@/lib/api/types";
 
 export type AccessViewer = { id: string; role: "admin" | "student" };
 
 export type AccessLesson = {
+  /** Missing = LIVE (older call sites and tests). */
+  format?: LessonFormat;
   publication: PublicationStatus;
   meetingStatus: MeetingStatus;
   joinOpensAt: Date;
@@ -30,7 +34,7 @@ export type AccessEnrollment = {
   revokedAt: Date | null;
 } | null;
 
-export type DenialReason = "NOT_ENROLLED" | "REVOKED" | "NOT_PUBLISHED" | "CANCELLED" | "EXPIRED";
+export type DenialReason = "NOT_ENROLLED" | "REVOKED" | "NOT_PUBLISHED" | "NOT_YET_AVAILABLE" | "CANCELLED" | "EXPIRED";
 
 export type LessonAccess =
   | { status: "admin" }
@@ -43,6 +47,8 @@ export type Capability =
   | "JOIN_LIVE"; // request meeting credentials
 
 export type CapabilityResult = { allowed: true } | { allowed: false; code: ApiErrorCode; message: string };
+
+export const isOffline = (lesson: { format?: LessonFormat }) => lesson.format === "OFFLINE";
 
 export const isExpired = (deadline: Date, now: Date) => now.getTime() >= deadline.getTime();
 
@@ -68,6 +74,8 @@ export function evaluateLessonAccess(
     return { status: "denied", reason: "NOT_PUBLISHED", deadline };
   }
   if (lesson.publication === "CANCELLED") return { status: "denied", reason: "CANCELLED", deadline };
+  // A scheduled offline lesson stays hidden (like a draft) until the day it appears.
+  if (isOffline(lesson) && now.getTime() < lesson.joinOpensAt.getTime()) return { status: "denied", reason: "NOT_YET_AVAILABLE", deadline };
   if (isExpired(deadline, now)) return { status: "denied", reason: "EXPIRED", deadline };
 
   return { status: "granted", deadline };
@@ -114,6 +122,7 @@ export function checkCapability(access: LessonAccess, capability: Capability, le
   if (capability === "VIEW_CONTENT") return { allowed: true };
 
   // JOIN_LIVE — admins host through a separate, admin-only path, but may also preview.
+  if (isOffline(lesson)) return { allowed: false, code: "LESSON_JOIN_NOT_OPEN", message: "Ky mësim nuk ka klasë live: materialet janë gati për t'u studiuar." };
   const meeting = effectiveMeetingStatus(lesson, now);
   if (meeting === "ENDED") {
     return { allowed: false, code: "LESSON_JOIN_NOT_OPEN", message: "Mësimi live ka përfunduar." };
@@ -143,8 +152,11 @@ export function grantLifetimeSeconds(access: LessonAccess, maxSeconds: number, n
   return Math.max(1, Math.min(maxSeconds, remaining));
 }
 
-/** Student-facing state for lesson cards and filters ("Upcoming", "Live", "Replay", "Expired"). */
-export type LessonPhase = "UPCOMING" | "STARTING_SOON" | "WAITING_FOR_HOST" | "LIVE" | "REPLAY" | "ENDED" | "EXPIRED" | "CANCELLED";
+/**
+ * Student-facing state for lesson cards and filters ("Upcoming", "Live", "Replay", "Expired").
+ * SELF_STUDY: an offline lesson the student can study now.
+ */
+export type LessonPhase = "UPCOMING" | "STARTING_SOON" | "WAITING_FOR_HOST" | "LIVE" | "REPLAY" | "ENDED" | "EXPIRED" | "CANCELLED" | "SELF_STUDY";
 
 export function lessonPhase(
   lesson: AccessLesson & { scheduledStartAt: Date },
@@ -155,6 +167,7 @@ export function lessonPhase(
 ): LessonPhase {
   if (lesson.publication === "CANCELLED") return "CANCELLED";
   if (access.status === "denied" && access.reason === "EXPIRED") return "EXPIRED";
+  if (isOffline(lesson)) return now.getTime() >= lesson.accessExpiresAt.getTime() ? "EXPIRED" : now.getTime() < lesson.joinOpensAt.getTime() ? "UPCOMING" : "SELF_STUDY";
   const meeting = effectiveMeetingStatus(lesson, now);
   if (meeting === "LIVE") return "LIVE";
   if (meeting === "ENDED") return hasReadyRecording ? "REPLAY" : "ENDED";

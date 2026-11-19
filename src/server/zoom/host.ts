@@ -32,9 +32,10 @@ async function loadHostableLesson(lessonId: string, admin: AppUser, now: number)
 
   const lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
-    select: { id: true, publication: true, meetingStatus: true, isDemo: true, scheduledStartAt: true, scheduledEndAt: true, zoomMeetingNumber: true, zoomPasscodeEncrypted: true },
+    select: { id: true, format: true, publication: true, meetingStatus: true, isDemo: true, scheduledStartAt: true, scheduledEndAt: true, zoomMeetingNumber: true, zoomPasscodeEncrypted: true },
   });
   if (!lesson) throw new ApiError("NOT_FOUND", "Mësimi nuk u gjet.");
+  if (lesson.format === "OFFLINE") throw new ApiError("CONFLICT", "Ky mësim është offline: nuk ka klasë live në Zoom.");
   if (lesson.isDemo) throw new ApiError("CONFLICT", "Kjo klasë është demonstrim dhe nuk përdor Zoom real.");
   if (lesson.publication !== "PUBLISHED") throw new ApiError("CONFLICT", "Publikoni mësimin para se të nisni klasën live.");
   // An ENDED meeting may be restarted (e.g. ended by mistake) until the scheduled end below.

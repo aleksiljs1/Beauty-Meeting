@@ -118,6 +118,15 @@ export function MeetingBadge({ status }: { status: MeetingValue }) {
   );
 }
 
+/** Shown instead of the meeting state for an offline lesson (it has no class). */
+export function OfflineBadge() {
+  return (
+    <Badge variant="outline" className="border-foreground/30 text-foreground">
+      {admin.lessons.offlineBadge}
+    </Badge>
+  );
+}
+
 export function DemoBadge() {
   return (
     <Badge variant="outline" className="border-rose text-rose-deep">

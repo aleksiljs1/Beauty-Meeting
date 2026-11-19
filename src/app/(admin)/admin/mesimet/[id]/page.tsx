@@ -9,18 +9,19 @@ import { LessonForm } from "@/components/admin/lessons/lesson-form";
 import { LessonStatusPanel } from "@/components/admin/lessons/lesson-status-panel";
 import { ZoomHostPanel } from "@/components/admin/lessons/zoom-host-panel";
 import { zoomText } from "@/i18n/zoom";
-import { LESSON_TABS, type LessonTab } from "@/components/admin/lessons/lesson-tab-ids";
+import { LESSON_TABS, LIVE_TABS, OFFLINE_TABS, type LessonTab } from "@/components/admin/lessons/lesson-tab-ids";
+import { ProgressPanel } from "@/components/admin/lessons/progress-panel";
 import { LessonTabs } from "@/components/admin/lessons/lesson-tabs";
 import { MaterialsPanel } from "@/components/admin/lessons/materials-panel";
 import { RecordingsPanel } from "@/components/admin/lessons/recordings-panel";
 import { RosterPanel } from "@/components/admin/lessons/roster-panel";
-import { DemoBadge, PageHeader, Pagination, SectionCard } from "@/components/admin/page-parts";
+import { DemoBadge, OfflineBadge, PageHeader, Pagination, SectionCard } from "@/components/admin/page-parts";
 import { admin } from "@/i18n/admin";
-import { formatDateTime, formatTimeRange, formatWeekdayDate, ACADEMY_TIMEZONE_LABEL, timezoneAbbreviation } from "@/lib/datetime";
+import { formatDateTime, formatLessonWhen, ACADEMY_TIMEZONE_LABEL, timezoneAbbreviation } from "@/lib/datetime";
 import { requirePageUser } from "@/server/auth/session";
 import { getLessonAttendance } from "@/server/services/attendance";
 import { env } from "@/server/env";
-import { getAdminLesson, getLessonRoster, listCourses, listLessonInvitations } from "@/server/queries/admin";
+import { getAdminLesson, getLessonProgress, getLessonRoster, listCourses, listLessonInvitations } from "@/server/queries/admin";
 import { listCourseCandidates } from "@/server/services/course-members";
 import { listMaterials } from "@/server/services/materials";
 import { listRecordings } from "@/server/services/recordings";
@@ -45,7 +46,8 @@ export default async function LessonDetailPage({ params, searchParams }: PagePro
 
   const lesson = await getAdminLesson(id);
   if (!lesson) notFound();
-  const [courses, roster, courseCandidates, invitations, materials, recordings, attendance] = await Promise.all([
+  const offline = lesson.format === "OFFLINE";
+  const [courses, roster, courseCandidates, invitations, materials, recordings, attendance, progress] = await Promise.all([
     listCourses(),
     getLessonRoster(id, rosterPage),
     listCourseCandidates(id),
@@ -53,6 +55,7 @@ export default async function LessonDetailPage({ params, searchParams }: PagePro
     listMaterials(user, id),
     listRecordings(user, id),
     getLessonAttendance(id),
+    offline ? getLessonProgress(id) : null,
   ]);
 
   return (
@@ -75,20 +78,30 @@ export default async function LessonDetailPage({ params, searchParams }: PagePro
         <PageHeader title={lesson.title} />
         <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           {lesson.isDemo && <DemoBadge />}
-          {formatWeekdayDate(lesson.scheduledStartAt)} · {formatTimeRange(lesson.scheduledStartAt, lesson.scheduledEndAt)} · {admin.lessonForm.deadline}:{" "}
-          {formatDateTime(lesson.accessExpiresAt)} ({ACADEMY_TIMEZONE_LABEL}, {timezoneAbbreviation(lesson.accessExpiresAt)})
+          {offline && <OfflineBadge />}
+          {offline ? (
+            <>
+              {formatLessonWhen(lesson, admin.lessons.offlineWindow)} ({ACADEMY_TIMEZONE_LABEL})
+            </>
+          ) : (
+            <>
+              {formatLessonWhen(lesson, admin.lessons.offlineWindow)} · {admin.lessonForm.deadline}: {formatDateTime(lesson.accessExpiresAt)} ({ACADEMY_TIMEZONE_LABEL},{" "}
+              {timezoneAbbreviation(lesson.accessExpiresAt)})
+            </>
+          )}
         </p>
       </div>
 
       <LessonTabs
         initialTab={tab}
+        tabs={offline ? OFFLINE_TABS : LIVE_TABS}
         panels={{
           detaje: (
             <>
               <SectionCard title={admin.lessonActions.status}>
                 <LessonStatusPanel lesson={lesson} zoomMode={env.ZOOM_MODE} />
               </SectionCard>
-              {!lesson.isDemo && (
+              {!lesson.isDemo && !offline && (
                 <SectionCard title={zoomText.admin.sectionTitle}>
                   <ZoomHostPanel
                     lessonId={lesson.id}
@@ -130,6 +143,11 @@ export default async function LessonDetailPage({ params, searchParams }: PagePro
               <RecordingsPanel lessonId={lesson.id} recordings={recordings} />
             </SectionCard>
           ),
+          perparimi: progress ? (
+            <SectionCard title={admin.progress.title}>
+              <ProgressPanel progress={progress} />
+            </SectionCard>
+          ) : null,
         }}
       />
     </div>

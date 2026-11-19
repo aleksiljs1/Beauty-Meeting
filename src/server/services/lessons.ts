@@ -1,8 +1,8 @@
 import "server-only";
 import { z } from "zod";
-import type { PublicationStatus } from "@/generated/prisma/enums";
+import type { LessonFormat, PublicationStatus } from "@/generated/prisma/enums";
 import { effectiveMeetingStatus } from "@/server/access/policy";
-import { MAX_CONCURRENT_LESSONS, MAX_REPEATED_LESSONS, peakOverlap, repeatSchedules, scheduleChanged, validateLessonSchedule, type LessonSchedule, type RepeatRule, type ScheduleIssue } from "@/lib/admin/lesson-rules";
+import { MAX_CONCURRENT_LESSONS, MAX_REPEATED_LESSONS, offlineSchedule, peakOverlap, repeatSchedules, scheduleChanged, validateLessonSchedule, validateOfflineSchedule, type LessonSchedule, type RepeatRule, type ScheduleIssue } from "@/lib/admin/lesson-rules";
 import { formatTimeRange, formatWeekdayDate } from "@/lib/datetime";
 import type { AppUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
@@ -32,6 +32,10 @@ export type LessonInput = {
   imageId?: string | null;
   isDemo?: boolean;
   allowDownloads?: boolean;
+  /** Set when the lesson is created; it can't change afterwards. */
+  format?: LessonFormat;
+  /** Offline only: visible from now (replaces `scheduledStartAt`). */
+  availableNow?: boolean;
 } & LessonSchedule;
 
 export type LessonPatch = Partial<LessonInput>;
@@ -61,6 +65,7 @@ export async function assertConcurrencyLimit(schedules: LessonSchedule[], exclud
   const others = await prisma.lesson.findMany({
     where: {
       isDemo: false,
+      format: "LIVE", // offline lessons hold no meeting
       publication: { in: ACTIVE_PUBLICATIONS },
       id: { notIn: excludeIds },
       scheduledStartAt: { lt: new Date(Math.max(...schedules.map((s) => s.scheduledEndAt.getTime()))) },
@@ -107,6 +112,7 @@ export async function createLesson(input: LessonInput, confirmEarlyDeadline: boo
 
 /** Creates a lesson and its repeats: one lesson per date, all with the same details and students. */
 export async function createRepeatingLesson(input: LessonInput, repeat: RepeatRule, confirmEarlyDeadline: boolean, admin: AppUser, studentIds: string[] = []) {
+  if (input.format === "OFFLINE") throw new ApiError("VALIDATION_FAILED", "Mësimet offline nuk përsëriten: ato nuk kanë orar.");
   const schedules = repeatSchedules(input, repeat);
   if (schedules.length > MAX_REPEATED_LESSONS) throw new ApiError("VALIDATION_FAILED", `Mund të krijohen deri në ${MAX_REPEATED_LESSONS} mësime njëherësh. Zgjidhni një datë mbarimi më të afërt.`);
   return createLessons(input, schedules, confirmEarlyDeadline, admin, studentIds);
@@ -117,8 +123,17 @@ export async function createRepeatingLesson(input: LessonInput, repeat: RepeatRu
  * audit entries are written in one transaction, so a failure (or a retry after one) never leaves
  * half a series behind.
  */
-async function createLessons(input: LessonInput, schedules: LessonSchedule[], confirmEarlyDeadline: boolean, admin: AppUser, studentIds: string[]) {
-  assertSchedules(schedules, confirmEarlyDeadline);
+async function createLessons(input: LessonInput, requested: LessonSchedule[], confirmEarlyDeadline: boolean, admin: AppUser, studentIds: string[]) {
+  const offline = input.format === "OFFLINE";
+  let schedules = requested;
+  if (offline) {
+    if (input.isDemo) throw new ApiError("VALIDATION_FAILED", "Një mësim offline nuk mund të jetë klasë demo.");
+    const [first] = requested;
+    schedules = [offlineSchedule(input.availableNow ? new Date() : first.scheduledStartAt, first.accessExpiresAt)];
+    throwScheduleIssues(validateOfflineSchedule(schedules[0]));
+  } else {
+    assertSchedules(schedules, confirmEarlyDeadline);
+  }
   await assertCourse(input.courseId);
   await assertImage(input.imageId);
   assertDemoAllowed(input.isDemo);
@@ -129,8 +144,8 @@ async function createLessons(input: LessonInput, schedules: LessonSchedule[], co
       ? (await prisma.courseMember.findMany({ where: { courseId: input.courseId, userId: { in: ids } }, select: { userId: true } })).map((m) => m.userId)
       : [],
   );
-  const isDemo = input.isDemo ?? false;
-  if (!isDemo) await assertConcurrencyLimit(schedules);
+  const isDemo = !offline && (input.isDemo ?? false);
+  if (!isDemo && !offline) await assertConcurrencyLimit(schedules);
 
   const lessons = await prisma.$transaction(async (tx) => {
     // Several dates are one series, so the admin can manage them together.
@@ -147,6 +162,7 @@ async function createLessons(input: LessonInput, schedules: LessonSchedule[], co
         joinOpensAt,
         accessExpiresAt,
         isDemo,
+        format: offline ? "OFFLINE" : "LIVE",
         allowDownloads: input.allowDownloads ?? false,
         // The demo classroom is always "provisioned"; real Zoom meetings are created in Phase 2.
         meetingStatus: isDemo ? "SCHEDULED" : "NOT_PROVISIONED",
@@ -162,7 +178,7 @@ async function createLessons(input: LessonInput, schedules: LessonSchedule[], co
     await tx.lessonEnrollment.createMany({ data: enrollments });
     await tx.auditLog.createMany({
       data: [
-        ...created.map((lesson) => ({ actorId: admin.id, action: "lesson.create", targetType: "lesson", targetId: lesson.id, details: { isDemo } })),
+        ...created.map((lesson) => ({ actorId: admin.id, action: "lesson.create", targetType: "lesson", targetId: lesson.id, details: { isDemo, ...(offline ? { format: "OFFLINE" } : {}) } })),
         ...enrollments.map((e) => ({ actorId: admin.id, action: "enrollment.grant", targetType: "lesson", targetId: e.lessonId, details: { userId: e.userId, via: e.source === "COURSE" ? "course" : "admin" } })),
       ],
     });
@@ -180,13 +196,24 @@ export async function updateLesson(lessonId: string, patch: LessonPatch, confirm
   const current = await prisma.lesson.findUnique({ where: { id: lessonId } });
   if (!current) throw new ApiError("NOT_FOUND", "Mësimi nuk u gjet.");
 
-  const schedule: LessonSchedule = {
-    scheduledStartAt: patch.scheduledStartAt ?? current.scheduledStartAt,
-    scheduledEndAt: patch.scheduledEndAt ?? current.scheduledEndAt,
-    joinOpensAt: patch.joinOpensAt ?? current.joinOpensAt,
-    accessExpiresAt: patch.accessExpiresAt ?? current.accessExpiresAt,
-  };
-  throwScheduleIssues(validateLessonSchedule(schedule, confirmEarlyDeadline));
+  const offline = current.format === "OFFLINE";
+  let schedule: LessonSchedule;
+  if (offline) {
+    if (patch.isDemo) throw new ApiError("VALIDATION_FAILED", "Një mësim offline nuk mund të jetë klasë demo.");
+    // "Right away" never moves a lesson students can already see to a later moment.
+    const now = new Date();
+    const from = patch.availableNow ? (current.scheduledStartAt < now ? current.scheduledStartAt : now) : (patch.scheduledStartAt ?? current.scheduledStartAt);
+    schedule = offlineSchedule(from, patch.accessExpiresAt ?? current.accessExpiresAt);
+    throwScheduleIssues(validateOfflineSchedule(schedule));
+  } else {
+    schedule = {
+      scheduledStartAt: patch.scheduledStartAt ?? current.scheduledStartAt,
+      scheduledEndAt: patch.scheduledEndAt ?? current.scheduledEndAt,
+      joinOpensAt: patch.joinOpensAt ?? current.joinOpensAt,
+      accessExpiresAt: patch.accessExpiresAt ?? current.accessExpiresAt,
+    };
+    throwScheduleIssues(validateLessonSchedule(schedule, confirmEarlyDeadline));
+  }
   if (patch.courseId !== undefined) await assertCourse(patch.courseId);
   if (patch.imageId !== undefined) await assertImage(patch.imageId);
 
@@ -201,11 +228,12 @@ export async function updateLesson(lessonId: string, patch: LessonPatch, confirm
 
   const isDemo = patch.isDemo ?? current.isDemo;
   const retimed = scheduleChanged(current, { scheduledStartAt: schedule.scheduledStartAt, scheduledEndAt: schedule.scheduledEndAt });
-  if (checkConcurrency && !isDemo && ACTIVE_PUBLICATIONS.includes(current.publication) && (retimed || current.isDemo)) {
+  if (checkConcurrency && !isDemo && !offline && ACTIVE_PUBLICATIONS.includes(current.publication) && (retimed || current.isDemo)) {
     await assertConcurrencyLimit([schedule], [lessonId]);
   }
 
   const changed = Object.keys(patch).filter((key) => {
+    if (key === "availableNow" || key === "format") return false;
     const raw = patch[key as keyof LessonPatch];
     const next = key === "summary" || key === "details" ? clean(raw as string | null | undefined) : raw;
     const prev = current[key as keyof typeof current];
@@ -235,7 +263,8 @@ export async function updateLesson(lessonId: string, patch: LessonPatch, confirm
 
   // Students who can see the lesson hear about a new time, as long as the lesson isn't over.
   const rescheduled = changed.includes("scheduledStartAt") || changed.includes("scheduledEndAt");
-  if (notify && rescheduled && current.publication === "PUBLISHED" && schedule.scheduledEndAt.getTime() > Date.now()) {
+  // An offline lesson has no time to move: a new availability window needs no notice.
+  if (notify && rescheduled && !offline && current.publication === "PUBLISHED" && schedule.scheduledEndAt.getTime() > Date.now()) {
     await notifyLessonRescheduled(lessonId);
   }
 
@@ -268,13 +297,13 @@ const TRANSITIONS: Record<PublicationStatus, PublicationStatus[]> = {
 export async function setLessonPublication(lessonId: string, publication: PublicationStatus, admin: AppUser, { notify = true } = {}) {
   const lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
-    select: { publication: true, meetingStatus: true, isDemo: true, scheduledStartAt: true, scheduledEndAt: true, joinOpensAt: true, accessExpiresAt: true, zoomMeetingNumber: true },
+    select: { publication: true, format: true, meetingStatus: true, isDemo: true, scheduledStartAt: true, scheduledEndAt: true, joinOpensAt: true, accessExpiresAt: true, zoomMeetingNumber: true },
   });
   if (!lesson) throw new ApiError("NOT_FOUND", "Mësimi nuk u gjet.");
   if (lesson.publication === publication) return { zoomDeleted: true };
   if (!TRANSITIONS[lesson.publication].includes(publication)) throw new ApiError("CONFLICT", "Ky ndryshim statusi nuk lejohet.");
   // A cancelled or archived lesson brought back takes up its time again.
-  if (!lesson.isDemo && !ACTIVE_PUBLICATIONS.includes(lesson.publication) && ACTIVE_PUBLICATIONS.includes(publication)) {
+  if (!lesson.isDemo && lesson.format === "LIVE" && !ACTIVE_PUBLICATIONS.includes(lesson.publication) && ACTIVE_PUBLICATIONS.includes(publication)) {
     await assertConcurrencyLimit([lesson], [lessonId]);
   }
   if (effectiveMeetingStatus(lesson, new Date()) === "LIVE" && publication !== "PUBLISHED") {
@@ -286,7 +315,9 @@ export async function setLessonPublication(lessonId: string, publication: Public
   if (result.count === 0) throw new ApiError("CONFLICT", "Mësimi u ndryshua ndërkohë. Rifreskoni faqen.");
   await audit(admin.id, PUBLICATION_ACTION[publication], "lesson", lessonId, { from: lesson.publication });
   // Students only knew about it if it was published; a lesson that's already over needs no notice.
-  if (notify && publication === "CANCELLED" && lesson.publication === "PUBLISHED" && lesson.scheduledEndAt.getTime() > Date.now()) {
+  // A scheduled offline lesson students can't see yet needs no notice either.
+  const known = lesson.format === "LIVE" || lesson.scheduledStartAt.getTime() <= Date.now();
+  if (notify && publication === "CANCELLED" && lesson.publication === "PUBLISHED" && known && lesson.scheduledEndAt.getTime() > Date.now()) {
     await notifyLessonCancelled(lessonId);
   } else {
     await publishLessonChanged(lessonId);
@@ -328,8 +359,10 @@ export async function deleteLessons(lessonIds: string[], admin: AppUser, now = n
     select: {
       id: true,
       title: true,
+      format: true,
       publication: true,
       meetingStatus: true,
+      scheduledStartAt: true,
       scheduledEndAt: true,
       zoomMeetingNumber: true,
       seriesId: true,
@@ -347,7 +380,8 @@ export async function deleteLessons(lessonIds: string[], admin: AppUser, now = n
     throw new ApiError("CONFLICT", "Një ngarkim regjistrimi është në vazhdim. Ndalojeni ose fshijeni fillimisht.");
   }
 
-  const expecting = await studentsExpecting(lessons.filter((l) => l.publication === "PUBLISHED" && l.scheduledEndAt > now).map((l) => l.id), now);
+  const visible = (l: (typeof lessons)[number]) => l.format === "LIVE" || l.scheduledStartAt <= now;
+  const expecting = await studentsExpecting(lessons.filter((l) => l.publication === "PUBLISHED" && visible(l) && l.scheduledEndAt > now).map((l) => l.id), now);
   // A meeting Zoom didn't delete would stay usable by anyone with its link: the admin is told
   // its number (it is also in the audit log) to delete it in Zoom.
   const zoomNotDeleted: string[] = [];

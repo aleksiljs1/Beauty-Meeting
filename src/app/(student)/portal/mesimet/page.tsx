@@ -18,6 +18,7 @@ const FILTERS: { slug: string | null; filter: LessonFilter; label: string }[] = 
   { slug: "te-ardhshme", filter: "upcoming", label: t.filters.upcoming },
   { slug: "live", filter: "live", label: t.filters.live },
   { slug: "te-perfunduara", filter: "replay", label: t.filters.replay },
+  { slug: "offline", filter: "offline", label: t.filters.offline },
   { slug: "skaduar", filter: "expired", label: t.filters.expired },
 ];
 
@@ -26,7 +27,10 @@ export default async function LessonsPage({ searchParams }: PageProps<"/portal/m
   const { filtri } = await searchParams;
   const active = FILTERS.find((f) => f.slug !== null && f.slug === filtri) ?? FILTERS[0];
 
-  const lessons = filterLessons(await listStudentLessons(user), active.filter);
+  const all = await listStudentLessons(user);
+  const lessons = filterLessons(all, active.filter);
+  // The "Offline" filter only for students who have offline lessons (or follow an old link to it).
+  const filters = FILTERS.filter((f) => f.filter !== "offline" || f === active || all.some((card) => card.format === "OFFLINE"));
   // History last, most recent first; everything else chronologically.
   if (active.filter === "expired" || active.filter === "replay") lessons.sort((a, b) => b.scheduledStartAt.localeCompare(a.scheduledStartAt));
 
@@ -37,7 +41,7 @@ export default async function LessonsPage({ searchParams }: PageProps<"/portal/m
 
       <nav aria-label={t.filtersLabel} className="-mx-4 overflow-x-auto px-4">
         <ul className="flex w-max gap-2">
-          {FILTERS.map((f) => {
+          {filters.map((f) => {
             const selected = f === active;
             return (
               <li key={f.filter}>

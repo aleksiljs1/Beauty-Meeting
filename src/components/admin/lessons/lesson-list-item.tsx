@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { DemoBadge, MeetingBadge, PublicationBadge } from "@/components/admin/page-parts";
+import { DemoBadge, MeetingBadge, OfflineBadge, PublicationBadge } from "@/components/admin/page-parts";
 import { CoverImage } from "@/components/cover-image";
 import { admin } from "@/i18n/admin";
-import { formatTimeRange, formatWeekdayDate } from "@/lib/datetime";
+import { formatLessonWhen } from "@/lib/datetime";
 import type { LessonRow } from "@/server/queries/admin";
 
 const t = admin.lessons;
@@ -27,14 +27,14 @@ export function LessonItem({ lesson }: { lesson: LessonRow }) {
             {lesson.isDemo && <DemoBadge />}
           </div>
           <p className="text-sm text-muted-foreground">
-            {formatWeekdayDate(lesson.scheduledStartAt)} · {formatTimeRange(lesson.scheduledStartAt, lesson.scheduledEndAt)}
+            {formatLessonWhen(lesson, t.offlineWindow)}
             {lesson.courseTitle ? ` · ${lesson.courseTitle}` : ""}
           </p>
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground md:justify-end">
         <PublicationBadge publication={lesson.publication} />
-        <MeetingBadge status={lesson.meetingStatus} />
+        {lesson.format === "OFFLINE" ? <OfflineBadge /> : <MeetingBadge status={lesson.meetingStatus} />}
         <span>
           {t.columns.students}: {lesson.students}
         </span>

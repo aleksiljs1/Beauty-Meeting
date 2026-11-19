@@ -51,6 +51,7 @@ model User {
   conversationMembers  ConversationMember[]
   messagesSent         Message[]            @relation("MessageSender")
   chatAttachments      ChatAttachment[]     @relation("ChatAttachmentUploader")
+  materialProgress     MaterialProgress[]
   /// People this user has blocked.
   blocksMade           UserBlock[]          @relation("BlockBlocker")
   /// People who have blocked this user.
@@ -154,6 +155,14 @@ enum MeetingStatus {
   ERROR
 }
 
+/// LIVE: a class held in Zoom at its scheduled time. OFFLINE: self-study, only materials (no
+/// meeting): visible from `scheduledStartAt` (= `joinOpensAt`) until `accessExpiresAt`
+/// (= `scheduledEndAt`).
+enum LessonFormat {
+  LIVE
+  OFFLINE
+}
+
 enum EnrollmentSource {
   ADMIN
   INVITATION
@@ -245,6 +254,7 @@ model Lesson {
   /// Last moment of access to live, replay and materials (exclusive: now >= this is expired).
   accessExpiresAt  DateTime @db.Timestamptz(3)
 
+  format        LessonFormat      @default(LIVE)
   publication   PublicationStatus @default(DRAFT)
   meetingStatus MeetingStatus     @default(NOT_PROVISIONED)
   liveStartedAt DateTime?         @db.Timestamptz(3)
@@ -424,9 +434,23 @@ model LessonMaterial {
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 
+  progress  MaterialProgress[]
+
   @@unique([lessonId, fileId])
   @@index([lessonId, position])
   @@index([fileId])
+}
+
+/// A student opened (viewed or downloaded) a lesson material: the "seen" marks of a lesson.
+model MaterialProgress {
+  userId           String
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonMaterialId String         @db.Uuid
+  lessonMaterial   LessonMaterial @relation(fields: [lessonMaterialId], references: [id], onDelete: Cascade)
+  seenAt           DateTime       @default(now()) @db.Timestamptz(3)
+
+  @@id([userId, lessonMaterialId])
+  @@index([lessonMaterialId])
 }
 
 model Recording {

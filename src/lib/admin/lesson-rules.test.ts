@@ -5,12 +5,14 @@ import {
   EARLY_DEADLINE_ISSUE_PATH,
   MAX_REPEATED_LESSONS,
   needsEarlyDeadlineConfirmation,
+  offlineSchedule,
   peakOverlap,
   repeatSchedules,
   retimeSchedule,
   scheduleChanged,
   suggestedStart,
   validateLessonSchedule,
+  validateOfflineSchedule,
 } from "./lesson-rules";
 
 const at = (iso: string) => new Date(iso);
@@ -133,5 +135,15 @@ describe("repeating lessons", () => {
   it("returns just the first lesson when nothing else fits, and stops past the limit", () => {
     expect(repeatSchedules(first, { weekdays: [1], until: "2026-10-20" })).toHaveLength(1);
     expect(repeatSchedules(first, { weekdays: [0, 1, 2, 3, 4, 5, 6], until: "2027-12-31" })).toHaveLength(MAX_REPEATED_LESSONS + 1);
+  });
+});
+
+describe("offline schedule", () => {
+  it("stores the availability window as the lesson's span", () => {
+    const from = new Date("2026-12-01T09:00:00Z");
+    const until = new Date("2026-12-31T22:00:00Z");
+    expect(offlineSchedule(from, until)).toEqual({ scheduledStartAt: from, joinOpensAt: from, scheduledEndAt: until, accessExpiresAt: until });
+    expect(validateOfflineSchedule(offlineSchedule(from, until))).toEqual([]);
+    expect(validateOfflineSchedule(offlineSchedule(until, from))[0]?.path).toBe("accessExpiresAt");
   });
 });

@@ -71,7 +71,7 @@ const MESSAGES: Record<Exclude<InvitationState, "VALID" | "ALREADY_ENROLLED">, s
 };
 
 type InvitationRow = Prisma.LessonInvitationGetPayload<{
-  include: { lesson: { select: { id: true; title: true; scheduledStartAt: true; scheduledEndAt: true; publication: true; accessExpiresAt: true } } };
+  include: { lesson: { select: { id: true; title: true; format: true; scheduledStartAt: true; scheduledEndAt: true; publication: true; accessExpiresAt: true } } };
 }>;
 
 async function findByToken(token: string): Promise<InvitationRow | null> {
@@ -79,7 +79,7 @@ async function findByToken(token: string): Promise<InvitationRow | null> {
   return prisma.lessonInvitation.findUnique({
     where: { tokenHash: hashInvitationToken(token) },
     include: {
-      lesson: { select: { id: true, title: true, scheduledStartAt: true, scheduledEndAt: true, publication: true, accessExpiresAt: true } },
+      lesson: { select: { id: true, title: true, format: true, scheduledStartAt: true, scheduledEndAt: true, publication: true, accessExpiresAt: true } },
     },
   });
 }
@@ -108,7 +108,7 @@ export async function previewInvitation(token: string, user: AppUser, now = new 
   return {
     state,
     // Lesson card details only — no materials, links or meeting data.
-    lesson: { id: lesson.id, title: lesson.title, scheduledStartAt: lesson.scheduledStartAt, scheduledEndAt: lesson.scheduledEndAt },
+    lesson: { id: lesson.id, title: lesson.title, format: lesson.format, scheduledStartAt: lesson.scheduledStartAt, scheduledEndAt: lesson.scheduledEndAt, accessExpiresAt: lesson.accessExpiresAt },
   };
 }
 

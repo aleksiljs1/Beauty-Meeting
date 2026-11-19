@@ -142,7 +142,7 @@ export async function getStudentParticipation(userId: string, now = new Date()) 
       where: { isDemo: false, publication: "PUBLISHED", scheduledEndAt: { gt: now }, enrollments: { some: { userId, revokedAt: null } } },
       orderBy: { scheduledStartAt: "asc" },
       take: 20,
-      select: { id: true, title: true, scheduledStartAt: true, scheduledEndAt: true, course: { select: { title: true } } },
+      select: { id: true, title: true, format: true, scheduledStartAt: true, scheduledEndAt: true, accessExpiresAt: true, course: { select: { title: true } } },
     }),
   ]);
   classes.sort((a, b) => b.scheduledStartAt.getTime() - a.scheduledStartAt.getTime());

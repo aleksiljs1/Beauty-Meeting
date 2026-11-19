@@ -13,7 +13,7 @@ import { formatTimeRange, formatWeekdayDate, toZonedInputValue } from "@/lib/dat
 import { cn } from "@/lib/utils";
 import { requirePageUser } from "@/server/auth/session";
 import { countPendingFeedback } from "@/server/queries/feedback";
-import { listStudentLessons } from "@/server/queries/portal";
+import { listStudentLessons, type StudentLessonCard } from "@/server/queries/portal";
 
 const t = portalText.dashboard;
 
@@ -26,6 +26,11 @@ export default async function DashboardPage() {
   const [lessons, pendingFeedback] = await Promise.all([listStudentLessons(user), countPendingFeedback(user)]);
 
   const live = lessons.filter((l) => l.phase === "LIVE");
+  // Offline lessons to study: unfinished first, then those whose access ends soonest.
+  const allStudy = lessons
+    .filter((l) => l.phase === "SELF_STUDY")
+    .sort((a, b) => Number(isDone(a)) - Number(isDone(b)) || (a.deadline ?? "").localeCompare(b.deadline ?? ""));
+  const study = allStudy.slice(0, 3);
   const allUpcoming = lessons.filter((l) => UPCOMING.has(l.phase));
   const upcoming = allUpcoming.slice(0, 3);
   const allReplays = lessons.filter((l) => l.phase === "REPLAY");
@@ -52,10 +57,11 @@ export default async function DashboardPage() {
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">{t.intro}</p>
 
-        {live.length + allUpcoming.length + allReplays.length > 0 ? (
+        {live.length + allUpcoming.length + allReplays.length + allStudy.length > 0 ? (
           <ul className="stagger mt-5 flex flex-wrap gap-2 text-sm">
             {live.length > 0 ? <Chip icon={Radio} live>{t.liveNow}</Chip> : null}
             {allUpcoming.length > 0 ? <Chip icon={CalendarClock}>{t.upcomingCount(allUpcoming.length)}</Chip> : null}
+            {allStudy.length > 0 ? <Chip icon={BookOpen}>{t.studyCount(allStudy.length)}</Chip> : null}
             {allReplays.length > 0 ? <Chip icon={PlayCircle}>{t.replayCount(allReplays.length)}</Chip> : null}
           </ul>
         ) : null}
@@ -117,6 +123,29 @@ export default async function DashboardPage() {
         </section>
       ) : null}
 
+      {study.length > 0 ? (
+        <section aria-labelledby="study-heading" className="grid gap-3">
+          <div className="flex items-baseline justify-between gap-4">
+            <div>
+              <h2 id="study-heading" className="text-2xl">
+                {t.studyTitle}
+              </h2>
+              <p className="text-sm text-muted-foreground">{t.studyIntro}</p>
+            </div>
+            {allStudy.length > study.length ? (
+              <Link href="/portal/mesimet?filtri=offline" className="relative inline-block shrink-0 touch-target text-sm text-rose-deep underline-offset-4 hover:underline">
+                {t.seeAll}
+              </Link>
+            ) : null}
+          </div>
+          <div className="stagger grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {study.map((lesson) => (
+              <LessonCard key={lesson.id} lesson={lesson} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       {lessons.length > 0 ? (
         <>
           <section aria-labelledby="upcoming-heading" className="grid gap-3">
@@ -166,6 +195,8 @@ export default async function DashboardPage() {
     </div>
   );
 }
+
+const isDone = (lesson: StudentLessonCard) => !!lesson.progress && lesson.progress.total > 0 && lesson.progress.seen >= lesson.progress.total;
 
 function Chip({ icon: Icon, live = false, children }: { icon: LucideIcon; live?: boolean; children: React.ReactNode }) {
   return (

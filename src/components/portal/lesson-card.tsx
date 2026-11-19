@@ -1,4 +1,4 @@
-import { CalendarDays, Clock, Hourglass } from "lucide-react";
+import { BookOpen, CalendarDays, Clock, Hourglass } from "lucide-react";
 import Link from "next/link";
 import { CoverImage } from "@/components/cover-image";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { formatDateTime, formatTimeRange, formatWeekdayDate, timezoneAbbreviatio
 import { cn } from "@/lib/utils";
 import type { StudentLessonCard } from "@/server/queries/portal";
 import { PhaseBadge } from "./phase-badge";
+import { StudyProgress } from "./study-progress";
 
 const t = portalText.lessons;
 
@@ -20,6 +21,8 @@ export function LessonCard({ lesson, headingLevel = "h3" }: { lesson: StudentLes
   const Heading = headingLevel;
   const history = lesson.phase === "EXPIRED" || lesson.phase === "CANCELLED";
   const href = `/portal/mesimet/${lesson.id}`;
+  const offline = lesson.format === "OFFLINE";
+  const progress = lesson.progress;
 
   return (
     <article
@@ -62,26 +65,38 @@ export function LessonCard({ lesson, headingLevel = "h3" }: { lesson: StudentLes
         {lesson.summary ? <p className="line-clamp-2 text-sm text-muted-foreground">{lesson.summary}</p> : null}
 
         <dl className="grid gap-1.5 text-sm">
-          <div className="flex items-start gap-2">
-            <dt className="sr-only">{portalText.lesson.scheduleLabel}</dt>
-            <CalendarDays aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-            <dd className="first-letter:uppercase">{formatWeekdayDate(lesson.scheduledStartAt)}</dd>
-          </div>
-          <div className="flex items-start gap-2">
-            <dt className="sr-only">{portalText.lesson.scheduleLabel}</dt>
-            <Clock aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-            <dd>{formatTimeRange(lesson.scheduledStartAt, lesson.scheduledEndAt)}</dd>
-          </div>
+          {offline ? (
+            <div className="flex items-start gap-2">
+              <dt className="sr-only">{portalText.lesson.scheduleLabel}</dt>
+              <BookOpen aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+              <dd>{t.selfStudy}</dd>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-start gap-2">
+                <dt className="sr-only">{portalText.lesson.scheduleLabel}</dt>
+                <CalendarDays aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                <dd className="first-letter:uppercase">{formatWeekdayDate(lesson.scheduledStartAt)}</dd>
+              </div>
+              <div className="flex items-start gap-2">
+                <dt className="sr-only">{portalText.lesson.scheduleLabel}</dt>
+                <Clock aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                <dd>{formatTimeRange(lesson.scheduledStartAt, lesson.scheduledEndAt)}</dd>
+              </div>
+            </>
+          )}
           {lesson.deadline ? (
             <div className="flex items-start gap-2">
               <dt className="sr-only">{common.accessUntil}</dt>
               <Hourglass aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
               <dd className={cn(history && "text-muted-foreground")}>
-                {lesson.phase === "EXPIRED" ? t.accessExpiredOn : common.accessUntil} {formatDeadline(lesson.deadline)}
+                {lesson.phase === "EXPIRED" ? t.accessExpiredOn : offline ? t.availableUntil : common.accessUntil} {formatDeadline(lesson.deadline)}
               </dd>
             </div>
           ) : null}
         </dl>
+
+        {progress && !history ? <StudyProgress seen={progress.seen} total={progress.total} compact /> : null}
 
         {history ? (
           <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-1">
@@ -102,9 +117,15 @@ export function LessonCard({ lesson, headingLevel = "h3" }: { lesson: StudentLes
                 <Link href={`${href}?panel=regjistrimet`}>{t.watchReplay}</Link>
               </Button>
             ) : null}
-            <Button asChild size="lg" variant="outline">
-              <Link href={href}>{t.open}</Link>
-            </Button>
+            {offline ? (
+              <Button asChild size="lg" variant={progress && progress.total > 0 && progress.seen >= progress.total ? "outline" : "default"}>
+                <Link href={href}>{!progress?.seen ? t.startStudy : progress.seen >= progress.total ? t.reviewStudy : t.continueStudy}</Link>
+              </Button>
+            ) : (
+              <Button asChild size="lg" variant="outline">
+                <Link href={href}>{t.open}</Link>
+              </Button>
+            )}
           </div>
         )}
       </div>

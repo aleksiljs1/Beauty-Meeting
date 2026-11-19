@@ -32,6 +32,12 @@ export function timezoneAbbreviation(value: DateInput): string {
 }
 
 /** "09:00 – 12:00 (ora e Tiranës, CET)" */
+/** Where an admin list shows a lesson's time: an offline lesson's availability window, else day and time. */
+export function formatLessonWhen(lesson: { format?: string; scheduledStartAt: DateInput; scheduledEndAt: DateInput; accessExpiresAt?: DateInput }, offlineWindow: (from: string, until: string) => string): string {
+  if (lesson.format === "OFFLINE") return offlineWindow(formatDate(lesson.scheduledStartAt), formatDate(lesson.accessExpiresAt ?? lesson.scheduledEndAt));
+  return `${formatWeekdayDate(lesson.scheduledStartAt)} · ${formatTimeRange(lesson.scheduledStartAt, lesson.scheduledEndAt)}`;
+}
+
 export function formatTimeRange(start: DateInput, end: DateInput): string {
   return `${formatTime(start)} – ${formatTime(end)} (${ACADEMY_TIMEZONE_LABEL}, ${timezoneAbbreviation(start)})`;
 }

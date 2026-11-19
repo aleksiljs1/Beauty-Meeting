@@ -1,9 +1,10 @@
 "use client";
 
-import { Download, Eye, FileText, Film, Image as ImageIcon, Loader2, Presentation, X } from "lucide-react";
+import { Check, Download, Eye, FileText, Film, Image as ImageIcon, Loader2, Presentation, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { portalText } from "@/i18n/portal";
 import { ApiClientError, apiSend } from "@/lib/api/client";
 import { EmptyState } from "./empty-state";
@@ -12,8 +13,12 @@ import { ProtectedVideo, type VideoGrant } from "./protected-video";
 
 const t = portalText.materials;
 
-/** `downloadable`: the lesson allows downloads (always true for admins). The server enforces it too. */
-export type MaterialItem = { id: string; displayName: string; mimeType: string; sizeBytes: number; viewable: boolean; downloadable: boolean };
+/**
+ * `downloadable`: the lesson allows downloads (always true for admins). The server enforces it too.
+ * `seen`: the student has opened it before (offline lessons show it as a step done).
+ */
+export type MaterialItem = { id: string; displayName: string; mimeType: string; sizeBytes: number; viewable: boolean; downloadable: boolean; seen?: boolean };
+const off = portalText.offline;
 
 /**
  * `lost`: the admin removed the material while it was open (it stays closed even if attached again).
@@ -26,7 +31,7 @@ function formatSize(bytes: number) {
   return t.sizeMb((bytes / (1024 * 1024)).toFixed(1).replace(".", ","));
 }
 
-function iconFor(mime: string) {
+export function iconFor(mime: string) {
   if (mime.startsWith("image/")) return ImageIcon;
   if (mime.startsWith("video/")) return Film;
   if (mime.includes("presentation")) return Presentation;
@@ -61,12 +66,18 @@ export function MaterialsPanel({
   materials,
   onViewerChange,
   visible = true,
+  steps = false,
+  onOpened,
 }: {
   lessonId: string;
   materials: MaterialItem[];
   onViewerChange?: (open: boolean) => void;
   /** False while the panel is hidden (another tab): a playing video is paused. */
   visible?: boolean;
+  /** Offline lessons: a numbered list of steps with "seen" marks, the next one highlighted. */
+  steps?: boolean;
+  /** A material was opened or downloaded (the server has marked it seen). */
+  onOpened?: (materialId: string) => void;
 }) {
   const [opened, setViewer] = useState<Viewer | null>(null);
   const [pending, setPending] = useState<string | null>(null);
@@ -85,7 +96,9 @@ export function MaterialsPanel({
     setPending(`${material.id}:${mode}`);
     try {
       // A fresh, short-lived URL every time — checked against the access policy on the server.
-      return await apiSend<VideoGrant>("post", `/lessons/${lessonId}/materials/${material.id}/access`, { mode });
+      const granted = await apiSend<VideoGrant>("post", `/lessons/${lessonId}/materials/${material.id}/access`, { mode });
+      onOpened?.(material.id);
+      return granted;
     } catch (error) {
       toast.error(error instanceof ApiClientError ? error.message : portalText.states.errorBody);
       return null;
@@ -141,6 +154,7 @@ export function MaterialsPanel({
 
   if (!materials.length) return <EmptyState icon={FileText} title={t.empty} />;
   const downloadsAllowed = materials.every((m) => m.downloadable);
+  const nextId = steps ? materials.find((m) => !m.seen && (m.viewable || m.downloadable))?.id : undefined;
 
   return (
     <div className="grid gap-4">
@@ -169,17 +183,46 @@ export function MaterialsPanel({
         </div>
       ) : null}
 
+      {steps ? <p className="text-xs text-muted-foreground">{off.stepsHint}</p> : null}
       <ul className="grid gap-2">
-        {materials.map((material) => {
+        {materials.map((material, index) => {
           const Icon = iconFor(material.mimeType);
           const canView = material.viewable && viewerKind(material.mimeType) !== null;
           const isOpen = viewer?.id === material.id;
+          const isNext = material.id === nextId;
           return (
-            <li key={material.id} className="flex flex-wrap items-center gap-3 rounded-lg border bg-card p-3" aria-current={isOpen ? "true" : undefined}>
-              <Icon aria-hidden="true" className="size-5 shrink-0 text-rose-deep" />
+            <li
+              key={material.id}
+              className={cn(
+                "flex flex-wrap items-center gap-3 rounded-lg border bg-card p-3",
+                steps && "sm:p-4",
+                isNext && "border-rose/50 bg-rose/10",
+              )}
+              aria-current={isOpen ? "true" : undefined}
+            >
+              {steps ? (
+                <span
+                  className={cn(
+                    "grid size-9 shrink-0 place-items-center rounded-full border text-sm font-medium tabular-nums",
+                    material.seen ? "border-rose-deep bg-rose-deep text-primary-foreground" : isNext ? "border-rose-deep text-rose-deep" : "text-muted-foreground",
+                  )}
+                >
+                  {material.seen ? <Check aria-hidden="true" className="size-4" /> : index + 1}
+                  <span className="sr-only">
+                    {off.step(index + 1)}, {material.seen ? off.seen : off.notSeen}
+                  </span>
+                </span>
+              ) : (
+                <Icon aria-hidden="true" className="size-5 shrink-0 text-rose-deep" />
+              )}
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{material.displayName}</p>
+                {isNext ? <p className="text-[11px] font-medium tracking-wide text-rose-deep uppercase">{off.next}</p> : null}
+                <p className="truncate text-sm font-medium">
+                  {steps ? <Icon aria-hidden="true" className="mr-1.5 inline size-4 -translate-y-px text-rose-deep" /> : null}
+                  {material.displayName}
+                </p>
                 <p className="text-xs text-muted-foreground">
+                  {steps && material.seen ? `${off.seen} · ` : null}
                   {formatSize(material.sizeBytes)}
                   {!canView ? ` · ${material.downloadable ? t.officeHint : t.officeNoDownload}` : !material.downloadable ? ` · ${t.viewOnlyHint}` : null}
                 </p>

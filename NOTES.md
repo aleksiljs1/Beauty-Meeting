@@ -660,3 +660,16 @@ PDF viewer 19/19 checks on phone and computer.
   `npx prisma migrate deploy` on the dev DB and on deploy.
 - **Tests:** `chat-attachments.integration.test.ts` (9). Note: `.env` points S3_ENDPOINT at the old Funnel URL, so run
   integration tests with `S3_ENDPOINT=http://localhost:8333`.
+
+## Offline lessons (2026-11-19, branch offline-lessons)
+
+Lessons without a Zoom class: only materials, studied whenever the student wants.
+
+- **Data:** `Lesson.format` (`LIVE` | `OFFLINE`, default LIVE) and `MaterialProgress` (student × lesson material, `seenAt`). Migration `20261119180000_offline_lessons`. An offline lesson keeps the usual columns: `scheduledStartAt` = `joinOpensAt` = "available from", `scheduledEndAt` = `accessExpiresAt` = the deadline (`offlineSchedule` in lesson-rules.ts). So current/past lists, deadlines and course enrolment work unchanged.
+- **Creating:** the form starts with "Lloji i mësimit" (Live në Zoom / Offline); the type can't change afterwards. Offline: "Menjëherë" (visible once published) or "Nga një datë" (hidden until then, even when published), plus the deadline. No repeats, no demo, no class time. Still created as a draft; publish from the status panel (its dialog says when students will see it).
+- **Rules (policy.ts):** before its date a published offline lesson is hidden like a draft (`NOT_YET_AVAILABLE`); JOIN_LIVE is always refused; phase `SELF_STUDY`. Zoom meeting creation and the host page refuse offline lessons. Left out of: the concurrent-lessons limit, the calendar, dashboard "upcoming", class alerts, admin and student "starts soon" reminders, reschedule emails, the .ics file, and course "next lesson" counts. Cancelling or deleting one students can't see yet sends no email.
+- **Student page:** `StudyRoom` instead of the classroom. A progress card ("X nga N materiale të para", then "Bravo!"), the materials as numbered steps (✓ when seen; the next one highlighted "Vazhdo këtu"), and beside them on computers (below on phones) "Rreth mësimit" and "Keni pyetje?", which opens Mesazhe. Opening or downloading a material marks it seen (in `grantMaterialAccess`, students only). Materials a student can't open at all (an Office file with downloads off) don't count toward progress.
+- **Lists:** cards show "Pa orar", "Në dispozicion deri më", a progress bar and "Fillo / Vazhdo / Rishiko". Home has a "Për të studiuar" section (unfinished first). The lessons page has an "Offline" filter, shown only to students who have one.
+- **Admin:** offline tabs are Detaje · Materialet · Studentët · Përparimi · Ftesat. "Përparimi" lists each student's opened count, fewest first. Lists show "Në dispozicion X – Y" and an "Offline" badge.
+- **Tests:** `offline-lessons.integration.test.ts` (5), plus offline cases in policy.test.ts and lesson-rules.test.ts.
+- **Deploy:** `npx prisma migrate deploy` (the offline migration; the chat attachments one is already applied on the dev DB).

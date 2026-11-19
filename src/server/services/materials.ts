@@ -17,6 +17,12 @@ import { PLAYBACK_URL_TTL_SECONDS } from "./recordings";
  * keeps the file in the library.
  */
 
+/**
+ * Whether a student can open a material at all: shown in the page, or downloadable. A Word file
+ * in a lesson without downloads can't be opened, so it doesn't count toward an offline lesson's progress.
+ */
+export const studentCanOpen = (mimeType: string, allowDownloads: boolean) => allowDownloads || isInlineSafe("material", mimeType);
+
 /** Admins can always download; students only when the lesson allows it. */
 async function canDownload(user: AppUser, lessonId: string) {
   if (user.role === "admin") return true;
@@ -24,16 +30,25 @@ async function canDownload(user: AppUser, lessonId: string) {
   return lesson?.allowDownloads ?? false;
 }
 
-/** Students (and admins): a lesson's materials. Students see READY files only. */
+/**
+ * Students (and admins): a lesson's materials. Students see READY files only, each with whether
+ * they have opened it already (`seen`, the progress of an offline lesson; always false for admins).
+ */
 export async function listMaterials(user: AppUser, lessonId: string) {
   await requireLessonCapability(user, lessonId, "VIEW_CONTENT");
   const downloadable = await canDownload(user, lessonId);
+  const student = user.role !== "admin";
   const rows = await prisma.lessonMaterial.findMany({
-    where: { lessonId, ...(user.role === "admin" ? {} : { file: { status: "READY" } }) },
+    where: { lessonId, ...(student ? { file: { status: "READY" } } : {}) },
     orderBy: [{ position: "asc" }, { createdAt: "asc" }],
-    select: { id: true, createdAt: true, file: { select: { id: true, displayName: true, mimeType: true, sizeBytes: true, status: true } } },
+    select: {
+      id: true,
+      createdAt: true,
+      file: { select: { id: true, displayName: true, mimeType: true, sizeBytes: true, status: true } },
+      progress: { where: { userId: student ? user.id : "" }, select: { seenAt: true }, take: 1 },
+    },
   });
-  return rows.map(({ id, createdAt, file }) => ({
+  return rows.map(({ id, createdAt, file, progress }) => ({
     id,
     fileId: file.id,
     displayName: file.displayName,
@@ -43,6 +58,7 @@ export async function listMaterials(user: AppUser, lessonId: string) {
     createdAt,
     viewable: isInlineSafe("material", file.mimeType),
     downloadable,
+    seen: progress.length > 0,
   }));
 }
 
@@ -83,6 +99,8 @@ export async function grantMaterialAccess(user: AppUser, lessonId: string, mater
   const material = await prisma.lessonMaterial.findFirst({ where: { id: materialId, lessonId, file: { status: "READY" } }, select: { file: true } });
   if (!material) throw new ApiError("NOT_FOUND", "Materiali nuk u gjet.");
   const { file } = material;
+  // Opening or downloading counts as "seen" (kept once; a video's grant renewals change nothing).
+  if (user.role !== "admin") await prisma.materialProgress.createMany({ data: [{ userId: user.id, lessonMaterialId: materialId }], skipDuplicates: true });
 
   const inline = mode === "view" && isInlineSafe("material", file.mimeType);
   const ttl = inline && isVideo(file.mimeType) ? PLAYBACK_URL_TTL_SECONDS : READ_URL_MAX_TTL_SECONDS;

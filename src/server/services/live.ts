@@ -7,7 +7,8 @@ import { ApiError } from "@/server/http";
 import { sendMail } from "@/server/mail";
 import type { MailMessage } from "@/server/mail";
 import { lessonCancelledEmail, lessonLiveEmail, lessonRescheduledEmail } from "@/server/mail/templates";
-import { formatTimeRange, formatWeekdayDate, timezoneAbbreviation } from "@/lib/datetime";
+import type { LessonFormat } from "@/generated/prisma/enums";
+import { formatDateTime, formatTimeRange, formatWeekdayDate, timezoneAbbreviation } from "@/lib/datetime";
 import { publishFeedChanged, publishLessonChanged } from "@/server/realtime/publish";
 import { closeOpenAttendance } from "./attendance";
 import { audit } from "./audit";
@@ -129,7 +130,7 @@ async function eligibleRecipients(lessonId: string, now: Date): Promise<Recipien
     .filter((e) => !isExpired(e.deadline, now));
 }
 
-type EmailLesson = { title: string; scheduledStartAt: Date; scheduledEndAt: Date };
+type EmailLesson = { title: string; scheduledStartAt: Date; scheduledEndAt: Date; accessExpiresAt: Date; format: LessonFormat };
 type EmailBuilder = (to: { id: string; email: string; name: string }, academyName: string) => MailMessage;
 
 /**
@@ -158,7 +159,9 @@ function emailInBackground(kind: string, userIds: string[], build: EmailBuilder)
 
 const lessonUrl = (lessonId: string, query = "") => new URL(`/portal/mesimet/${lessonId}${query}`, env.APP_URL).toString();
 const scheduleText = (lesson: EmailLesson) =>
-  `${formatWeekdayDate(lesson.scheduledStartAt)}, ${formatTimeRange(lesson.scheduledStartAt, lesson.scheduledEndAt)} (${timezoneAbbreviation(lesson.scheduledStartAt)})`;
+  lesson.format === "OFFLINE"
+    ? `mësim offline, në dispozicion deri më ${formatDateTime(lesson.accessExpiresAt)} (${timezoneAbbreviation(lesson.accessExpiresAt)})`
+    : `${formatWeekdayDate(lesson.scheduledStartAt)}, ${formatTimeRange(lesson.scheduledStartAt, lesson.scheduledEndAt)} (${timezoneAbbreviation(lesson.scheduledStartAt)})`;
 
 /** Ends these lessons' still-open pop-up notices of these types (they describe a time that no longer applies). */
 async function closeNotices(lessonIds: string[], types: ("LESSON_LIVE" | "LESSON_STARTING_SOON")[], at: Date) {
@@ -235,7 +238,7 @@ export async function notifyLessonRescheduled(lessonId: string, now = new Date()
   await publishLessonChanged(lessonId);
 }
 
-type NoticeLesson = { id: string; title: string; scheduledStartAt: Date; scheduledEndAt: Date };
+type NoticeLesson = EmailLesson & { id: string };
 /** Per student, the lessons they were expecting (earliest first). */
 export type ExpectingStudents = Map<string, NoticeLesson[]>;
 
@@ -251,7 +254,7 @@ export async function studentsExpecting(lessonIds: string[], now = new Date()): 
     select: {
       userId: true,
       accessExpiresAt: true,
-      lesson: { select: { id: true, title: true, scheduledStartAt: true, scheduledEndAt: true, accessExpiresAt: true } },
+      lesson: { select: { id: true, title: true, format: true, scheduledStartAt: true, scheduledEndAt: true, accessExpiresAt: true } },
     },
   });
   const byStudent: ExpectingStudents = new Map();
@@ -341,6 +344,7 @@ export async function getLiveFeed(user: AppUser, now = new Date()): Promise<Live
       lesson: {
         select: {
           title: true,
+          format: true,
           publication: true,
           meetingStatus: true,
           joinOpensAt: true,
@@ -393,6 +397,7 @@ async function ensureStartingSoonNotices(user: AppUser, now: Date) {
       OR: [{ accessExpiresAt: null }, { accessExpiresAt: { gt: now } }],
       lesson: {
         publication: "PUBLISHED",
+        format: "LIVE",
         meetingStatus: { in: ["NOT_PROVISIONED", "SCHEDULED"] },
         scheduledStartAt: { gt: now, lte: new Date(now.getTime() + STARTING_SOON_MS) },
         accessExpiresAt: { gt: now },

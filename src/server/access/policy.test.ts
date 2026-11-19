@@ -198,3 +198,40 @@ describe("lessonPhase", () => {
     expect(lessonPhase(l({ meetingStatus: "ENDED" }), granted, true, ms(start, 4 * 3_600_000))).toBe("REPLAY");
   });
 });
+
+describe("offline lessons", () => {
+  const FROM = new Date("2026-11-10T08:00:00.000Z");
+  const offline = (overrides: Partial<AccessLesson> = {}) =>
+    lesson({ format: "OFFLINE", meetingStatus: "NOT_PROVISIONED", joinOpensAt: FROM, scheduledEndAt: DEADLINE, ...overrides });
+
+  it("hides a scheduled offline lesson (card and content) until it appears", () => {
+    const before = ms(FROM, -1);
+    const access = evaluateLessonAccess(student, offline(), enrolled(), before);
+    expect(access).toMatchObject({ status: "denied", reason: "NOT_YET_AVAILABLE" });
+    expect(checkCapability(access, "VIEW_CARD", offline(), before).allowed).toBe(false);
+    expect(checkCapability(access, "VIEW_CONTENT", offline(), before).allowed).toBe(false);
+  });
+
+  it("opens its content from the moment it appears until the deadline", () => {
+    const access = evaluateLessonAccess(student, offline(), enrolled(), FROM);
+    expect(access.status).toBe("granted");
+    expect(checkCapability(access, "VIEW_CONTENT", offline(), FROM).allowed).toBe(true);
+    expect(evaluateLessonAccess(student, offline(), enrolled(), DEADLINE)).toMatchObject({ status: "denied", reason: "EXPIRED" });
+  });
+
+  it("never offers a class to join", () => {
+    const at = ms(FROM, 60_000);
+    const access = evaluateLessonAccess(student, offline({ meetingStatus: "LIVE" }), enrolled(), at);
+    expect(checkCapability(access, "JOIN_LIVE", offline({ meetingStatus: "LIVE" }), at)).toMatchObject({ allowed: false, code: "LESSON_JOIN_NOT_OPEN" });
+  });
+
+  it("is in the self-study phase while available", () => {
+    const phase = (now: Date) => lessonPhase({ ...offline(), scheduledStartAt: FROM }, evaluateLessonAccess(student, offline(), enrolled(), now), false, now);
+    expect(phase(ms(FROM, 1000))).toBe("SELF_STUDY");
+    expect(phase(DEADLINE)).toBe("EXPIRED");
+  });
+
+  it("lets admins see it before it appears", () => {
+    expect(evaluateLessonAccess(admin, offline(), null, ms(FROM, -1))).toEqual({ status: "admin" });
+  });
+});

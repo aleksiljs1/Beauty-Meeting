@@ -362,6 +362,10 @@ export const admin = {
       ERROR: "Gabim në klasën live",
     },
     demoBadge: "Demo",
+    offlineBadge: "Offline",
+    /** An offline lesson in lists: its availability window instead of a class time. */
+    offlineWindow: (from: string, until: string) => `Në dispozicion ${from} – ${until}`,
+    offlineTabs: { details: "Detaje", materials: "Materialet", students: "Studentët", progress: "Përparimi", invitations: "Ftesat" },
     backToList: "Të gjitha mësimet",
     bulkDelete: {
       trigger: "Fshi mësimet",
@@ -429,6 +433,21 @@ export const admin = {
     course: "Kursi",
     noCourse: "Pa kurs",
     scheduleLegend: "Orari dhe afati i aksesit",
+    format: {
+      legend: "Lloji i mësimit",
+      live: "Live në Zoom",
+      liveHint: "Klasë në orar, me takim Zoom, prani dhe regjistrime.",
+      offline: "Offline",
+      offlineHint: "Pa takim: vetëm materiale (PDF, video, foto…) që studentët i studiojnë kur të duan.",
+      locked: "Lloji nuk ndryshohet pasi mësimi krijohet.",
+    },
+    offlineLegend: "Kur e shohin studentët",
+    availableNow: "Menjëherë",
+    availableNowHint: "Shfaqet sapo ta publikoni.",
+    availableLater: "Nga një datë",
+    availableLaterHint: "Mbetet e fshehur deri në këtë datë, edhe pasi ta publikoni.",
+    availableFrom: "Shfaqet më",
+    offlineDeadlineHint: "Deri kur studentët i shohin materialet.",
     start: "Fillimi",
     end: "Përfundimi",
     joinOpens: "Hyrja hapet",
@@ -485,6 +504,13 @@ export const admin = {
     publish: "Publiko",
     publishTitle: "Të publikohet mësimi?",
     publishBody: "Studentët e regjistruar do ta shohin mësimin dhe lidhjet e ftesave do të funksionojnë.",
+    publishBodyOffline: (from: string | null) =>
+      from
+        ? `Studentët e regjistruar do ta shohin mësimin më ${from}. Deri atëherë mbetet i fshehur.`
+        : "Studentët e regjistruar do ta shohin mësimin menjëherë, me materialet e tij.",
+    format: "Lloji",
+    offlineVisibleFrom: (date: string) => `Shfaqet për studentët më ${date}`,
+    offlineVisibleNow: "Studentët e shohin që tani (kur është i publikuar)",
     unpublish: "Kthe në draft",
     unpublishTitle: "Të kthehet mësimi në draft?",
     unpublishBody: "Studentët nuk do ta shohin më mësimin derisa ta publikoni përsëri. Regjistrimet e tyre ruhen.",
@@ -686,6 +712,18 @@ export const admin = {
       added: (count: number) => (count === 1 ? "Materiali u shtua." : `U shtuan ${count} materiale.`),
     },
     uploadFailed: "Ngarkimi dështoi. Kontrolloni lidhjen dhe provoni përsëri.",
+  },
+
+  progress: {
+    title: "Përparimi i studentëve",
+    intro: "Sa materiale ka hapur secili student (parë ose shkarkuar). Ata që kanë hapur më pak dalin të parët.",
+    empty: "Ky mësim nuk ka ende studentë.",
+    noMaterials: "Shtoni materiale te skeda Materialet: përparimi llogaritet mbi to.",
+    count: (seen: number, total: number) => `${seen} nga ${total}`,
+    done: "Përfunduar",
+    notStarted: "Nuk ka filluar",
+    lastSeen: (when: string) => `Hera e fundit: ${when}`,
+    summary: (done: number, started: number, total: number) => `${done} e kanë përfunduar · ${started} kanë filluar · ${total} gjithsej`,
   },
 
   attendance: {

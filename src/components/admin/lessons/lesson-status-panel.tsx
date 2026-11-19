@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Archive, Ban, Eye, EyeOff, FlaskConical, RotateCcw, Square, Trash2, Undo2 } from "lucide-react";
 import { ConfirmAction } from "@/components/admin/confirm-action";
-import { DemoBadge, MeetingBadge, PublicationBadge } from "@/components/admin/page-parts";
+import { DemoBadge, MeetingBadge, OfflineBadge, PublicationBadge } from "@/components/admin/page-parts";
 import { useApiAction } from "@/components/admin/use-api-action";
 import { Button } from "@/components/ui/button";
 import { apiSend } from "@/lib/api/client";
@@ -23,6 +24,8 @@ export function LessonStatusPanel({
     publication: Publication;
     meetingStatus: "NOT_PROVISIONED" | "SCHEDULED" | "LIVE" | "ENDED" | "ERROR";
     isDemo: boolean;
+    format: "LIVE" | "OFFLINE";
+    scheduledStartAt: Date;
     liveStartedAt: Date | null;
     liveEndedAt: Date | null;
     enrollmentCount: number;
@@ -43,6 +46,10 @@ export function LessonStatusPanel({
   const isLive = lesson.meetingStatus === "LIVE";
   const held = !lesson.isDemo && lesson.liveStartedAt !== null; // see tookPlace: kept for attendance
   const p = lesson.publication;
+  const offline = lesson.format === "OFFLINE";
+  // A scheduled offline lesson: hidden from students until then, even when published.
+  const [now] = useState(() => Date.now());
+  const visibleFrom = offline && lesson.scheduledStartAt.getTime() > now ? formatDateTime(lesson.scheduledStartAt) : null;
 
   return (
     <div className="space-y-5">
@@ -53,13 +60,23 @@ export function LessonStatusPanel({
             <PublicationBadge publication={p} />
           </dd>
         </div>
-        <div className="space-y-1">
-          <dt className="text-muted-foreground">{t.meeting}</dt>
-          <dd className="flex flex-wrap items-center gap-2">
-            <MeetingBadge status={lesson.meetingStatus} />
-            {lesson.isDemo && <DemoBadge />}
-          </dd>
-        </div>
+        {offline ? (
+          <div className="space-y-1">
+            <dt className="text-muted-foreground">{t.format}</dt>
+            <dd className="flex flex-wrap items-center gap-2">
+              <OfflineBadge />
+              <span className="text-xs text-muted-foreground">{visibleFrom ? t.offlineVisibleFrom(visibleFrom) : t.offlineVisibleNow}</span>
+            </dd>
+          </div>
+        ) : (
+          <div className="space-y-1">
+            <dt className="text-muted-foreground">{t.meeting}</dt>
+            <dd className="flex flex-wrap items-center gap-2">
+              <MeetingBadge status={lesson.meetingStatus} />
+              {lesson.isDemo && <DemoBadge />}
+            </dd>
+          </div>
+        )}
       </dl>
       {lesson.liveStartedAt && (
         <p className="text-sm text-muted-foreground">
@@ -77,7 +94,7 @@ export function LessonStatusPanel({
               </Button>
             }
             title={t.publishTitle}
-            description={t.publishBody}
+            description={offline ? t.publishBodyOffline(visibleFrom) : t.publishBody}
             confirmLabel={t.publish}
             onConfirm={() => setPublication("PUBLISHED")}
           />

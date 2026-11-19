@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
-import { Info } from "lucide-react";
+import { BookOpen, Info, Video } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { CheckList } from "@/components/admin/check-list";
@@ -34,10 +34,12 @@ import {
   defaultSchedule,
   MAX_REPEATED_LESSONS,
   needsEarlyDeadlineConfirmation,
+  offlineSchedule,
   repeatSchedules,
   scheduleMessages,
   suggestedStart,
   validateLessonSchedule,
+  validateOfflineSchedule,
   type LessonSchedule,
   type RepeatRule,
 } from "@/lib/admin/lesson-rules";
@@ -60,6 +62,9 @@ const schema = z.object({
   imageId: z.string().nullable(),
   isDemo: z.boolean(),
   allowDownloads: z.boolean(),
+  format: z.enum(["LIVE", "OFFLINE"]),
+  /** Offline: visible as soon as it is published (else from `scheduledStartAt`). */
+  availableNow: z.boolean(),
   scheduledStartAt: dateField,
   scheduledEndAt: dateField,
   joinOpensAt: dateField,
@@ -76,11 +81,15 @@ export type LessonFormLesson = {
   imageId: string | null;
   isDemo: boolean;
   allowDownloads: boolean;
+  format: "LIVE" | "OFFLINE";
   publication: "DRAFT" | "PUBLISHED" | "ARCHIVED" | "CANCELLED";
   meetingStatus: string;
 } & LessonSchedule;
 
-function toValues(source: LessonSchedule & { title?: string; summary?: string | null; details?: string | null; courseId?: string | null; imageId?: string | null; isDemo?: boolean; allowDownloads?: boolean }): Values {
+function toValues(
+  source: LessonSchedule & { title?: string; summary?: string | null; details?: string | null; courseId?: string | null; imageId?: string | null; isDemo?: boolean; allowDownloads?: boolean; format?: "LIVE" | "OFFLINE" },
+): Values {
+  const offline = source.format === "OFFLINE";
   return {
     title: source.title ?? "",
     summary: source.summary ?? "",
@@ -89,6 +98,9 @@ function toValues(source: LessonSchedule & { title?: string; summary?: string | 
     imageId: source.imageId ?? null,
     isDemo: source.isDemo ?? false,
     allowDownloads: source.allowDownloads ?? false,
+    format: source.format ?? "LIVE",
+    // An offline lesson students can already see counts as "right away".
+    availableNow: !offline || source.scheduledStartAt.getTime() <= Date.now(),
     scheduledStartAt: toZonedInputValue(source.scheduledStartAt),
     scheduledEndAt: toZonedInputValue(source.scheduledEndAt),
     joinOpensAt: toZonedInputValue(source.joinOpensAt),
@@ -97,6 +109,10 @@ function toValues(source: LessonSchedule & { title?: string; summary?: string | 
 }
 
 function toSchedule(values: Values): LessonSchedule {
+  if (values.format === "OFFLINE") {
+    const from = values.availableNow ? new Date() : fromZonedInputValue(values.scheduledStartAt)!;
+    return offlineSchedule(from, fromZonedInputValue(values.accessExpiresAt)!);
+  }
   return {
     scheduledStartAt: fromZonedInputValue(values.scheduledStartAt)!,
     scheduledEndAt: fromZonedInputValue(values.scheduledEndAt)!,
@@ -123,6 +139,9 @@ export function LessonForm({
   const { errors, dirtyFields, isSubmitting } = form.formState;
 
   const isEdit = !!lesson;
+  const format = useWatch({ control: form.control, name: "format" });
+  const offline = format === "OFFLINE";
+  const availableNow = useWatch({ control: form.control, name: "availableNow" });
   const scheduleDirty = SCHEDULE_FIELDS.some((field) => dirtyFields[field]);
   const startValue = useWatch({ control: form.control, name: "scheduledStartAt" });
   const zoneAt = fromZonedInputValue(startValue) ?? new Date();
@@ -170,21 +189,24 @@ export function LessonForm({
 
   async function save(values: Values, confirmEarlyDeadline: boolean) {
     const schedule = toSchedule(values);
+    const isOffline = values.format === "OFFLINE";
     const body = {
       title: values.title,
       summary: values.summary,
       details: values.details,
       courseId: values.courseId === NO_COURSE ? null : values.courseId,
       imageId: values.imageId,
-      ...(demoAllowed || isEdit ? { isDemo: values.isDemo } : {}),
+      ...((demoAllowed || isEdit) && !isOffline ? { isDemo: values.isDemo } : {}),
       allowDownloads: values.allowDownloads,
+      ...(isEdit ? {} : { format: values.format }),
+      ...(isOffline ? { availableNow: values.availableNow } : {}),
       scheduledStartAt: schedule.scheduledStartAt.toISOString(),
       scheduledEndAt: schedule.scheduledEndAt.toISOString(),
       joinOpensAt: schedule.joinOpensAt.toISOString(),
       accessExpiresAt: schedule.accessExpiresAt.toISOString(),
       confirmEarlyDeadline,
       ...(isEdit ? {} : { studentIds: courseStudents.status === "done" ? [...courseStudents.selected] : [] }),
-      ...(repeat && !isEdit ? { repeat } : {}),
+      ...(repeat && !isEdit && !isOffline ? { repeat } : {}),
     };
     try {
       if (lesson) {
@@ -214,6 +236,11 @@ export function LessonForm({
   }
 
   const submit = form.handleSubmit(async (values) => {
+    if (values.format === "OFFLINE") {
+      const issues = validateOfflineSchedule(toSchedule(values));
+      if (issues.length) return applyIssues(issues);
+      return save(values, false);
+    }
     if (repeatProblem) return;
     // Instant feedback with the same rules the server enforces.
     const issues = validateLessonSchedule(toSchedule(values));
@@ -226,6 +253,8 @@ export function LessonForm({
 
   return (
     <form onSubmit={submit} className="space-y-6" noValidate>
+      <Controller control={form.control} name="format" render={({ field }) => <FormatField value={field.value} onChange={field.onChange} locked={isEdit} />} />
+
       <div className="grid gap-4">
         <FormField label={t.title} info={fieldInfo.lesson.title} error={errors.title?.message}>
           <Input autoComplete="off" {...form.register("title")} />
@@ -267,48 +296,95 @@ export function LessonForm({
         </div>
       </div>
 
-      <fieldset className="space-y-4 rounded-md border p-4">
-        <legend className="px-1 text-sm font-medium">{t.scheduleLegend}</legend>
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Info className="size-4" aria-hidden /> {t.timezone(ACADEMY_TIMEZONE_LABEL, timezoneAbbreviation(zoneAt))}
-        </p>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {(
-            [
-              ["scheduledStartAt", t.start, undefined, fieldInfo.lesson.start, onStartChange],
-              ["scheduledEndAt", t.end, undefined, fieldInfo.lesson.end, onEndChange],
-              ["joinOpensAt", t.joinOpens, t.joinOpensHint, fieldInfo.lesson.joinOpens, undefined],
-              ["accessExpiresAt", t.deadline, t.deadlineHint, fieldInfo.lesson.deadline, undefined],
-            ] as const
-          ).map(([name, label, hint, info, follow]) => (
+      {offline ? (
+        <fieldset className="space-y-4 rounded-md border p-4">
+          <legend className="px-1 text-sm font-medium">{t.offlineLegend}</legend>
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Info className="size-4" aria-hidden /> {t.timezone(ACADEMY_TIMEZONE_LABEL, timezoneAbbreviation(zoneAt))}
+          </p>
+          <Controller
+            control={form.control}
+            name="availableNow"
+            render={({ field }) => (
+              <div role="radiogroup" aria-label={t.offlineLegend} className="grid gap-2 sm:grid-cols-2">
+                {(
+                  [
+                    [true, t.availableNow, t.availableNowHint],
+                    [false, t.availableLater, t.availableLaterHint],
+                  ] as const
+                ).map(([value, label, hint]) => (
+                  <ChoiceCard key={label} selected={field.value === value} onSelect={() => field.onChange(value)} label={label} hint={hint} />
+                ))}
+              </div>
+            )}
+          />
+          <div className="grid gap-4 sm:grid-cols-2">
+            {!availableNow && (
+              <Controller
+                control={form.control}
+                name="scheduledStartAt"
+                render={({ field }) => (
+                  <FormField label={t.availableFrom} error={errors.scheduledStartAt?.message}>
+                    <DateTimeInput {...field} />
+                  </FormField>
+                )}
+              />
+            )}
             <Controller
-              key={name}
               control={form.control}
-              name={name}
+              name="accessExpiresAt"
               render={({ field }) => (
-                <FormField label={label} hint={hint} info={info} error={errors[name]?.message}>
-                  <DateTimeInput
-                    {...field}
-                    onChange={(value) => {
-                      field.onChange(value);
-                      follow?.(value);
-                    }}
-                  />
+                <FormField label={t.deadline} hint={t.offlineDeadlineHint} info={fieldInfo.lesson.deadline} error={errors.accessExpiresAt?.message}>
+                  <DateTimeInput {...field} />
                 </FormField>
               )}
             />
-          ))}
-        </div>
-        {!isEdit && <RepeatField rule={repeat} onToggle={toggleRepeat} onChange={setRepeat} startDay={firstStart && weekdayIndex(academyDay(firstStart))} schedules={repeated ?? []} problem={repeatProblem} />}
-        <div aria-live="polite">
-          {isEdit && lesson.publication === "PUBLISHED" && scheduleDirty && (
-            <Alert>
-              <Info aria-hidden />
-              <AlertDescription>{t.publishedNote}</AlertDescription>
-            </Alert>
-          )}
-        </div>
-      </fieldset>
+          </div>
+        </fieldset>
+      ) : (
+        <fieldset className="space-y-4 rounded-md border p-4">
+          <legend className="px-1 text-sm font-medium">{t.scheduleLegend}</legend>
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Info className="size-4" aria-hidden /> {t.timezone(ACADEMY_TIMEZONE_LABEL, timezoneAbbreviation(zoneAt))}
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {(
+              [
+                ["scheduledStartAt", t.start, undefined, fieldInfo.lesson.start, onStartChange],
+                ["scheduledEndAt", t.end, undefined, fieldInfo.lesson.end, onEndChange],
+                ["joinOpensAt", t.joinOpens, t.joinOpensHint, fieldInfo.lesson.joinOpens, undefined],
+                ["accessExpiresAt", t.deadline, t.deadlineHint, fieldInfo.lesson.deadline, undefined],
+              ] as const
+            ).map(([name, label, hint, info, follow]) => (
+              <Controller
+                key={name}
+                control={form.control}
+                name={name}
+                render={({ field }) => (
+                  <FormField label={label} hint={hint} info={info} error={errors[name]?.message}>
+                    <DateTimeInput
+                      {...field}
+                      onChange={(value) => {
+                        field.onChange(value);
+                        follow?.(value);
+                      }}
+                    />
+                  </FormField>
+                )}
+              />
+            ))}
+          </div>
+          {!isEdit && <RepeatField rule={repeat} onToggle={toggleRepeat} onChange={setRepeat} startDay={firstStart && weekdayIndex(academyDay(firstStart))} schedules={repeated ?? []} problem={repeatProblem} />}
+          <div aria-live="polite">
+            {isEdit && lesson.publication === "PUBLISHED" && scheduleDirty && (
+              <Alert>
+                <Info aria-hidden />
+                <AlertDescription>{t.publishedNote}</AlertDescription>
+              </Alert>
+            )}
+          </div>
+        </fieldset>
+      )}
 
       <Controller
         control={form.control}
@@ -326,7 +402,7 @@ export function LessonForm({
         )}
       />
 
-      {(demoAllowed || lesson?.isDemo) && (
+      {!offline && (demoAllowed || lesson?.isDemo) && (
         <Controller
           control={form.control}
           name="isDemo"
@@ -377,6 +453,44 @@ export function LessonForm({
         </AlertDialogContent>
       </AlertDialog>
     </form>
+  );
+}
+
+/** A big tappable option (radio): the lesson type, or when an offline lesson appears. */
+function ChoiceCard({ selected, onSelect, label, hint, icon: Icon, disabled = false }: { selected: boolean; onSelect: () => void; label: string; hint: string; icon?: typeof Info; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      disabled={disabled}
+      onClick={onSelect}
+      className={cn(
+        "flex items-start gap-3 rounded-md border p-3 text-left transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed",
+        selected ? "border-rose-deep bg-rose/10" : "bg-card hover:bg-muted/50",
+        disabled && !selected && "opacity-50",
+      )}
+    >
+      {Icon ? <Icon aria-hidden className={cn("mt-0.5 size-5 shrink-0", selected ? "text-rose-deep" : "text-muted-foreground")} /> : null}
+      <span className="grid gap-0.5">
+        <span className="text-sm font-medium">{label}</span>
+        <span className="text-xs text-muted-foreground">{hint}</span>
+      </span>
+    </button>
+  );
+}
+
+function FormatField({ value, onChange, locked }: { value: "LIVE" | "OFFLINE"; onChange: (value: "LIVE" | "OFFLINE") => void; locked: boolean }) {
+  const f = t.format;
+  return (
+    <fieldset className="grid gap-2">
+      <legend className="mb-1.5 text-sm font-medium">{f.legend}</legend>
+      <div role="radiogroup" aria-label={f.legend} className="grid gap-2 sm:grid-cols-2">
+        <ChoiceCard icon={Video} selected={value === "LIVE"} onSelect={() => onChange("LIVE")} label={f.live} hint={f.liveHint} disabled={locked} />
+        <ChoiceCard icon={BookOpen} selected={value === "OFFLINE"} onSelect={() => onChange("OFFLINE")} label={f.offline} hint={f.offlineHint} disabled={locked} />
+      </div>
+      {locked ? <p className="text-xs text-muted-foreground">{f.locked}</p> : null}
+    </fieldset>
   );
 }
 

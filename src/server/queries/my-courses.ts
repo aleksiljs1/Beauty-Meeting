@@ -33,7 +33,8 @@ export async function getMyCourses(user: AppUser, now = new Date()): Promise<MyC
 
   const [lessons, classes, { accounts }] = await Promise.all([
     prisma.lesson.findMany({
-      where: { courseId: { in: courseIds }, isDemo: false, publication: "PUBLISHED", enrollments: { some: { userId: user.id, revokedAt: null } } },
+      // Classes only: offline lessons have no date to count down to.
+      where: { courseId: { in: courseIds }, isDemo: false, format: "LIVE", publication: "PUBLISHED", enrollments: { some: { userId: user.id, revokedAt: null } } },
       orderBy: { scheduledStartAt: "asc" },
       select: { id: true, title: true, courseId: true, scheduledStartAt: true, scheduledEndAt: true },
     }),

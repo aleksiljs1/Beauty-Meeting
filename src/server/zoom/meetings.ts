@@ -60,12 +60,13 @@ async function findExistingMeeting(hostUserId: string, lesson: LessonSchedule) {
 }
 
 export async function createZoomMeetingForLesson(lessonId: string, admin: AppUser) {
-  const { hostUserId } = requireZoomCredentials();
   const lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
-    select: { id: true, title: true, scheduledStartAt: true, scheduledEndAt: true, isDemo: true, publication: true, meetingStatus: true, zoomMeetingNumber: true },
+    select: { id: true, title: true, format: true, scheduledStartAt: true, scheduledEndAt: true, isDemo: true, publication: true, meetingStatus: true, zoomMeetingNumber: true },
   });
   if (!lesson) throw new ApiError("NOT_FOUND", "Mësimi nuk u gjet.");
+  if (lesson.format === "OFFLINE") throw new ApiError("CONFLICT", "Ky mësim është offline: nuk ka klasë live në Zoom.");
+  const { hostUserId } = requireZoomCredentials();
   if (lesson.isDemo) throw new ApiError("CONFLICT", "Klasat demo nuk përdorin Zoom.");
   if (lesson.zoomMeetingNumber) throw new ApiError("CONFLICT", "Ky mësim ka tashmë një takim Zoom.");
   if (lesson.publication === "CANCELLED" || lesson.publication === "ARCHIVED") {

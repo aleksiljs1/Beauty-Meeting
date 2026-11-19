@@ -12,6 +12,7 @@ const STYLES: Record<LessonPhase, string> = {
   ENDED: "bg-muted text-muted-foreground",
   EXPIRED: "bg-muted text-muted-foreground",
   CANCELLED: "bg-muted text-muted-foreground line-through decoration-1",
+  SELF_STUDY: "border-rose/40 bg-rose/12 text-rose-deep",
 };
 
 /** Lesson phase label. LIVE comes from stored meeting state only — never from the clock. */

@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { admin } from "@/i18n/admin";
 import { statsText } from "@/i18n/stats";
 import { courseMonthLabel, formatEuro } from "@/lib/billing";
-import { formatCalendarDate, formatDate, formatTimeRange, formatWeekdayDate } from "@/lib/datetime";
+import { formatCalendarDate, formatDate, formatLessonWhen, formatTimeRange, formatWeekdayDate } from "@/lib/datetime";
 import { toProfileInput } from "@/lib/student-profile";
 import { cn } from "@/lib/utils";
 import { requirePageUser } from "@/server/auth/session";
@@ -176,7 +176,7 @@ export default async function StudentPage({ params }: PageProps<"/admin/studente
                 <Link href={`/admin/mesimet/${l.id}`} className="-mx-2 block rounded-md px-2 py-3 transition-colors duration-200 outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50">
                   <span className="block font-medium">{l.title}</span>
                   <span className="block text-sm text-muted-foreground first-letter:uppercase">
-                    {formatWeekdayDate(l.scheduledStartAt)} · {formatTimeRange(l.scheduledStartAt, l.scheduledEndAt)}
+                    {formatLessonWhen(l, admin.lessons.offlineWindow)}
                     {l.courseTitle ? ` · ${l.courseTitle}` : ""}
                   </span>
                 </Link>

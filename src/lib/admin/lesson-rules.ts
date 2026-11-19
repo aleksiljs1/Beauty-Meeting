@@ -46,6 +46,23 @@ export function validateLessonSchedule(schedule: LessonSchedule, confirmEarlyDea
   return issues;
 }
 
+export const offlineMessages = {
+  deadlineBeforeAvailable: "Afati i aksesit duhet të jetë pas datës kur mësimi shfaqet.",
+} as const;
+
+/**
+ * An offline (self-study) lesson has no class time: it appears for students at `availableFrom`
+ * and stays until `accessExpiresAt`. Stored like a lesson that "runs" for that whole window, so
+ * start = join opens = available from, and end = deadline.
+ */
+export function offlineSchedule(availableFrom: Date, accessExpiresAt: Date): LessonSchedule {
+  return { scheduledStartAt: availableFrom, scheduledEndAt: accessExpiresAt, joinOpensAt: availableFrom, accessExpiresAt };
+}
+
+export function validateOfflineSchedule(schedule: Pick<LessonSchedule, "scheduledStartAt" | "accessExpiresAt">): ScheduleIssue[] {
+  return schedule.accessExpiresAt.getTime() > schedule.scheduledStartAt.getTime() ? [] : [{ path: "accessExpiresAt", message: offlineMessages.deadlineBeforeAvailable }];
+}
+
 /** True when the only remaining problem is the unconfirmed early deadline. */
 export const needsEarlyDeadlineConfirmation = (issues: { path: string }[]) =>
   issues.length > 0 && issues.every((issue) => issue.path === EARLY_DEADLINE_ISSUE_PATH);

@@ -27,7 +27,7 @@ export default async function HostRoomPage({ params }: PageProps<"/klasa/[id]">)
   const { id } = await params;
   if (!UUID.test(id)) notFound();
   const lesson = await getAdminLesson(id);
-  if (!lesson || lesson.isDemo || !zoomLive) notFound();
+  if (!lesson || lesson.isDemo || lesson.format === "OFFLINE" || !zoomLive) notFound();
   const [materials, roster, courseCandidates, invitations] = await Promise.all([
     listMaterials(user, id),
     getLessonRoster(id),

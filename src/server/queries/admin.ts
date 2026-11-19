@@ -8,6 +8,7 @@ import { END_GRACE_MS, effectiveMeetingStatus } from "@/server/access/policy";
 import { prisma } from "@/server/db";
 import { env, ZOOM_LIVE_VARIABLES } from "@/server/env";
 import { ApiError } from "@/server/http";
+import { studentCanOpen } from "@/server/services/materials";
 import { s3 } from "@/server/storage/storage";
 import { coverSelect, lessonCoverSrc } from "./cover";
 import { invitationStatus, rosterEntryState } from "./invitation-status";
@@ -72,7 +73,8 @@ const DRAFT_WARNING_MS = 48 * HOUR;
 export async function getAdminDashboard(now = new Date()) {
   const stale = new Date(now.getTime() - HOUR);
   // The count and the list below it are the same lessons (drafts included: they carry a badge).
-  const upcomingWhere: Prisma.LessonWhereInput = { scheduledStartAt: { gt: now }, publication: { in: ["PUBLISHED", "DRAFT"] }, meetingStatus: { not: "LIVE" } };
+  // Classes only: an offline lesson has no time to hold it at.
+  const upcomingWhere: Prisma.LessonWhereInput = { format: "LIVE", scheduledStartAt: { gt: now }, publication: { in: ["PUBLISHED", "DRAFT"] }, meetingStatus: { not: "LIVE" } };
   const [activeStudents, live, upcoming, upcomingCount, failedRecordings, stalledRecordings, failedMaterials, stalledMaterials, draftsSoon] = await Promise.all([
     prisma.user.count({ where: activeStudentWhere }),
     prisma.lesson.findMany({
@@ -236,6 +238,7 @@ const lessonRowSelect = {
   scheduledStartAt: true,
   scheduledEndAt: true,
   accessExpiresAt: true,
+  format: true,
   publication: true,
   meetingStatus: true,
   isDemo: true,
@@ -398,7 +401,8 @@ export async function listMaterialLibrary({ q, readyOnly = false }: { q?: string
 /** Lessons starting in [from, to) for the teachers' calendar; archived lessons are left out. */
 export async function listCalendarLessons({ from, to, courseId }: { from: Date; to: Date; courseId?: string }) {
   const rows = await prisma.lesson.findMany({
-    where: { scheduledStartAt: { gte: from, lt: to }, publication: { not: "ARCHIVED" }, ...(courseId ? { courseId } : {}) },
+    // The calendar shows class times; offline lessons have none (they are in the lessons list).
+    where: { format: "LIVE", scheduledStartAt: { gte: from, lt: to }, publication: { not: "ARCHIVED" }, ...(courseId ? { courseId } : {}) },
     orderBy: { scheduledStartAt: "asc" },
     take: 500,
     select: { id: true, title: true, scheduledStartAt: true, scheduledEndAt: true, publication: true, courseId: true, course: { select: { title: true } } },
@@ -422,6 +426,7 @@ export async function getAdminLesson(lessonId: string, now = new Date()) {
       scheduledEndAt: true,
       joinOpensAt: true,
       accessExpiresAt: true,
+      format: true,
       publication: true,
       meetingStatus: true,
       liveStartedAt: true,
@@ -607,6 +612,7 @@ export async function getClassAlerts(adminId: string, now = new Date()) {
   const leadMinutes = prefs?.lessonReminderMinutes ?? 60;
   const lessons = await prisma.lesson.findMany({
     where: {
+      format: "LIVE", // an offline lesson has no class to start
       publication: { in: ["PUBLISHED", "DRAFT"] },
       OR: [
         { meetingStatus: "LIVE", scheduledEndAt: { gt: new Date(now.getTime() - END_GRACE_MS) } },
@@ -629,4 +635,36 @@ export async function getClassAlerts(adminId: string, now = new Date()) {
   }));
   // Running classes first, then the soonest to start.
   return { leadMinutes, zoomLive: env.ZOOM_MODE === "live", alerts: alerts.sort((a, b) => Number(b.live) - Number(a.live)) };
+}
+
+/**
+ * An offline lesson's progress: for each student who has it (enrolment not revoked), how many of
+ * its ready materials they have opened and when last. Fewest opened first: who may need a nudge.
+ */
+export async function getLessonProgress(lessonId: string) {
+  const lesson = await prisma.lesson.findUnique({ where: { id: lessonId }, select: { allowDownloads: true } });
+  const [all, enrollments] = await Promise.all([
+    prisma.lessonMaterial.findMany({ where: { lessonId, file: { status: "READY" } }, select: { id: true, file: { select: { mimeType: true } } } }),
+    prisma.lessonEnrollment.findMany({
+      where: { lessonId, revokedAt: null },
+      select: { user: { select: { id: true, name: true, email: true } } },
+      take: 1000,
+    }),
+  ]);
+  // Only what students can open counts (see studentCanOpen).
+  const materialIds = all.filter((m) => studentCanOpen(m.file.mimeType, lesson?.allowDownloads ?? false)).map((m) => m.id);
+  const rows = materialIds.length
+    ? await prisma.materialProgress.findMany({ where: { lessonMaterialId: { in: materialIds } }, select: { userId: true, seenAt: true } })
+    : [];
+  const byStudent = Map.groupBy(rows, (row) => row.userId);
+  const students = enrollments.map(({ user }) => {
+    const seen = byStudent.get(user.id) ?? [];
+    return {
+      ...user,
+      seen: seen.length,
+      lastSeenAt: seen.reduce<Date | null>((last, row) => (!last || row.seenAt > last ? row.seenAt : last), null),
+    };
+  });
+  students.sort((a, b) => a.seen - b.seen || a.name.localeCompare(b.name, "sq"));
+  return { total: materialIds.length, students };
 }

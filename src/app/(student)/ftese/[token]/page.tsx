@@ -8,7 +8,7 @@ import { InvitationJoin } from "@/components/portal/invitation-join";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { portalText } from "@/i18n/portal";
-import { formatTimeRange, formatWeekdayDate } from "@/lib/datetime";
+import { formatDateTime, formatTimeRange, formatWeekdayDate } from "@/lib/datetime";
 import { getPageUser } from "@/server/auth/session";
 import { ApiError } from "@/server/http";
 import { getAcademyName } from "@/server/queries/portal";
@@ -88,18 +88,37 @@ export default async function InvitationPage({ params }: PageProps<"/ftese/[toke
         {showLesson && lesson ? (
           <div className="grid gap-2">
             <h1 className="text-3xl leading-tight">{lesson.title}</h1>
-            <dl className="grid gap-1.5 text-sm">
-              <div className="flex items-start gap-2">
-                <dt className="sr-only">{portalText.lesson.scheduleLabel}</dt>
-                <CalendarDays aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                <dd className="first-letter:uppercase">{formatWeekdayDate(lesson.scheduledStartAt)}</dd>
-              </div>
-              <div className="flex items-start gap-2">
-                <dt className="sr-only">{portalText.lesson.scheduleLabel}</dt>
-                <Clock aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                <dd>{formatTimeRange(lesson.scheduledStartAt, lesson.scheduledEndAt)}</dd>
-              </div>
-            </dl>
+            {lesson.format === "OFFLINE" ? (
+              <dl className="grid gap-1.5 text-sm">
+                <div className="flex items-start gap-2">
+                  <dt className="sr-only">{portalText.lesson.scheduleLabel}</dt>
+                  <CalendarDays aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <dd>
+                    {portalText.offline.badge} · {portalText.lessons.selfStudy}
+                  </dd>
+                </div>
+                <div className="flex items-start gap-2">
+                  <dt className="sr-only">{portalText.lesson.deadlineLabel}</dt>
+                  <Clock aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <dd>
+                    {portalText.lessons.availableUntil} {formatDateTime(lesson.accessExpiresAt)}
+                  </dd>
+                </div>
+              </dl>
+            ) : (
+              <dl className="grid gap-1.5 text-sm">
+                <div className="flex items-start gap-2">
+                  <dt className="sr-only">{portalText.lesson.scheduleLabel}</dt>
+                  <CalendarDays aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <dd className="first-letter:uppercase">{formatWeekdayDate(lesson.scheduledStartAt)}</dd>
+                </div>
+                <div className="flex items-start gap-2">
+                  <dt className="sr-only">{portalText.lesson.scheduleLabel}</dt>
+                  <Clock aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <dd>{formatTimeRange(lesson.scheduledStartAt, lesson.scheduledEndAt)}</dd>
+                </div>
+              </dl>
+            )}
           </div>
         ) : null}
 

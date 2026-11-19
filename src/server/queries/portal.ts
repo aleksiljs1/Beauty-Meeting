@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import type { Prisma } from "@/generated/prisma/client";
+import type { LessonFormat } from "@/generated/prisma/enums";
 import { requireLessonCapability } from "@/server/access/lesson-access";
 import { checkCapability, effectiveMeetingStatus, evaluateLessonAccess, lessonPhase, type LessonAccess, type LessonPhase } from "@/server/access/policy";
 import type { AppUser } from "@/server/auth/session";
@@ -9,7 +10,7 @@ import { coverSelect, lessonCoverSrc } from "./cover";
 import { zoomLive } from "@/server/env";
 import { ApiError } from "@/server/http";
 import { STARTING_SOON_MS } from "@/server/services/live";
-import { listMaterials } from "@/server/services/materials";
+import { listMaterials, studentCanOpen } from "@/server/services/materials";
 import { listRecordings } from "@/server/services/recordings";
 
 /**
@@ -50,7 +51,16 @@ export type StudentLessonCard = {
   isDemo: boolean;
   /** The lesson's photo, else its course's; null for the default cover. */
   coverSrc: string | null;
+  format: LessonFormat;
+  /** Offline lessons the student can open: how many of its materials they have opened. */
+  progress: { seen: number; total: number } | null;
 };
+
+/** Seen out of the materials the student can open (see studentCanOpen). */
+function studyProgress(materials: { file: { mimeType: string }; progress: unknown[] }[], allowDownloads: boolean) {
+  const openable = materials.filter((m) => studentCanOpen(m.file.mimeType, allowDownloads));
+  return { seen: openable.filter((m) => m.progress.length > 0).length, total: openable.length };
+}
 
 const deadlineOf = (access: LessonAccess) => (access.status === "admin" ? null : access.deadline);
 
@@ -59,6 +69,7 @@ const cardSelect = (user: AppUser) =>
     id: true,
     title: true,
     summary: true,
+    format: true,
     publication: true,
     meetingStatus: true,
     scheduledStartAt: true,
@@ -70,6 +81,8 @@ const cardSelect = (user: AppUser) =>
     image: coverSelect,
     enrollments: { where: { userId: user.id }, select: { accessExpiresAt: true, revokedAt: true }, take: 1 },
     _count: { select: { recordings: { where: { status: "READY" } } } },
+    allowDownloads: true,
+    materials: { where: { file: { status: "READY" } }, select: { file: { select: { mimeType: true } }, progress: { where: { userId: user.id }, select: { seenAt: true }, take: 1 } } },
   }) satisfies Prisma.LessonSelect;
 
 const MAX_CURRENT_CARDS = 200;
@@ -107,19 +120,22 @@ export async function listStudentLessons(user: AppUser, now = new Date()): Promi
       canJoin: hasAccess && checkCapability(access, "JOIN_LIVE", row, now).allowed,
       isDemo: row.isDemo,
       coverSrc: lessonCoverSrc(row),
+      format: row.format,
+      progress: row.format === "OFFLINE" && hasAccess ? studyProgress(row.materials, row.allowDownloads) : null,
     });
   }
   // A class still running past its scheduled end sits in the past group: bring it to the top.
   return cards.sort((a, b) => Number(b.phase === "LIVE") - Number(a.phase === "LIVE"));
 }
 
-export type LessonFilter = "all" | "upcoming" | "live" | "replay" | "expired";
+export type LessonFilter = "all" | "upcoming" | "live" | "replay" | "offline" | "expired";
 
 const FILTER_PHASES: Record<Exclude<LessonFilter, "all">, LessonPhase[]> = {
   upcoming: ["UPCOMING", "STARTING_SOON", "WAITING_FOR_HOST"],
   live: ["LIVE"],
   // Over: with its recording, or still waiting for it (or held without one).
   replay: ["REPLAY", "ENDED"],
+  offline: ["SELF_STUDY"],
   expired: ["EXPIRED", "CANCELLED"],
 };
 
@@ -146,6 +162,7 @@ export type ClassroomData = {
     isDemo: boolean;
     /** The lesson's photo, else its course's; null for the default cover. */
     coverSrc: string | null;
+    format: LessonFormat;
   };
   /** History view (expired/cancelled): no content is loaded or exposed. */
   history: null | { reason: "EXPIRED" | "CANCELLED" };
@@ -212,6 +229,7 @@ export async function getClassroom(user: AppUser, rawLessonId: string, now = new
       deadline: deadline?.toISOString() ?? null,
       phase,
       isDemo: base.isDemo,
+      format: base.format,
     },
     history,
     stage,

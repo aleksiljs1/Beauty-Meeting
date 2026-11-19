@@ -14,6 +14,8 @@ export async function GET(_request: Request, ctx: RouteContext<"/portal/mesimet/
   const user = await requirePageUser("student");
   try {
     const { lesson } = await requireLessonCapability(user, parseLessonId((await ctx.params).id), "VIEW_CARD");
+    // An offline lesson has no class time to put in a calendar.
+    if (lesson.format === "OFFLINE") return new Response("Ky mësim nuk ka orar.", { status: 404 });
     const url = new URL(`/portal/mesimet/${lesson.id}`, env.APP_URL).toString();
     const body = lessonIcs({ id: lesson.id, title: lesson.title, start: lesson.scheduledStartAt, end: lesson.scheduledEndAt, url, host: new URL(env.APP_URL).hostname });
     return new Response(body, {
