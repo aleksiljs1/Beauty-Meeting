@@ -17,8 +17,8 @@ export function InfoTip({ label, children, className }: { label: string; childre
           type="button"
           aria-label={`Çfarë është: ${label}`}
           className={cn(
-            // 16px icon; the ::after enlarges the tap area to 28px without moving the layout.
-            "relative inline-grid size-4 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors after:absolute after:-inset-1.5 hover:text-foreground focus-visible:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none data-[state=open]:text-rose-deep",
+            // 16px icon; the ::after enlarges the tap area (28px, 40px on touch screens) without moving the layout.
+            "relative inline-grid size-4 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors after:absolute after:-inset-1.5 pointer-coarse:after:-inset-3 hover:text-foreground focus-visible:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none data-[state=open]:text-rose-deep",
             className,
           )}
         >

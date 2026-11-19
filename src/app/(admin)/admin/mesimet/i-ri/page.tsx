@@ -15,7 +15,7 @@ export default async function NewLessonPage() {
   const courses = await listCourses();
   return (
     <div className="max-w-3xl space-y-6">
-      <Link href="/admin/mesimet" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+      <Link href="/admin/mesimet" className="relative touch-target inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ChevronLeft className="size-4" aria-hidden /> {admin.lessons.backToList}
       </Link>
       <PageHeader title={admin.lessons.newTitle} intro={admin.lessons.newIntro} />

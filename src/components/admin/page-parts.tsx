@@ -133,7 +133,7 @@ export function FilterChip({ href, active, children }: { href: string; active: b
       href={href}
       aria-current={active ? "true" : undefined}
       className={cn(
-        "rounded-full border px-3 py-1 text-sm transition-colors duration-200 outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+        "relative touch-target rounded-full border px-3 py-1 text-sm transition-colors duration-200 outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
         active ? "border-foreground bg-foreground text-background" : "bg-card text-muted-foreground hover:border-rose/50 hover:text-foreground",
       )}
     >

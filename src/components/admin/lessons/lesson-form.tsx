@@ -439,7 +439,7 @@ function RepeatField({
                   title={day === startDay ? r.startDay : undefined}
                   onClick={() => toggleDay(day)}
                   className={cn(
-                    "rounded-full border px-3 py-1 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                    "relative touch-target rounded-full border px-3 py-1 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                     rule.weekdays.includes(day) || day === startDay ? "border-foreground bg-foreground text-background" : "bg-card text-muted-foreground hover:text-foreground",
                   )}
                 >

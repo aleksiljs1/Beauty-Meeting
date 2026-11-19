@@ -181,7 +181,8 @@ export function MaterialsPanel({
                   {!canView ? ` · ${material.downloadable ? t.officeHint : t.officeNoDownload}` : !material.downloadable ? ` · ${t.viewOnlyHint}` : null}
                 </p>
               </div>
-              <div className="flex gap-1.5">
+              {/* Phones: the buttons get their own row, so the file name and hint aren't squeezed. */}
+              <div className="flex w-full gap-1.5 sm:w-auto [&>*]:flex-1 sm:[&>*]:flex-none">
                 {canView ? (
                   <Button variant={isOpen ? "secondary" : "outline"} size="lg" disabled={pending !== null} onClick={() => void open(material)}>
                     {pending === `${material.id}:view` ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Eye aria-hidden="true" />}
@@ -196,7 +197,7 @@ export function MaterialsPanel({
                 ) : (
                   // Shown switched off (dimmed and darker) so students see downloading is turned off.
                   <span title={t.downloadDisabled} className="inline-flex cursor-not-allowed">
-                    <Button variant="outline" size="lg" disabled aria-label={`${t.download}: ${t.downloadDisabled}`} className="bg-muted text-muted-foreground opacity-40 grayscale disabled:opacity-40">
+                    <Button variant="outline" size="lg" disabled aria-label={`${t.download}: ${t.downloadDisabled}`} className="w-full bg-muted text-muted-foreground opacity-40 grayscale disabled:opacity-40 sm:w-auto">
                       <Download aria-hidden="true" />
                       {t.download}
                     </Button>

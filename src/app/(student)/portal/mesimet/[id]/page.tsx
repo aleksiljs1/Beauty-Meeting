@@ -59,7 +59,7 @@ export default async function LessonPage({ params, searchParams }: PageProps<"/p
 
   const header = (
     <header className="grid gap-3">
-      <Link href="/portal/mesimet" className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+      <Link href="/portal/mesimet" className="relative touch-target inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft aria-hidden="true" className="size-4" />
         {t.back}
       </Link>

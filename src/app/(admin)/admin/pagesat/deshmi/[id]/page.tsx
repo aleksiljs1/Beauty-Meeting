@@ -41,7 +41,7 @@ export default async function ReceiptPage({ params }: PageProps<"/admin/pagesat/
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <Link href="/admin/pagesat" className="inline-flex items-center gap-1 rounded-sm text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50">
+        <Link href="/admin/pagesat" className="relative touch-target inline-flex items-center gap-1 rounded-sm text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50">
           <ChevronLeft aria-hidden className="size-4" /> {t.back}
         </Link>
         <PrintButton label={t.print} />

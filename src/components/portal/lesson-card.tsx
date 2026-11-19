@@ -34,7 +34,9 @@ export function LessonCard({ lesson, headingLevel = "h3" }: { lesson: StudentLes
         title={lesson.courseTitle ?? lesson.title}
         sizes="(min-width: 1024px) 380px, (min-width: 640px) 50vw, 100vw"
         className={cn(
-          "aspect-[16/9] [&_img]:transition-transform [&_img]:duration-700 motion-safe:group-hover:[&_img]:scale-[1.03]",
+          // Phones without a real photo: a slim placeholder strip, so more than one lesson fits on screen.
+          lesson.coverSrc ? "aspect-[16/9]" : "aspect-[16/5] sm:aspect-[16/9]",
+          "[&_img]:transition-transform [&_img]:duration-700 motion-safe:group-hover:[&_img]:scale-[1.03]",
           history && "opacity-50 grayscale",
         )}
       />

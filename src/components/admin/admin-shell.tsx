@@ -75,6 +75,17 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+function initials(name: string) {
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]!.toUpperCase())
+      .join("") || "?"
+  );
+}
+
 function Brand() {
   return (
     <Link href="/admin" className="block px-3 font-heading text-2xl leading-tight text-foreground">
@@ -104,13 +115,22 @@ export function AdminShell({ user, children }: { user: { name: string; email: st
     }
   }
 
-  const userMenu = (
+  /** Side menu: icon + name. Phone header: an initials circle, so the bar doesn't crowd. */
+  const userMenu = (compact: boolean) => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="h-auto max-w-full justify-start gap-2 px-2 py-1.5" aria-label={admin.shell.userMenu}>
-          <UserRound className="size-4 shrink-0" aria-hidden />
-          <span className="truncate text-sm">{user.name}</span>
-        </Button>
+        {compact ? (
+          <Button variant="ghost" size="icon-lg" className="rounded-full" aria-label={admin.shell.userMenu}>
+            <span className="flex size-8 items-center justify-center rounded-full bg-secondary text-xs font-semibold" aria-hidden="true">
+              {initials(user.name)}
+            </span>
+          </Button>
+        ) : (
+          <Button variant="ghost" className="h-auto max-w-full justify-start gap-2 px-2 py-1.5" aria-label={admin.shell.userMenu}>
+            <UserRound className="size-4 shrink-0" aria-hidden />
+            <span className="truncate text-sm">{user.name}</span>
+          </Button>
+        )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-56">
         <DropdownMenuLabel className="space-y-0.5">
@@ -135,7 +155,7 @@ export function AdminShell({ user, children }: { user: { name: string; email: st
         </nav>
         <div className="grid gap-1 border-t pt-3">
           <ChatButton withLabel />
-          {userMenu}
+          {userMenu(false)}
         </div>
       </aside>
 
@@ -158,10 +178,10 @@ export function AdminShell({ user, children }: { user: { name: string; email: st
               </nav>
             </SheetContent>
           </Sheet>
-          {SHOW_BRAND_NAME && <span className="font-heading text-lg">{common.brandFallback}</span>}
+          {SHOW_BRAND_NAME && <span className="min-w-0 truncate font-heading text-lg">{common.brandFallback}</span>}
           <div className="flex items-center gap-1">
             <ChatButton />
-            {userMenu}
+            {userMenu(true)}
           </div>
         </header>
         <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-10">

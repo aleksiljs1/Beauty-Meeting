@@ -143,7 +143,7 @@ export default async function AdminFeedbackPage({ searchParams }: PageProps<"/ad
 
       {view === "courses" && courseId && UUID.test(courseId) ? (
         <>
-          <Link href="/admin/vleresimet" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+          <Link href="/admin/vleresimet" className="relative touch-target inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
             <ChevronLeft aria-hidden className="size-4" />
             {t.back}
           </Link>

@@ -103,7 +103,7 @@ export function ReminderSettingsForm({ initial, accountEmail }: { initial: Remin
                   aria-pressed={active}
                   onClick={() => setLead({ value: String(split.value), unit: split.unit })}
                   className={cn(
-                    "h-8 rounded-full border px-3 text-xs transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
+                    "relative touch-target h-8 rounded-full border px-3 text-xs transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
                     active ? "border-foreground bg-foreground text-background" : "bg-card hover:bg-muted",
                   )}
                 >

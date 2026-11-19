@@ -48,7 +48,7 @@ export default async function StudentPage({ params }: PageProps<"/admin/studente
 
   return (
     <div className="space-y-8">
-      <Link href="/admin/studentet" className="inline-flex items-center gap-1 rounded-sm text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50">
+      <Link href="/admin/studentet" className="relative touch-target inline-flex items-center gap-1 rounded-sm text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50">
         <ChevronLeft aria-hidden className="size-4" /> {t.back}
       </Link>
 

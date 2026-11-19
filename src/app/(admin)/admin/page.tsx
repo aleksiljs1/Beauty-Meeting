@@ -36,15 +36,15 @@ function Stat({ label, value, icon, href, live = false }: { label: string; value
     <Link
       href={href}
       className={cn(
-        "panel-sheen card-lift relative flex items-center justify-between gap-4 overflow-hidden rounded-md border bg-card p-5 outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+        "panel-sheen card-lift relative flex items-center justify-between gap-4 overflow-hidden rounded-md border bg-card p-3 outline-none sm:p-5 focus-visible:ring-3 focus-visible:ring-ring/50",
         live && "border-live/40",
       )}
     >
       <div>
-        <p className="text-sm text-muted-foreground">{label}</p>
-        <p className={cn("mt-1 font-heading text-4xl lining-nums tabular-nums", live ? "text-live" : "text-gold")}>{value}</p>
+        <p className="text-xs leading-snug text-muted-foreground sm:text-sm">{label}</p>
+        <p className={cn("mt-1 font-heading text-3xl lining-nums sm:text-4xl tabular-nums", live ? "text-live" : "text-gold")}>{value}</p>
       </div>
-      <IconBadge icon={icon} tone={live ? "live" : "gold"} className={cn("size-11", live && "motion-safe:animate-pulse")} />
+      <IconBadge icon={icon} tone={live ? "live" : "gold"} className={cn("hidden size-11 sm:flex", live && "motion-safe:animate-pulse")} />
     </Link>
   );
 }
@@ -78,7 +78,7 @@ export default async function AdminDashboardPage() {
         }
       />
 
-      <div className="stagger grid gap-4 sm:grid-cols-3">
+      <div className="stagger grid grid-cols-3 gap-2 sm:gap-4">
         <Stat label={t.activeStudents} value={data.activeStudents} icon={Users} href="/admin/studentet" />
         <Stat label={t.upcomingLessons} value={data.upcomingCount} icon={CalendarClock} href="/admin/kalendari" />
         <Stat label={t.liveNow} value={data.live.length} icon={Radio} href="/admin/mesimet" live={data.live.length > 0} />
@@ -163,9 +163,7 @@ function LessonList({ lessons }: { lessons: Awaited<ReturnType<typeof getAdminDa
               <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 <PublicationBadge publication={lesson.publication} />
                 <MeetingBadge status={lesson.meetingStatus} />
-                <span>
-                  {lesson.students} {admin.shell.nav.students.toLowerCase()}
-                </span>
+                <span>{t.studentCount(lesson.students)}</span>
               </div>
             </div>
           </Link>

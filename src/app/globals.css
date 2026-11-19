@@ -270,6 +270,21 @@
   }
 }
 
+/*
+ * Touch screens only: an invisible tap area of at least 44 × 44 px around a small control (Apple/Google
+ * guidance), centred on it, without changing its look or the layout. The element must be positioned
+ * (relative/absolute) and must not use ::after for anything else. Mouse users get the visible size.
+ */
+@utility touch-target {
+  @media (pointer: coarse) {
+    &::after {
+      content: "";
+      position: absolute;
+      inset: min(0px, calc((100% - 44px) / 2));
+    }
+  }
+}
+
 /* Gold hairline that grows under a text link on hover/focus (same gesture as the header nav). Wraps across lines. */
 @utility link-underline {
   background-image: linear-gradient(var(--rose), var(--rose));

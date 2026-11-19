@@ -51,6 +51,7 @@ export const admin = {
     liveEmpty: "Asnjë mësim nuk është live tani.",
     upcomingTitle: "Mësimet e ardhshme",
     upcomingEmpty: "Nuk ka mësime të planifikuara.",
+    studentCount: (n: number) => (n === 1 ? "1 student" : `${n} studentë`),
     issuesTitle: "Kërkon vëmendje",
     issuesEmpty: "Asnjë problem. Gjithçka është në rregull.",
     failedRecording: "Regjistrimi dështoi",

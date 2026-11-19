@@ -602,3 +602,29 @@ The user wanted the chat "like the Facebook chat pop-up". On computers (≥ 768 
   window" and opening a chat full screen on a phone (the dev copy was stopped). Live delivery between two people
   wasn't part of this run (the dev copy's port isn't allowed by the realtime service); it uses the same signals
   as before.
+
+## Mobile pass (2026-11-19)
+
+Every page checked at 360 px (visitor, student, admin) and both workflows walked through on a 390 px touch phone
+(student: login, lesson + tabs, material, notifications, chat, profile, sign out; admin: login, menu, create a student,
+series → date → all 6 tabs, create + publish a lesson, calendar, chat reply, payments, sign out). No page scrolls
+sideways and there were no page errors. Fixed:
+
+- **Finger-sized tap areas** on touch screens: new `touch-target` utility (`globals.css`) gives small controls an
+  invisible ≥ 44 × 44 px tap area without changing their look; used by every `Button`, filter chips and "← back"
+  links. Switches and the "i" tips get a larger tap area on touch screens too.
+- **Admin header on phones:** the brand stays on one line and the account menu is an initials circle (it showed
+  the full name and wrapped the brand onto two lines).
+- **Admin dashboard on phones:** the three numbers sit side by side in one compact row instead of three tall cards.
+- **"1 studentët"** under dashboard lessons → "1 student" / "3 studentë".
+- **Student lesson cards on phones:** without a real photo the placeholder is a slim strip (16:5), so more than one
+  lesson fits on screen.
+- **Materials on phones:** the Shiko/Shkarko buttons get their own row; the file name was cut to "Teknikat.p…".
+
+Not built yet (needs the user's OK):
+- **PDFs on phones with downloads off** still open in a new tab as the raw file, which Android Chrome downloads.
+  Proposed: draw PDFs inside the page on phones with pdf.js (`pdfjs-dist`, new dependency).
+- **`/api/auth/token` limit is 30 per minute per IP.** Students on the academy's Wi-Fi share one IP; 20–30 opening
+  the portal at the start of a class could hit it (429). Proposed: raise it (the endpoint already needs a session).
+
+Not yet seen in a browser after the fixes: the rebuild was stopped for low memory (type-check and lint are clean).
