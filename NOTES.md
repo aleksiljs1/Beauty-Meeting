@@ -621,10 +621,20 @@ sideways and there were no page errors. Fixed:
   lesson fits on screen.
 - **Materials on phones:** the Shiko/Shkarko buttons get their own row; the file name was cut to "Teknikat.p…".
 
+- **Tap areas, second round:** login-page links, "Shiko të gjitha", "Të gjitha kurset →", student names in the admin
+  list and other small text links got `touch-target`; tab bars are 44px tall on touch screens.
+- **PDFs with downloads off (user OK'd pdf.js, no watermark):** `pdf-viewer.tsx` draws every page on a canvas with
+  `pdfjs-dist` 6.5.438, on phones and computers alike. No browser PDF viewer (its save button), no raw-file tab that
+  Android saves. Page counter, zoom 50–300%, full screen; long-press/right-click menu blocked. The whole file is fetched
+  at once (the presigned link expires in minutes; needs the bucket CORS from `storage:init`, already there). Pages are
+  drawn only near the screen and freed when far (long PDFs on phones); canvases capped at 16 MP for iOS. The worker is
+  bundled same-origin (`pdf-worker.ts`, CSP `worker-src` falls back to `'self'`); importing pdf.js's worker is enough,
+  it starts itself (calling `initializeFromPort` again made it answer twice). Downloadable PDFs are unchanged (iframe on
+  computers, new tab on phones). A deterrent, not DRM: the server still refuses downloads.
+
 Not built yet (needs the user's OK):
-- **PDFs on phones with downloads off** still open in a new tab as the raw file, which Android Chrome downloads.
-  Proposed: draw PDFs inside the page on phones with pdf.js (`pdfjs-dist`, new dependency).
 - **`/api/auth/token` limit is 30 per minute per IP.** Students on the academy's Wi-Fi share one IP; 20–30 opening
   the portal at the start of a class could hit it (429). Proposed: raise it (the endpoint already needs a session).
 
-Not yet seen in a browser after the fixes: the rebuild was stopped for low memory (type-check and lint are clean).
+Browser-verified 2026-11-19 on a production build: sweep at 360/390 px, student flow 19/19, admin flow 24/24, protected
+PDF viewer 19/19 checks on phone and computer.

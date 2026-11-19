@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { portalText } from "@/i18n/portal";
 import { ApiClientError, apiSend } from "@/lib/api/client";
 import { EmptyState } from "./empty-state";
+import { PdfViewer } from "./pdf-viewer";
 import { ProtectedVideo, type VideoGrant } from "./protected-video";
 
 const t = portalText.materials;
@@ -14,8 +15,11 @@ const t = portalText.materials;
 /** `downloadable`: the lesson allows downloads (always true for admins). The server enforces it too. */
 export type MaterialItem = { id: string; displayName: string; mimeType: string; sizeBytes: number; viewable: boolean; downloadable: boolean };
 
-/** `lost`: the admin removed the material while it was open (it stays closed even if attached again). */
-type Viewer = { id: string; name: string; kind: "pdf" | "image" | "video"; grant: VideoGrant; lost?: boolean };
+/**
+ * `lost`: the admin removed the material while it was open (it stays closed even if attached again).
+ * `protect`: a PDF that may not be downloaded, drawn page by page in our own viewer (no save button).
+ */
+type Viewer = { id: string; name: string; kind: "pdf" | "image" | "video"; grant: VideoGrant; protect: boolean; lost?: boolean };
 
 function formatSize(bytes: number) {
   if (bytes < 1024 * 1024) return t.sizeKb(Math.max(1, Math.round(bytes / 1024)));
@@ -31,7 +35,8 @@ function iconFor(mime: string) {
 
 /**
  * Phones and tablets: their browsers don't show a PDF inside the page (Android shows nothing), so
- * there a PDF opens in a new tab, in the phone's own PDF viewer.
+ * there a downloadable PDF opens in a new tab, in the phone's own PDF viewer. A PDF that may not be
+ * downloaded never does (Android would save it): it opens in our own viewer on every device.
  */
 const pdfOpensInTab = () => window.matchMedia("(max-width: 767px), (pointer: coarse)").matches;
 
@@ -92,7 +97,8 @@ export function MaterialsPanel({
   const open = async (material: MaterialItem) => {
     const kind = viewerKind(material.mimeType);
     if (!kind) return;
-    if (kind === "pdf" && pdfOpensInTab()) {
+    const protect = kind === "pdf" && !material.downloadable;
+    if (kind === "pdf" && !protect && pdfOpensInTab()) {
       // Opened before the request, while the tap still counts, or the browser blocks the pop-up.
       const tab = window.open("", "_blank");
       const granted = await grant(material, "view");
@@ -110,7 +116,7 @@ export function MaterialsPanel({
     }
     const granted = await grant(material, "view");
     if (!granted) return;
-    setViewer({ id: material.id, name: material.displayName, kind, grant: granted });
+    setViewer({ id: material.id, name: material.displayName, kind, grant: granted, protect });
     onViewerChange?.(true);
   };
 
@@ -149,20 +155,16 @@ export function MaterialsPanel({
           {viewer.kind === "video" ? (
             // key: another video gets a fresh player (and grant renewal schedule).
             <MaterialVideo key={viewer.id} lessonId={lessonId} viewer={viewer} visible={visible} />
+          ) : viewer.kind === "pdf" && viewer.protect ? (
+            <PdfViewer key={viewer.grant.url} url={viewer.grant.url} name={viewer.name} />
           ) : viewer.kind === "pdf" ? (
-            <iframe
-              key={viewer.grant.url}
-              // No downloads: hide the browser's PDF toolbar (its save button). A deterrent only.
-              src={downloadsAllowed ? viewer.grant.url : `${viewer.grant.url}#toolbar=0`}
-              title={t.viewerTitle(viewer.name)}
-              className="h-[65vh] min-h-96 w-full rounded-md border bg-muted"
-            />
+            <iframe key={viewer.grant.url} src={viewer.grant.url} title={t.viewerTitle(viewer.name)} className="h-[65vh] min-h-96 w-full rounded-md border bg-muted" />
           ) : (
             // Presigned, short-lived private URL: next/image optimization doesn't apply here.
             // eslint-disable-next-line @next/next/no-img-element
             <img src={viewer.grant.url} alt={viewer.name} className="max-h-[65vh] w-full rounded-md border bg-muted object-contain" />
           )}
-          <p className="text-xs text-muted-foreground">{downloadsAllowed ? t.viewerFallback : t.viewerFallbackNoDownload}</p>
+          <p className="text-xs text-muted-foreground">{viewer.protect || !downloadsAllowed ? t.viewerFallbackNoDownload : t.viewerFallback}</p>
         </div>
       ) : null}
 
