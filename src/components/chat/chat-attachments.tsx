@@ -185,21 +185,21 @@ export function PendingTray({ items, onRemove }: { items: PendingAttachment[]; o
       {items.map((item) => (
         <li
           key={item.key}
-          className={cn("relative size-16 shrink-0 overflow-hidden rounded-lg border bg-muted", item.status === "failed" && "border-destructive ring-2 ring-destructive/40")}
+          className={cn("relative size-16 shrink-0 rounded-lg border bg-muted", item.status === "failed" && "border-destructive ring-2 ring-destructive/40")}
           title={item.name}
         >
           {item.preview ? (
             // A local blob preview of the picked photo.
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={item.preview} alt={item.name} className="size-full object-cover" />
+            <img src={item.preview} alt={item.name} className="size-full rounded-[inherit] object-cover" />
           ) : (
-            <div className="flex size-full flex-col items-center justify-center gap-0.5 p-1 text-center">
+            <div className="flex size-full flex-col items-center justify-center gap-0.5 overflow-hidden p-1 text-center">
               <FileIcon mimeType={item.mimeType} className="size-5" />
               <span className="line-clamp-2 text-[10px] leading-tight break-all">{item.name}</span>
             </div>
           )}
           {item.status === "uploading" ? (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/35" aria-label={t.uploading}>
+            <div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-[inherit] bg-black/35" aria-label={t.uploading}>
               <Loader2 className="size-5 animate-spin text-white" aria-hidden />
               <span className="absolute inset-x-0 bottom-0 h-1 bg-white/30">
                 <span className="block h-full bg-white transition-[width]" style={{ width: `${Math.round(item.progress * 100)}%` }} />

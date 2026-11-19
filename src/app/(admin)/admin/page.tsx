@@ -41,7 +41,8 @@ function Stat({ label, value, icon, href, live = false }: { label: string; value
       )}
     >
       <div>
-        <p className="text-xs leading-snug text-muted-foreground sm:text-sm">{label}</p>
+        {/* Phones: room for two lines, so the three numbers line up whatever their label's length. */}
+        <p className="min-h-[2.75em] text-xs leading-snug text-muted-foreground sm:min-h-0 sm:text-sm">{label}</p>
         <p className={cn("mt-1 font-heading text-3xl lining-nums sm:text-4xl tabular-nums", live ? "text-live" : "text-gold")}>{value}</p>
       </div>
       <IconBadge icon={icon} tone={live ? "live" : "gold"} className={cn("hidden size-11 sm:flex", live && "motion-safe:animate-pulse")} />

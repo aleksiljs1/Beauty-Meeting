@@ -164,7 +164,8 @@ export function MaterialsPanel({
             // eslint-disable-next-line @next/next/no-img-element
             <img src={viewer.grant.url} alt={viewer.name} className="max-h-[65vh] w-full rounded-md border bg-muted object-contain" />
           )}
-          <p className="text-xs text-muted-foreground">{viewer.protect || !downloadsAllowed ? t.viewerFallbackNoDownload : t.viewerFallback}</p>
+          {/* The protected PDF viewer says itself when a document can't be opened. */}
+          {viewer.protect ? null : <p className="text-xs text-muted-foreground">{downloadsAllowed ? t.viewerFallback : t.viewerFallbackNoDownload}</p>}
         </div>
       ) : null}
 

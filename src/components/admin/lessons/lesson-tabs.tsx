@@ -30,7 +30,9 @@ export function LessonTabs({ initialTab, panels }: { initialTab: LessonTab; pane
 
   return (
     <Tabs value={tab} onValueChange={select} className="gap-6">
-      <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+      {/* Phones: the six tabs scroll sideways; the faded right edge shows there are more (the extra end
+          padding lets the last tab scroll clear of the fade). */}
+      <div className="-mx-4 overflow-x-auto pr-12 pl-4 [mask-image:linear-gradient(to_right,black_80%,transparent)] sm:mx-0 sm:px-0 sm:[mask-image:none]">
         <TabsList variant="line" className="w-max">
           {LESSON_TABS.map((value) => (
             <TabsTrigger key={value} value={value} className="px-3">

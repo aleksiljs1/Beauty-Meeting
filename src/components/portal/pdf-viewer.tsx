@@ -43,6 +43,8 @@ export function PdfViewer({ url, name }: { url: string; name: string }) {
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
   const [sizes, setSizes] = useState<Size[]>([]);
   const [failed, setFailed] = useState(false);
+  /** Share of the file downloaded so far (0–1), shown while it loads. */
+  const [progress, setProgress] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [full, setFull] = useState(false);
   const [current, setCurrent] = useState(1);
@@ -60,9 +62,28 @@ export function PdfViewer({ url, name }: { url: string; name: string }) {
         // The whole file is fetched right away: the link expires after a few minutes.
         const [lib, bytes] = await Promise.all([
           loadPdfJs(),
-          fetch(url, { credentials: "omit" }).then((response) => {
+          fetch(url, { credentials: "omit" }).then(async (response) => {
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            return response.arrayBuffer();
+            const total = Number(response.headers.get("content-length")) || 0;
+            if (!response.body || !total) return response.arrayBuffer();
+            // Read piece by piece to show progress: a big PDF on mobile data takes a while.
+            const reader = response.body.getReader();
+            const chunks: Uint8Array[] = [];
+            let loaded = 0;
+            for (;;) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              chunks.push(value);
+              loaded += value.byteLength;
+              if (!cancelled) setProgress(loaded / total);
+            }
+            const whole = new Uint8Array(loaded);
+            let offset = 0;
+            for (const chunk of chunks) {
+              whole.set(chunk, offset);
+              offset += chunk.byteLength;
+            }
+            return whole.buffer;
           }),
         ]);
         if (cancelled) return;
@@ -185,6 +206,7 @@ export function PdfViewer({ url, name }: { url: string; name: string }) {
           <p className="flex items-center justify-center gap-2 p-6 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" aria-hidden="true" />
             {t.loading}
+            {progress > 0 && progress < 1 ? <span className="tabular-nums">{Math.round(progress * 100)}%</span> : null}
           </p>
         ) : (
           <div ref={pages} className="relative mx-auto flex w-max min-w-full flex-col items-center gap-3 p-3">

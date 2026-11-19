@@ -412,9 +412,10 @@ export function ChatThread({
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={onComposerKey}
               onPaste={(event) => {
-                // A copied photo (a screenshot) pasted into the box is attached.
+                // A copied photo (a screenshot) pasted into the box is attached. Text copied from Word or
+                // Excel also brings a picture of itself: when there is text, the text wins.
                 const files = [...event.clipboardData.files];
-                if (!files.length) return;
+                if (!files.length || event.clipboardData.getData("text/plain").trim()) return;
                 event.preventDefault();
                 void pending.add(files);
               }}
