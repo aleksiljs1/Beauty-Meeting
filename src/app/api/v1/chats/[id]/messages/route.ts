@@ -13,7 +13,7 @@ export const GET = route<Ctx>(async (request, { params }) => {
   return ok(await getMessages(user, id, messagesQuery(new URL(request.url))));
 });
 
-/** Send a text message (`{ body }`). */
+/** Send a message: `{ body, attachmentIds? }` (text, uploaded photos and files, or both). */
 export const POST = route<Ctx>(async (request, { params }) => {
   const user = await requireApiUser(request);
   const id = chatIdParam((await params).id);

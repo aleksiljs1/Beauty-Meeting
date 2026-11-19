@@ -1,7 +1,9 @@
 import "server-only";
 import type { AppUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
+import { isChatPhoto } from "@/lib/chat";
 import { ApiError } from "@/server/http";
+import { photoLink } from "@/server/services/chat-attachments";
 
 /**
  * Read-only chat lookups: my chat list (with unread counts), a page of messages, people search.
@@ -22,7 +24,7 @@ export type ChatListItem = {
   title: string;
   /** Direct chats: the other person (null once their account is deleted). */
   otherUser: { id: string; name: string; role: string } | null;
-  lastMessage: { body: string | null; createdAt: Date; mine: boolean } | null;
+  lastMessage: { body: string | null; createdAt: Date; mine: boolean; photos: number; files: number } | null;
   unread: number;
   pinned: boolean;
 };
@@ -50,7 +52,11 @@ export async function listChats(user: AppUser): Promise<{ chats: ChatListItem[];
           lastMessageAt: true,
           createdAt: true,
           members: { where: { userId: { not: user.id } }, select: { user: { select: { id: true, name: true, role: true } } } },
-          messages: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 1, select: { body: true, createdAt: true, senderId: true, deletedAt: true } },
+          messages: {
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            take: 1,
+            select: { body: true, createdAt: true, senderId: true, deletedAt: true, attachments: { select: { mimeType: true } } },
+          },
         },
       },
     },
@@ -86,7 +92,15 @@ export async function listChats(user: AppUser): Promise<{ chats: ChatListItem[];
       title: c.type === "GROUP" ? (c.title ?? "") : (other?.name ?? DELETED_USER_NAME),
       otherUser: other,
       lastMessage:
-        last && last.createdAt > visibleFrom ? { body: last.deletedAt ? null : last.body, createdAt: last.createdAt, mine: last.senderId === user.id } : null,
+        last && last.createdAt > visibleFrom
+          ? {
+              body: last.deletedAt ? null : last.body,
+              createdAt: last.createdAt,
+              mine: last.senderId === user.id,
+              photos: last.deletedAt ? 0 : last.attachments.filter((a) => isChatPhoto(a.mimeType)).length,
+              files: last.deletedAt ? 0 : last.attachments.filter((a) => !isChatPhoto(a.mimeType)).length,
+            }
+          : null,
       unread: unreadByChat.get(c.id) ?? 0,
       pinned: !!m.pinnedAt,
     };
@@ -99,7 +113,8 @@ export async function listChats(user: AppUser): Promise<{ chats: ChatListItem[];
   return { chats, unreadTotal: chats.reduce((sum, chat) => sum + chat.unread, 0) };
 }
 
-export type ChatMessage = { id: string; senderId: string | null; body: string | null; createdAt: Date; mine: boolean };
+export type ChatAttachment = { id: string; name: string; mimeType: string; size: number; width: number | null; height: number | null; url: string | null };
+export type ChatMessage = { id: string; senderId: string | null; body: string | null; createdAt: Date; mine: boolean; attachments: ChatAttachment[] };
 
 /**
  * Blocks between me and these people, in either direction. `byMe`: I blocked one of them;
@@ -140,7 +155,14 @@ export async function getMessages(user: AppUser, conversationId: string, options
     // One extra row tells whether there is an older page.
     take: options.limit + 1,
     ...(options.before ? { cursor: { id: options.before }, skip: 1 } : {}),
-    select: { id: true, senderId: true, body: true, createdAt: true, deletedAt: true },
+    select: {
+      id: true,
+      senderId: true,
+      body: true,
+      createdAt: true,
+      deletedAt: true,
+      attachments: { orderBy: { position: "asc" }, select: { id: true, objectKey: true, displayName: true, mimeType: true, sizeBytes: true, width: true, height: true } },
+    },
   });
   const page = rows.slice(0, options.limit).reverse();
 
@@ -154,7 +176,31 @@ export async function getMessages(user: AppUser, conversationId: string, options
   );
 
   return {
-    messages: page.map((m): ChatMessage => ({ id: m.id, senderId: m.senderId, body: m.deletedAt ? null : m.body, createdAt: m.createdAt, mine: m.senderId === user.id })),
+    messages: await Promise.all(
+      page.map(
+        async (m): Promise<ChatMessage> => ({
+          id: m.id,
+          senderId: m.senderId,
+          body: m.deletedAt ? null : m.body,
+          createdAt: m.createdAt,
+          mine: m.senderId === user.id,
+          // A deleted message shows nothing of what it carried. Photos come with a short-lived link to show them.
+          attachments: m.deletedAt
+            ? []
+            : await Promise.all(
+                m.attachments.map(async (a) => ({
+                  id: a.id,
+                  name: a.displayName,
+                  mimeType: a.mimeType,
+                  size: a.sizeBytes,
+                  width: a.width,
+                  height: a.height,
+                  url: isChatPhoto(a.mimeType) ? await photoLink(a) : null,
+                })),
+              ),
+        }),
+      ),
+    ),
     hasMore: rows.length > options.limit,
     readBy: others.map((o) => ({ userId: o.user.id, name: o.user.name, lastReadAt: o.lastReadAt })),
     blocked,

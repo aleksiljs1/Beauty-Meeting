@@ -188,7 +188,7 @@ function ChatList({
                     <span className={cn("flex min-w-0 items-center gap-1 text-xs", chat.unread > 0 ? "font-semibold text-foreground" : "text-muted-foreground")}>
                       <span className="min-w-0 truncate">
                         {chat.lastMessage
-                          ? `${chat.lastMessage.mine ? `${t.you}: ` : ""}${chat.lastMessage.body ?? t.deletedMessage}`
+                          ? `${chat.lastMessage.mine ? `${t.you}: ` : ""}${chat.lastMessage.body === null ? t.deletedMessage : t.preview(chat.lastMessage.body, chat.lastMessage.photos, chat.lastMessage.files)}`
                           : t.noMessagesYet}
                       </span>
                       {chat.lastMessage ? <span className="shrink-0">· {listTime(chat.lastMessage.createdAt)}</span> : null}

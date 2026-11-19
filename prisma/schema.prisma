@@ -50,6 +50,7 @@ model User {
   conversationsStarted Conversation[]       @relation("ConversationCreator")
   conversationMembers  ConversationMember[]
   messagesSent         Message[]            @relation("MessageSender")
+  chatAttachments      ChatAttachment[]     @relation("ChatAttachmentUploader")
   /// People this user has blocked.
   blocksMade           UserBlock[]          @relation("BlockBlocker")
   /// People who have blocked this user.
@@ -776,8 +777,9 @@ model Conversation {
   createdAt     DateTime         @default(now()) @db.Timestamptz(3)
   updatedAt     DateTime         @updatedAt @db.Timestamptz(3)
 
-  members  ConversationMember[]
-  messages Message[]
+  members     ConversationMember[]
+  messages    Message[]
+  attachments ChatAttachment[]
 
   @@index([lastMessageAt])
 }
@@ -825,8 +827,39 @@ model Message {
   /// "Delete for everyone": the text is no longer shown.
   deletedAt      DateTime?    @db.Timestamptz(3)
 
+  attachments ChatAttachment[]
+
   @@index([conversationId, createdAt])
   @@index([senderId, createdAt])
+}
+
+/// A photo or file sent in a chat. Uploaded straight to private storage before the message is sent;
+/// `messageId` stays empty until then (an upload never sent is deleted after a day). The real file
+/// type is checked when the message is sent. Only the chat's members get (short-lived) links to it.
+model ChatAttachment {
+  id             String       @id @default(uuid(7)) @db.Uuid
+  conversationId String       @db.Uuid
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  messageId      String?      @db.Uuid
+  message        Message?     @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  /// Null once the uploader's account is deleted (the message stays, like its text).
+  uploaderId     String?
+  uploader       User?        @relation("ChatAttachmentUploader", fields: [uploaderId], references: [id], onDelete: SetNull)
+  /// Server-generated, non-guessable key in private storage. Never a public URL.
+  objectKey      String       @unique
+  /// Sanitized file name, shown on the file card.
+  displayName    String
+  mimeType       String
+  sizeBytes      Int
+  /// Photos: pixel size, so the chat keeps its place while they load.
+  width          Int?
+  height         Int?
+  /// Order inside the message.
+  position       Int          @default(0)
+  createdAt      DateTime     @default(now()) @db.Timestamptz(3)
+
+  @@index([uploaderId, createdAt])
+  @@index([messageId, createdAt])
 }
 
 ///This table keeps each user's block list: one row per "blocker blocked this person".

@@ -38,6 +38,31 @@ export const chatText = {
   send: "Dërgo",
   charsLeft: (left: number) => `${left} karaktere të mbetura`,
 
+  attachPhoto: "Shto foto",
+  attachFile: "Shto skedar",
+  removeAttachment: (name: string) => `Hiq ${name}`,
+  uploading: "Duke ngarkuar…",
+  uploadFailed: (name: string) => `${name} nuk u ngarkua. Provoni përsëri.`,
+  tooMany: (max: number) => `Mund të dërgoni deri në ${max} foto ose skedarë në një mesazh.`,
+  fileType: "Ky lloj skedari nuk lejohet. Lejohen foto (JPG, PNG, WebP), PDF, Word dhe PowerPoint.",
+  fileTooBig: (name: string, limit: string) => `${name} është shumë i madh (maksimumi ${limit}).`,
+  dropHere: "Lëshojini këtu për t'i dërguar",
+  photo: "Foto",
+  openPhoto: "Hap foton",
+  openFile: (name: string) => `Hap ${name}`,
+  photoOf: (n: number, total: number) => `Foto ${n} nga ${total}`,
+  previous: "E mëparshmja",
+  next: "Tjetra",
+  download: "Shkarko",
+  morePhotos: (n: number) => `+${n}`,
+  /** Chat list and notices, for a message without text. */
+  preview: (body: string | null, photos: number, files: number) => {
+    if (body) return body;
+    if (photos && !files) return photos === 1 ? "📷 Foto" : `📷 ${photos} foto`;
+    if (files && !photos) return files === 1 ? "📎 Skedar" : `📎 ${files} skedarë`;
+    return `📎 ${photos + files} skedarë`;
+  },
+
   block: "Blloko",
   unblock: "Zhblloko",
   blockedToast: (name: string) => `${name} u bllokua.`,

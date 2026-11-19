@@ -638,3 +638,25 @@ Not built yet (needs the user's OK):
 
 Browser-verified 2026-11-19 on a production build: sweep at 360/390 px, student flow 19/19, admin flow 24/24, protected
 PDF viewer 19/19 checks on phone and computer.
+
+## Chat photos and files (2026-11-19, branch chat-attachments)
+
+- **What:** photos (JPG/PNG/WebP, 10 MB) and files (PDF/Word/PowerPoint, 25 MB), up to 10 per message, with or
+  without text. Composer has a photo button and a 📎 button; pasting a screenshot or dropping files on the chat works
+  too. Photos show in the bubble (1 = its own shape within 240×300; 2+ = a grid, "+N" after four) and open full screen
+  (swipe/arrows, download). Files are cards: a PDF opens in a new tab, Word/PowerPoint download.
+- **Flow:** picking a file starts the upload at once (`POST /chats/[id]/attachments` → presigned PUT, with progress);
+  send passes `attachmentIds`. The server checks size and real file type (first bytes) at send time, then attaches them
+  inside the send transaction (`ChatAttachment.messageId`). An upload can be sent once. ✕ before sending deletes it.
+- **Phones:** big photos are shrunk in the browser to 2048 px (JPEG 85%, PNG stays PNG) before upload.
+- **Access:** only chat members, only for messages they can see (not before joining / "delete for me", not a deleted
+  message). Photos come with a 60 s link in the messages page; the browser keeps the first link per photo (no reload
+  on every refetch) and asks `/attachments/[aid]/link` for a fresh one when an old link fails.
+- **Cleanup:** uploads never sent are deleted after a day (hourly job `jobs/chat-attachment-cleanup.ts`). Storage
+  objects of sent attachments stay until a "delete for everyone" exists (not built).
+- **Limits:** 40 upload starts per minute and 30 unsent uploads per person; the same "may I send" rules as messages
+  (block, deactivated account).
+- **Migration:** `20261119120000_chat_attachments` (new table). Applied to the test DB only; run
+  `npx prisma migrate deploy` on the dev DB and on deploy.
+- **Tests:** `chat-attachments.integration.test.ts` (9). Note: `.env` points S3_ENDPOINT at the old Funnel URL, so run
+  integration tests with `S3_ENDPOINT=http://localhost:8333`.

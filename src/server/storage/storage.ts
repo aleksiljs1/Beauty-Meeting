@@ -38,7 +38,7 @@ export const UPLOAD_URL_TTL_SECONDS = 10 * 60;
 export const READ_URL_MAX_TTL_SECONDS = 60;
 
 /** Non-guessable key; never derived from user input. */
-export function newObjectKey(prefix: "materials" | "recordings" | "gallery", scopeId?: string) {
+export function newObjectKey(prefix: "materials" | "recordings" | "gallery" | "chat", scopeId?: string) {
   const id = crypto.randomUUID();
   return scopeId ? `${prefix}/${scopeId}/${id}` : `${prefix}/${id}`;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Ban, Loader2, Minus, MoreVertical, Pin, PinOff, Send, Trash2, Unlock, X } from "lucide-react";
+import { ArrowLeft, Ban, ImagePlus, Loader2, Minus, MoreVertical, Paperclip, Pin, PinOff, Send, Trash2, Unlock, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { MAX_MESSAGE_LENGTH, type ChatMessageItem, type ChatPage } from "@/lib/c
 import { academyDay, formatDate, formatTime } from "@/lib/datetime";
 import { subscribeChat } from "@/lib/realtime/client";
 import { cn } from "@/lib/utils";
+import { FILE_ACCEPT, MessageAttachments, PendingTray, PHOTO_ACCEPT, usePendingAttachments } from "./chat-attachments";
 import { Avatar } from "./chat-common";
 
 const errorMessage = (error: unknown) => (error instanceof ApiClientError ? error.message : t.loadError);
@@ -27,7 +28,8 @@ function merge(current: ChatMessageItem[], incoming: ChatMessageItem[]) {
 }
 
 /**
- * One open chat: messages, "Parë", load older, composer, and pin/delete/block in the header menu.
+ * One open chat: messages (text, photos, files), "Parë", load older, composer with photo and file
+ * buttons (or paste / drop them in), and pin/delete/block in the header menu.
  * When either person has blocked the other, the composer is replaced by a notice. The block state
  * comes with every load of the messages, so a block or unblock made mid-chat (by either side)
  * shows as soon as the chat refetches on its realtime signal.
@@ -74,6 +76,10 @@ export function ChatThread({
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const pending = usePendingAttachments(chatId);
+  const [dragging, setDragging] = useState(false);
+  const photoInput = useRef<HTMLInputElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   const scroller = useRef<HTMLDivElement>(null);
   /** How the next render should scroll: to the bottom, keep position after loading older, or leave it. */
@@ -163,13 +169,17 @@ export function ChatThread({
     }
   }
 
+  // Text, photos/files, or both; photos and files must have finished uploading.
+  const canSend = (!!draft.trim() || pending.items.length > 0) && !pending.uploading && !pending.failed && !sending;
+
   async function send() {
     const body = draft.trim();
-    if (!body || sending) return;
+    if (!canSend) return;
     setSending(true);
     try {
-      await apiSend("post", `/chats/${chatId}/messages`, { body });
+      await apiSend("post", `/chats/${chatId}/messages`, { body, attachmentIds: pending.items.map((item) => item.id) });
       setDraft("");
+      pending.clear();
       scrollMode.current = "bottom";
       await loadLatest();
       void refreshChats();
@@ -210,9 +220,38 @@ export function ChatThread({
   const lastMine = [...messages].reverse().find((m) => m.mine);
   const seen = !!lastMine && readBy.some((r) => r.lastReadAt && Date.parse(r.lastReadAt) >= Date.parse(lastMine.createdAt));
   const left = MAX_MESSAGE_LENGTH - draft.length;
+  const canCompose = !(blocked.byMe || blocked.byThem);
+
+  const pick = (input: HTMLInputElement | null) => {
+    if (!input?.files?.length) return;
+    void pending.add([...input.files]);
+    input.value = ""; // the same file can be picked again
+  };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div
+      className="relative flex min-h-0 flex-1 flex-col"
+      // Computers: drop photos and files anywhere on the chat.
+      onDragOver={(event) => {
+        if (!canCompose || !event.dataTransfer.types.includes("Files")) return;
+        event.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false);
+      }}
+      onDrop={(event) => {
+        if (!canCompose || !event.dataTransfer.files.length) return;
+        event.preventDefault();
+        setDragging(false);
+        void pending.add([...event.dataTransfer.files]);
+      }}
+    >
+      {dragging ? (
+        <div className="pointer-events-none absolute inset-1 z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-rose-deep bg-background/85 p-4 text-center text-sm font-medium">
+          {t.dropHere}
+        </div>
+      ) : null}
       <header
         className={cn(
           "flex items-center gap-1 border-b",
@@ -302,20 +341,28 @@ export function ChatThread({
                 <li key={message.id} className="grid gap-1.5">
                   {newDay ? <p className="my-2 text-center text-xs text-muted-foreground">{formatDate(message.createdAt)}</p> : null}
                   <div className={cn("flex", message.mine ? "justify-end" : "justify-start")}>
-                    <div
-                      className={cn(
-                        "max-w-[80%] rounded-2xl px-3 py-2 text-sm leading-relaxed shadow-xs",
-                        message.mine ? "rounded-br-sm bg-rose-deep text-primary-foreground" : "rounded-bl-sm bg-muted text-foreground",
-                      )}
-                    >
-                      {message.body === null ? (
-                        <p className="italic opacity-80">{t.deletedMessage}</p>
+                    <div className={cn("flex max-w-[80%] min-w-0 flex-col gap-1", message.mine ? "items-end" : "items-start")}>
+                      {message.attachments.length ? <MessageAttachments chatId={chatId} attachments={message.attachments} /> : null}
+                      {message.body === "" ? (
+                        // Only photos or files: just the time under them.
+                        <p className="px-1 text-[11px] text-muted-foreground">{formatTime(message.createdAt)}</p>
                       ) : (
-                        <p className="wrap-break-word whitespace-pre-wrap">{message.body}</p>
+                        <div
+                          className={cn(
+                            "max-w-full rounded-2xl px-3 py-2 text-sm leading-relaxed shadow-xs",
+                            message.mine ? "rounded-br-sm bg-rose-deep text-primary-foreground" : "rounded-bl-sm bg-muted text-foreground",
+                          )}
+                        >
+                          {message.body === null ? (
+                            <p className="italic opacity-80">{t.deletedMessage}</p>
+                          ) : (
+                            <p className="wrap-break-word whitespace-pre-wrap">{message.body}</p>
+                          )}
+                          <p className={cn("mt-0.5 text-right text-[11px]", message.mine ? "text-primary-foreground/75" : "text-muted-foreground")}>
+                            {formatTime(message.createdAt)}
+                          </p>
+                        </div>
                       )}
-                      <p className={cn("mt-0.5 text-right text-[11px]", message.mine ? "text-primary-foreground/75" : "text-muted-foreground")}>
-                        {formatTime(message.createdAt)}
-                      </p>
                     </div>
                   </div>
                   {message === lastMine && seen ? <p className="text-right text-[11px] text-muted-foreground">{t.seen}</p> : null}
@@ -326,7 +373,7 @@ export function ChatThread({
         )}
       </div>
 
-      {blocked.byMe || blocked.byThem ? (
+      {!canCompose ? (
         // Blocked either way: no composer. Only the one who blocked is told, and offered to unblock.
         <div className="grid justify-items-center gap-2 border-t bg-muted/40 p-4 text-center text-sm" role="status">
           <p className="flex items-center gap-2 text-muted-foreground">
@@ -342,18 +389,35 @@ export function ChatThread({
           ) : null}
         </div>
       ) : (
-        <form
-          className="flex items-end gap-2 border-t p-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void send();
-          }}
-        >
-          <div className="grid min-w-0 flex-1 gap-1">
+        <div>
+          <PendingTray items={pending.items} onRemove={pending.remove} />
+          <form
+            className={cn("flex items-end gap-1 p-2", !pending.items.length && "border-t")}
+            onSubmit={(event) => {
+              event.preventDefault();
+              void send();
+            }}
+          >
+            <input ref={photoInput} type="file" accept={PHOTO_ACCEPT} multiple hidden onChange={(event) => pick(event.currentTarget)} />
+            <input ref={fileInput} type="file" accept={FILE_ACCEPT} multiple hidden onChange={(event) => pick(event.currentTarget)} />
+            <Button type="button" variant="ghost" size={dock ? "icon" : "icon-lg"} className="mb-0.5 shrink-0 text-muted-foreground" aria-label={t.attachPhoto} title={t.attachPhoto} onClick={() => photoInput.current?.click()}>
+              <ImagePlus className={dock ? "size-4" : "size-5"} />
+            </Button>
+            <Button type="button" variant="ghost" size={dock ? "icon" : "icon-lg"} className="mb-0.5 shrink-0 text-muted-foreground" aria-label={t.attachFile} title={t.attachFile} onClick={() => fileInput.current?.click()}>
+              <Paperclip className={dock ? "size-4" : "size-5"} />
+            </Button>
+          <div className="ml-1 grid min-w-0 flex-1 gap-1">
             <Textarea
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={onComposerKey}
+              onPaste={(event) => {
+                // A copied photo (a screenshot) pasted into the box is attached.
+                const files = [...event.clipboardData.files];
+                if (!files.length) return;
+                event.preventDefault();
+                void pending.add(files);
+              }}
               autoFocus={autoFocus}
               placeholder={t.composerPlaceholder}
               aria-label={t.composerLabel}
@@ -363,10 +427,11 @@ export function ChatThread({
             />
             {left <= 200 ? <p className="text-right text-[11px] text-muted-foreground">{t.charsLeft(left)}</p> : null}
           </div>
-          <Button type="submit" size="icon-lg" aria-label={t.send} disabled={sending || !draft.trim()}>
-            {sending ? <Loader2 className="animate-spin" aria-hidden /> : <Send aria-hidden />}
+          <Button type="submit" size="icon-lg" className="ml-1 shrink-0" aria-label={t.send} title={pending.uploading ? t.uploading : t.send} disabled={!canSend}>
+            {sending || pending.uploading ? <Loader2 className="animate-spin" aria-hidden /> : <Send aria-hidden />}
           </Button>
-        </form>
+          </form>
+        </div>
       )}
     </div>
   );

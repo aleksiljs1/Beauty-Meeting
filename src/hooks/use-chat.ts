@@ -144,7 +144,7 @@ function announceNewMessages(previous: ChatInbox | null, next: ChatInbox) {
     }
     if (state.open && state.activeChatId === chat.id) continue;
     toast(chatText.newMessageFrom(chat.title), {
-      description: chat.lastMessage?.body ?? undefined,
+      description: chat.lastMessage?.body != null ? chatText.preview(chat.lastMessage.body, chat.lastMessage.photos, chat.lastMessage.files) : undefined,
       action: { label: chatText.openChat, onClick: () => openChats(chat.id) },
     });
   }

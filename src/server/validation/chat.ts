@@ -1,6 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import { MAX_MESSAGE_LENGTH } from "@/lib/chat";
+import { MAX_ATTACHMENTS, MAX_MESSAGE_LENGTH } from "@/lib/chat";
 import { ApiError } from "@/server/http";
 import { uuidParam } from "./admin";
 
@@ -25,10 +25,33 @@ export const startChatSchema = z.object({
   userId: z.string().min(1).max(100),
 });
 
-/** POST /chats/[id]/messages. Ends are trimmed; line breaks inside the text are kept. */
-export const sendMessageSchema = z.object({
-  body: z.string().trim().min(1, "Shkruani një mesazh.").max(MAX_MESSAGE_LENGTH, `Mesazhi mund të ketë deri në ${MAX_MESSAGE_LENGTH} karaktere.`),
+/**
+ * POST /chats/[id]/messages. Ends are trimmed; line breaks inside the text are kept. Text may be
+ * empty when photos or files come with it (uploaded first: POST /chats/[id]/attachments).
+ */
+export const sendMessageSchema = z
+  .object({
+    body: z.string().trim().max(MAX_MESSAGE_LENGTH, `Mesazhi mund të ketë deri në ${MAX_MESSAGE_LENGTH} karaktere.`).default(""),
+    attachmentIds: z.array(z.uuid()).max(MAX_ATTACHMENTS, `Mund të dërgoni deri në ${MAX_ATTACHMENTS} foto ose skedarë në një mesazh.`).default([]),
+  })
+  .refine((v) => v.body.length > 0 || v.attachmentIds.length > 0, { message: "Shkruani një mesazh.", path: ["body"] })
+  .refine((v) => new Set(v.attachmentIds).size === v.attachmentIds.length, { message: "Skedar i dyfishuar.", path: ["attachmentIds"] });
+
+/** POST /chats/[id]/attachments: a photo or file about to be uploaded (checked again after upload). */
+export const startAttachmentSchema = z.object({
+  filename: z.string().trim().min(1).max(255),
+  mimeType: z.string().max(200),
+  sizeBytes: z.number().int().positive(),
+  /** Photos: pixel size as measured by the browser (only used to lay the chat out). */
+  width: z.number().int().min(1).max(20_000).optional(),
+  height: z.number().int().min(1).max(20_000).optional(),
 });
+
+/** POST /chats/[id]/attachments/[aid]/link: show it (photos, PDFs) or download it. */
+export const attachmentLinkSchema = z.object({ download: z.boolean().default(false) });
+
+/** Attachment ids are UUIDs; anything else is simply "not found". */
+export const attachmentIdParam = (value: string) => uuidParam(value, "Skedari nuk u gjet.");
 
 /** PATCH /chats/[id]: pin/unpin, or delete the chat for me. */
 export const updateChatSchema = z
@@ -41,6 +64,7 @@ export const updateChatSchema = z
 /** What the service receives: input that already passed the schemas above (limits included). */
 export type StartChatInput = z.infer<typeof startChatSchema>;
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;
+export type StartAttachmentInput = z.infer<typeof startAttachmentSchema>;
 export type UpdateChatInput = z.infer<typeof updateChatSchema>;
 
 /** GET /chats/[id]/messages?before=<messageId>: older messages than this one (none = newest). */

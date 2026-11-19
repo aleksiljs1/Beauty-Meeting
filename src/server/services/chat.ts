@@ -5,7 +5,8 @@ import { prisma } from "@/server/db";
 import { ApiError } from "@/server/http";
 import { blockStatus } from "@/server/queries/chat";
 import { publishChatChanged } from "@/server/realtime/publish";
-import type { SendMessageInput, StartChatInput, UpdateChatInput } from "@/server/validation/chat";
+import type { SendMessageInput, StartAttachmentInput, StartChatInput, UpdateChatInput } from "@/server/validation/chat";
+import { claimAttachments, startChatAttachment, verifyAttachments } from "./chat-attachments";
 
 /**
  * Chat rules: starting a chat, sending, reading, pinning and deleting a chat for me.
@@ -21,6 +22,8 @@ import type { SendMessageInput, StartChatInput, UpdateChatInput } from "@/server
  *
  * Offline: someone who doesn't read a message within a few minutes gets one email about it
  * (services/chat-emails.ts).
+ *
+ * Photos and files: uploaded first, then sent with the message (services/chat-attachments.ts).
  *
  * Not here yet: "delete a message for everyone" (waiting on the client's answer).
  */
@@ -111,8 +114,8 @@ export async function startDirectChat(user: AppUser, input: StartChatInput, now 
   }
 }
 
-/** Sends a text message to a chat I'm in. Returns the new message's id and time. */
-export async function sendMessage(user: AppUser, conversationId: string, input: SendMessageInput, now = new Date()) {
+/** I'm in this chat and may send to it: no block either way, and the other person is still active. */
+async function requireCanSend(user: AppUser, conversationId: string) {
   await requireMembership(user, conversationId);
 
   // A block between me and the other person, in either direction, stops the message. Checked here
@@ -130,6 +133,26 @@ export async function sendMessage(user: AppUser, conversationId: string, input: 
   // A deactivated account can't read anything: say so instead of sending into the void.
   const inactive = await prisma.user.count({ where: { id: { in: others.map((o) => o.userId) }, banned: true } });
   if (inactive) throw new ApiError("FORBIDDEN", "Ky person nuk është më aktiv. Mesazhi nuk u dërgua.");
+}
+
+/** Starts uploading a photo or file to send in this chat (same "may I send" rules as a message). */
+export async function startAttachment(user: AppUser, conversationId: string, input: StartAttachmentInput) {
+  await requireCanSend(user, conversationId);
+  return startChatAttachment(user, conversationId, input);
+}
+
+/**
+ * Sends a message to a chat I'm in: text, photos and files (uploaded beforehand), or both.
+ * Returns the new message's id and time.
+ */
+export async function sendMessage(
+  user: AppUser,
+  conversationId: string,
+  input: Omit<SendMessageInput, "attachmentIds"> & { attachmentIds?: string[] },
+  now = new Date(),
+) {
+  await requireCanSend(user, conversationId);
+  const attachmentIds = input.attachmentIds ?? [];
 
   // Rate limit: count what I sent in the last minute.
   const sentLastMinute = await prisma.message.count({
@@ -139,20 +162,25 @@ export async function sendMessage(user: AppUser, conversationId: string, input: 
     throw new ApiError("RATE_LIMITED", "Po dërgoni shumë mesazhe. Prisni pak dhe provoni përsëri.");
   }
 
-  // All together or not at all: the message, the chat's "last message" time (sorts the chat
-  // list, and brings the chat back for anyone who had deleted it for themselves), and my read
-  // time (my own message is never "unread" for me).
-  const [message] = await prisma.$transaction([
-    prisma.message.create({
+  // Photos and files: really uploaded, and really the type they claim (storage calls, so before the transaction).
+  await verifyAttachments(user, conversationId, attachmentIds);
+
+  // All together or not at all: the message and its attachments, the chat's "last message" time
+  // (sorts the chat list, and brings the chat back for anyone who had deleted it for themselves),
+  // and my read time (my own message is never "unread" for me).
+  const message = await prisma.$transaction(async (tx) => {
+    const created = await tx.message.create({
       data: { conversationId, senderId: user.id, body: input.body, createdAt: now },
       select: { id: true, createdAt: true },
-    }),
-    prisma.conversation.update({ where: { id: conversationId }, data: { lastMessageAt: now } }),
-    prisma.conversationMember.update({
+    });
+    await claimAttachments(tx, user.id, conversationId, created.id, attachmentIds);
+    await tx.conversation.update({ where: { id: conversationId }, data: { lastMessageAt: now } });
+    await tx.conversationMember.update({
       where: { conversationId_userId: { conversationId, userId: user.id } },
       data: { lastReadAt: now, hiddenAt: null },
-    }),
-  ]);
+    });
+    return created;
+  });
   await signalMembers(conversationId);
   return message;
 }

@@ -5,7 +5,7 @@
  * same declared-file check before uploading (the server stays the authority).
  */
 
-export type UploadKind = "material" | "recording" | "image";
+export type UploadKind = "material" | "recording" | "image" | "chat";
 
 type FileRule = {
   mime: string;
@@ -38,19 +38,24 @@ const GB = 1024 * MB;
 export const MATERIAL_DOCUMENT_MAX_BYTES = 100 * MB;
 /** Short technique demos next to the lesson; full lesson recordings belong in Recordings (8 GB). */
 export const MATERIAL_VIDEO_MAX_BYTES = 4 * GB;
+/** Chat: documents up to 25 MB; photos use the kind's default (10 MB, and the browser shrinks big ones first). */
+export const CHAT_DOCUMENT_MAX_BYTES = 25 * MB;
+
+const PPTX = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+const DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 const RULES: Record<UploadKind, FileRule[]> = {
   material: [
     { mime: "application/pdf", extensions: ["pdf"], inline: true, matches: isPdf, maxBytes: MATERIAL_DOCUMENT_MAX_BYTES },
     {
-      mime: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      mime: PPTX,
       extensions: ["pptx"],
       inline: false,
       matches: isZip,
       maxBytes: MATERIAL_DOCUMENT_MAX_BYTES,
     },
     {
-      mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      mime: DOCX,
       extensions: ["docx"],
       inline: false,
       matches: isZip,
@@ -74,6 +79,14 @@ const RULES: Record<UploadKind, FileRule[]> = {
     { mime: "image/png", extensions: ["png"], inline: true, matches: isPng },
     { mime: "image/webp", extensions: ["webp"], inline: true, matches: isWebp },
   ],
+  chat: [
+    { mime: "image/jpeg", extensions: ["jpg", "jpeg"], inline: true, matches: isJpeg },
+    { mime: "image/png", extensions: ["png"], inline: true, matches: isPng },
+    { mime: "image/webp", extensions: ["webp"], inline: true, matches: isWebp },
+    { mime: "application/pdf", extensions: ["pdf"], inline: true, matches: isPdf, maxBytes: CHAT_DOCUMENT_MAX_BYTES },
+    { mime: DOCX, extensions: ["docx"], inline: false, matches: isZip, maxBytes: CHAT_DOCUMENT_MAX_BYTES },
+    { mime: PPTX, extensions: ["pptx"], inline: false, matches: isZip, maxBytes: CHAT_DOCUMENT_MAX_BYTES },
+  ],
 };
 
 /** Default limits per kind (bytes); a rule's `maxBytes` overrides it. Recordings use multipart uploads. */
@@ -81,6 +94,7 @@ export const MAX_UPLOAD_BYTES: Record<UploadKind, number> = {
   material: 50 * MB,
   recording: 8 * GB,
   image: 10 * MB,
+  chat: 10 * MB,
 };
 
 /** Bytes needed from the start of an object to identify it. */
