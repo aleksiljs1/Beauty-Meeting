@@ -4,7 +4,7 @@ import { publicSite } from "@/i18n/public";
 
 const t = publicSite.legal.privacy;
 
-export const metadata: Metadata = { title: t.title, description: t.description, robots: { index: false } };
+export const metadata: Metadata = { title: t.title, description: t.description };
 
 export default function PrivacyPage() {
   return <LegalDraft title={t.title} sections={t.sections} />;

@@ -1,6 +1,7 @@
 import "server-only";
 import { env, zoomLive } from "@/server/env";
 import { catchUpMissedRecordings, importNextZoomRecording } from "@/server/zoom/recording-import";
+import { withJobLock } from "./job-lock";
 
 const EVERY_MS = 60_000;
 const CATCH_UP_EVERY_MS = 60 * 60_000;
@@ -23,12 +24,14 @@ export function startRecordingImports() {
     if (running) return;
     running = true;
     try {
-      if (env.ZOOM_AUTO_RECORDING === "cloud" && Date.now() - lastCatchUp >= CATCH_UP_EVERY_MS) {
-        lastCatchUp = Date.now();
-        const queued = await catchUpMissedRecordings();
-        if (queued) console.info(`[recordings] found ${queued} recording(s) whose Zoom event was missed`);
-      }
-      for (let i = 0; i < PER_RUN && (await importNextZoomRecording()); i++);
+      await withJobLock("recording-imports", async () => {
+        if (env.ZOOM_AUTO_RECORDING === "cloud" && Date.now() - lastCatchUp >= CATCH_UP_EVERY_MS) {
+          lastCatchUp = Date.now();
+          const queued = await catchUpMissedRecordings();
+          if (queued) console.info(`[recordings] found ${queued} recording(s) whose Zoom event was missed`);
+        }
+        for (let i = 0; i < PER_RUN && (await importNextZoomRecording()); i++);
+      });
     } catch (error) {
       console.error("[recordings] import run failed", (error as Error).message);
     } finally {

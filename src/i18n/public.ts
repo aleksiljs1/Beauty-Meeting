@@ -23,6 +23,7 @@ export const publicSite = {
     terms: "Kushtet e përdorimit",
     studentPortal: "Hyrja për studentët",
     rights: "Të gjitha të drejtat e rezervuara.",
+    poweredBy: "Mundësuar nga",
   },
 
   home: {
@@ -168,6 +169,14 @@ export const publicSite = {
         },
       ],
     },
+  },
+
+  error: {
+    eyebrow: "Gabim",
+    title: "Diçka shkoi keq",
+    body: "Faqja nuk u ngarkua për momentin. Provoni përsëri pas pak.",
+    retry: "Provo përsëri",
+    home: "Kthehu në faqen kryesore",
   },
 
   notFound: {

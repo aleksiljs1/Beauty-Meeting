@@ -1,5 +1,6 @@
 import "server-only";
 import { sendUnreadChatEmails } from "@/server/services/chat-emails";
+import { withJobLock } from "./job-lock";
 
 const EVERY_MS = 5 * 60_000;
 
@@ -18,8 +19,10 @@ export function startChatEmails() {
     if (running) return;
     running = true;
     try {
-      const sent = await sendUnreadChatEmails();
-      if (sent) console.info(`[chat-emails] sent ${sent}`);
+      await withJobLock("chat-emails", async () => {
+        const sent = await sendUnreadChatEmails();
+        if (sent) console.info(`[chat-emails] sent ${sent}`);
+      });
     } catch (error) {
       console.error("[chat-emails] run failed", error);
     } finally {

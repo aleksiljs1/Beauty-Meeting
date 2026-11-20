@@ -55,3 +55,35 @@ describe("password links", () => {
     expect(await prisma.verification.count({ where: { value: student.id } })).toBe(0);
   });
 });
+
+describe("deleting a student", () => {
+  it("deletes their unsent chat uploads from storage but keeps photos already sent in surviving chats", async () => {
+    const { deleteStudent } = await import("./students");
+    const { sendMessage, startAttachment, startDirectChat } = await import("./chat");
+    const { sendMessageSchema, startAttachmentSchema } = await import("@/server/validation/chat");
+    const { headObject } = await import("@/server/storage/storage");
+    const student = await createUser("student");
+    const friend = await createUser("student");
+    const chatId = (await startDirectChat(student, { userId: friend.id })).id;
+    const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, ...new Array(56).fill(7)]);
+    const upload = async () => {
+      const started = await startAttachment(student, chatId, startAttachmentSchema.parse({ filename: "foto.png", mimeType: "image/png", sizeBytes: PNG.byteLength, width: 8, height: 8 }));
+      expect((await fetch(started.uploadUrl, { method: "PUT", body: PNG, headers: started.headers })).ok).toBe(true);
+      return started.id;
+    };
+    const sentId = await upload();
+    await sendMessage(student, chatId, sendMessageSchema.parse({ attachmentIds: [sentId] }));
+    const unsentId = await upload();
+    const keyOf = async (id: string) => (await prisma.chatAttachment.findUniqueOrThrow({ where: { id } })).objectKey;
+    const [sentKey, unsentKey] = [await keyOf(sentId), await keyOf(unsentId)];
+
+    await deleteStudent(student.id, admin);
+
+    expect(await prisma.chatAttachment.findUnique({ where: { id: unsentId } })).toBeNull();
+    expect(await headObject(unsentKey)).toBeNull();
+    // The friend still sees the message with its photo (from a deleted user).
+    expect(await prisma.chatAttachment.findUnique({ where: { id: sentId } })).toMatchObject({ uploaderId: null });
+    expect(await headObject(sentKey)).not.toBeNull();
+    expect(await prisma.conversation.count({ where: { id: chatId } })).toBe(1);
+  });
+});

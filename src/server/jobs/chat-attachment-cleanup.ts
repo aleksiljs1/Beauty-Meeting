@@ -1,5 +1,6 @@
 import "server-only";
 import { deleteUnsentAttachments } from "@/server/services/chat-attachments";
+import { withJobLock } from "./job-lock";
 
 const EVERY_MS = 60 * 60_000;
 
@@ -17,8 +18,10 @@ export function startChatAttachmentCleanup() {
     if (running) return;
     running = true;
     try {
-      const deleted = await deleteUnsentAttachments();
-      if (deleted) console.info(`[chat-attachments] deleted ${deleted} unsent upload(s)`);
+      await withJobLock("chat-attachment-cleanup", async () => {
+        const deleted = await deleteUnsentAttachments();
+        if (deleted) console.info(`[chat-attachments] deleted ${deleted} unsent upload(s)`);
+      });
     } catch (error) {
       console.error("[chat-attachments] cleanup run failed", (error as Error).message);
     } finally {

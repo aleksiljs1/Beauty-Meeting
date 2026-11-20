@@ -1,0 +1,8 @@
+/* TEAM */
+Design & development: Cilicom
+Site: https://cilicom.net
+
+/* SITE */
+Language: Albanian (sq)
+Standards: HTML5, CSS3, TypeScript
+Components: Next.js, React, Tailwind CSS, shadcn/ui, Prisma

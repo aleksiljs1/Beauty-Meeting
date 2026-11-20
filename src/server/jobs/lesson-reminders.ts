@@ -1,5 +1,6 @@
 import "server-only";
 import { sendDueLessonReminders } from "@/server/services/admin-reminders";
+import { withJobLock } from "./job-lock";
 
 const EVERY_MS = 60_000;
 
@@ -17,8 +18,10 @@ export function startLessonReminders() {
     if (running) return;
     running = true;
     try {
-      const sent = await sendDueLessonReminders();
-      if (sent) console.info(`[reminders] sent ${sent}`);
+      await withJobLock("lesson-reminders", async () => {
+        const sent = await sendDueLessonReminders();
+        if (sent) console.info(`[reminders] sent ${sent}`);
+      });
     } catch (error) {
       console.error("[reminders] run failed", error);
     } finally {

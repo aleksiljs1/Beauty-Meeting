@@ -7,6 +7,7 @@ import type { StudentProfileInput } from "@/lib/student-profile";
 import { prisma } from "@/server/db";
 import { ApiError } from "@/server/http";
 import { publishFeedChanged } from "@/server/realtime/publish";
+import { deleteObject } from "@/server/storage/storage";
 import { audit } from "./audit";
 import { sendAccountSetupEmail } from "./accounts";
 
@@ -103,8 +104,20 @@ export async function deleteStudent(userId: string, admin: AppUser) {
   const student = await findStudent(userId);
   // Payments are kept for the books (the FK restricts too, in case one is recorded meanwhile).
   if (await prisma.payment.count({ where: { userId } })) throw new ApiError("CONFLICT", HAS_PAYMENTS);
+  // Chats outlive the account (messages and sent photos/files stay, shown as from a deleted user),
+  // so the only files it orphans are the student's unsent uploads: nobody else can ever see them.
+  // Their rows go in the transaction, the objects after it (best effort, like lessons.ts).
+  let orphanKeys: string[] = [];
   try {
     await prisma.$transaction(async (tx) => {
+      const unsent = await tx.chatAttachment.findMany({ where: { uploaderId: userId, messageId: null }, select: { id: true, objectKey: true } });
+      if (unsent.length) {
+        const ids = unsent.map((a) => a.id);
+        await tx.chatAttachment.deleteMany({ where: { id: { in: ids }, messageId: null } });
+        // One sent at the last moment stays with its message, and so does its file.
+        const kept = new Set((await tx.chatAttachment.findMany({ where: { id: { in: ids } }, select: { id: true } })).map((a) => a.id));
+        orphanKeys = unsent.filter((a) => !kept.has(a.id)).map((a) => a.objectKey);
+      }
       await tx.user.delete({ where: { id: userId } });
       await tx.auditLog.create({
         data: { actorId: admin.id, action: "account.delete", targetType: "user", targetId: userId, details: { deleted: true } },
@@ -116,6 +129,7 @@ export async function deleteStudent(userId: string, admin: AppUser) {
     }
     throw error;
   }
+  await Promise.all(orphanKeys.map((key) => deleteObject(key).catch((error) => console.error("[storage] orphan chat object", key, error))));
   await publishFeedChanged([userId]);
   return { id: student.id, deleted: true };
 }

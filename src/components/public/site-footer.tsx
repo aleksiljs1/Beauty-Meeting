@@ -98,6 +98,14 @@ export function SiteFooter({ settings }: { settings: PublicSettings }) {
             </li>
           </ul>
         </Container>
+        <Container className="-mt-2 pb-6 text-[0.7rem] tracking-wide text-muted-foreground/80 sm:text-right">
+          <p>
+            {t.poweredBy}{" "}
+            <a className={`${linkClass} relative touch-target`} href="https://cilicom.net" target="_blank" rel="noopener">
+              Cilicom
+            </a>
+          </p>
+        </Container>
       </div>
     </footer>
   );

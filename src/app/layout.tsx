@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Manrope } from "next/font/google";
+import { SITE_URL } from "@/lib/site-url";
 import "./globals.css";
 
 // Self-hosted at build time by next/font (no runtime requests to Google). latin-ext covers ë and ç.
@@ -17,8 +18,12 @@ const body = Manrope({
 });
 
 export const metadata: Metadata = {
+  metadataBase: SITE_URL,
   title: { default: "Akademia CEM", template: "%s · Akademia CEM" },
   description: "Sallon bukurie dhe akademi estetike.",
+  // Site built by Cilicom (see also /humans.txt).
+  authors: [{ name: "Cilicom", url: "https://cilicom.net" }],
+  creator: "Cilicom",
 };
 
 export const viewport: Viewport = {
@@ -28,7 +33,11 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="sq" className={`${display.variable} ${body.variable} h-full antialiased`}>
-      <body className="ambient-glow flex min-h-full flex-col">{children}</body>
+      <body className="ambient-glow flex min-h-full flex-col">
+        {/* Hoisted into <head> by React; the Metadata API has no field for it. */}
+        <link rel="author" href="/humans.txt" />
+        {children}
+      </body>
     </html>
   );
 }

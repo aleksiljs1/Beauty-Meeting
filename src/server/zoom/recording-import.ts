@@ -22,9 +22,16 @@ import { pickRecordingFiles, type ZoomRecordingFile } from "./recording-files";
 const MAX_ATTEMPTS = 3;
 const GAVE_UP = "Importi nga Zoom dështoi disa herë. Shkarkojeni nga Zoom dhe ngarkojeni me dorë.";
 const RETRY_AFTER_MS = 10 * 60_000;
-/** An import still IMPORTING after this was interrupted (e.g. a restart) and is picked up again.
- *  Longer than the longest allowed download (client.ts), so a slow import is never taken twice. */
-const STUCK_AFTER_MS = 3 * 60 * 60_000;
+/** While copying, the importer touches its row this often to show it is still alive. */
+const HEARTBEAT_MS = 60_000;
+/**
+ * An import still IMPORTING with no heartbeat for this long was interrupted (e.g. a deploy
+ * restarted the server) and is picked up again. A download may run for hours (client.ts allows
+ * two), so the heartbeat, not the download limit, is what proves an import alive; this is several
+ * missed heartbeats, so a short database hiccup doesn't hand a live import to a second copy. Should
+ * that still happen, the first importer sees the row taken over and stops (`importNextZoomRecording`).
+ */
+const STUCK_AFTER_MS = 10 * 60_000;
 
 /** Queues a meeting's recording files for import. Returns how many new files were queued. */
 export async function queueZoomRecordings(lessonId: string, meetingUuid: string | null, files: ZoomRecordingFile[]) {
@@ -93,13 +100,27 @@ export async function importNextZoomRecording(now = new Date()): Promise<boolean
 
   const recording = await prisma.recording.findUnique({ where: { id: candidate.id } });
   if (!recording) return true;
+  // The attempt number this claim set identifies our claim: a later re-claim (after a missed
+  // heartbeat) bumps it, and then every write of ours below matches nothing.
+  const ours = { id: recording.id, status: "IMPORTING" as const, importAttempts: recording.importAttempts };
+  // Heartbeat; stops the copy once the row is no longer ours (re-claimed, or the recording deleted).
+  const lost = new AbortController();
+  const heartbeat = setInterval(() => {
+    prisma.recording
+      .updateMany({ where: ours, data: { updatedAt: new Date() } })
+      .then(({ count }) => {
+        if (!count) lost.abort(new Error("import taken over or deleted"));
+      })
+      .catch((error) => console.error("[recordings] import heartbeat failed", recording.id, (error as Error).message));
+  }, HEARTBEAT_MS);
+  heartbeat.unref();
   const objectKey = newObjectKey("recordings", recording.lessonId);
   let uploadId: string | null = null;
   let stored = false;
   try {
     const response = await zoomDownload(await currentDownloadUrl(recording));
     uploadId = await startMultipart(objectKey, "video/mp4");
-    const size = await streamIntoStorage(response.body!, objectKey, uploadId);
+    const size = await streamIntoStorage(response.body!, objectKey, uploadId, lost.signal);
     uploadId = null;
     stored = true;
 
@@ -109,7 +130,7 @@ export async function importNextZoomRecording(now = new Date()): Promise<boolean
 
     // Only while still ours: the recording or its lesson may have been deleted during the copy.
     const ready = await prisma.recording.updateMany({
-      where: { id: recording.id, status: "IMPORTING" },
+      where: ours,
       data: { status: "READY", objectKey, mimeType: "video/mp4", sizeBytes: BigInt(size), providerDownloadUrl: null, readyAt: new Date(), errorMessage: null },
     });
     if (!ready.count) {
@@ -122,7 +143,7 @@ export async function importNextZoomRecording(now = new Date()): Promise<boolean
     const attempts = recording.importAttempts;
     console.error("[recordings] Zoom import failed", recording.id, (error as Error).message);
     await prisma.recording.updateMany({
-      where: { id: recording.id, status: "IMPORTING" },
+      where: ours,
       data: {
         status: "FAILED",
         errorMessage:
@@ -134,6 +155,8 @@ export async function importNextZoomRecording(now = new Date()): Promise<boolean
       },
     });
     return true;
+  } finally {
+    clearInterval(heartbeat);
   }
 
   // The video is in Regjistrimet; what follows must never turn it back into a failure.
@@ -171,9 +194,12 @@ async function currentDownloadUrl(recording: { providerMeetingUuid: string | nul
   return url;
 }
 
-/** Copies the download into storage in multipart parts; returns the total size. */
-async function streamIntoStorage(body: ReadableStream<Uint8Array>, key: string, uploadId: string): Promise<number> {
+/** Copies the download into storage in multipart parts; returns the total size. Stops (throws) once `signal` aborts. */
+async function streamIntoStorage(body: ReadableStream<Uint8Array>, key: string, uploadId: string, signal: AbortSignal): Promise<number> {
   const reader = body.getReader();
+  // Ends a read that is waiting on Zoom; the check below then turns it into an error, so a
+  // cut-off copy is never completed as if it were the whole file.
+  signal.addEventListener("abort", () => void reader.cancel().catch(() => undefined), { once: true });
   const parts: { partNumber: number; etag: string }[] = [];
   let buffer = new Uint8Array(MULTIPART_PART_BYTES);
   let filled = 0;
@@ -186,6 +212,7 @@ async function streamIntoStorage(body: ReadableStream<Uint8Array>, key: string, 
   };
   for (;;) {
     const { done, value } = await reader.read();
+    signal.throwIfAborted();
     if (done) break;
     let offset = 0;
     while (offset < value.length) {

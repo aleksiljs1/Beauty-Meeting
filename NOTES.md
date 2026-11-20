@@ -673,3 +673,59 @@ Lessons without a Zoom class: only materials, studied whenever the student wants
 - **Admin:** offline tabs are Detaje · Materialet · Studentët · Përparimi · Ftesat. "Përparimi" lists each student's opened count, fewest first. Lists show "Në dispozicion X – Y" and an "Offline" badge.
 - **Tests:** `offline-lessons.integration.test.ts` (5), plus offline cases in policy.test.ts and lesson-rules.test.ts.
 - **Deploy:** `npx prisma migrate deploy` (the offline migration; the chat attachments one is already applied on the dev DB).
+
+## Production deploy: Railway + Cloudflare R2 (2026-11-20, branch prod-prep)
+
+Hosting decided: everything on **Railway (Pro)**: web service, realtime service, Railway Postgres.
+Files on **Cloudflare R2**. Zoom Pro. (Replaces the earlier Vercel + Neon quote.)
+
+**Deploy from git only**, never `railway up` from the dev PC: the local `.env` points at the old Funnel.
+
+### 1. Cloudflare R2 (dashboard)
+- Create a private bucket. Set CORS by hand (an object-scoped token can't call PutBucketCors), with the
+  same rule `scripts/storage-init.mts` builds: AllowedOrigins = the prod APP_URL origin (plus `www.` if used),
+  methods GET/PUT/HEAD, AllowedHeaders `content-type, content-length, range`,
+  ExposeHeaders `etag, content-length, content-range, accept-ranges`, MaxAge 3600.
+  Alternative: run `NODE_ENV=production APP_URL=<prod> npm run storage:init` once with an admin R2 token.
+- Lifecycle rule: "Abort incomplete multipart uploads after 1 day" (whole bucket).
+- API token: Object Read & Write, scoped to this bucket only. That's what Railway gets.
+
+### 2. Railway services
+**web** (repo root): build `npm run build`, start `npm run start`, **pre-deploy `npx prisma migrate deploy`**
+(dev dependencies must not be pruned: prisma is one), healthcheck `/api/health`, Node 22.
+**realtime** (same repo): start `npx tsx src/realtime/main.mts`, healthcheck `/health`, **1 replica only**
+(per-user socket caps are per process), `NODE_ENV=production`, `APP_URL`, `DATABASE_URL` (private URL; LISTEN
+needs a direct connection, not a pooler). It listens on Railway's `PORT`.
+**Postgres**: Railway plugin; Pro has backups, so turn them on and try one restore.
+Ignore `docker-compose.yml` (local dev only).
+
+### 3. Web variables (set BEFORE the first build: the CSP and the realtime URL are baked in at build time)
+- `APP_URL` = final https origin (auth baseURL, trusted origins, JWT, realtime CORS, emails, bucket CORS).
+- `DATABASE_URL`, `BETTER_AUTH_SECRET` (32+ chars), `APP_ENCRYPTION_KEY`.
+- `TRUSTED_IP_HEADER=x-real-ip` (Railway's edge sets it; with Cloudflare proxy in front use
+  `cf-connecting-ip` only if the `*.up.railway.app` domain is disabled).
+- `S3_ENDPOINT=https://<account>.r2.cloudflarestorage.com`, `S3_REGION=auto`, `S3_BUCKET`, keys, `S3_FORCE_PATH_STYLE=true`.
+- `NEXT_PUBLIC_REALTIME_URL=https://<realtime domain>` (no path).
+- SMTP_* + `MAIL_FROM` (real provider, still to choose).
+- `ZOOM_MODE=live` + all Zoom vars, `ZOOM_AUTO_RECORDING=cloud`.
+Changing APP_URL, S3_* or the realtime domain = update both services and **rebuild** web.
+
+### 4. After the first deploy
+`npm run admin:create` against the prod DB (emails a setup link) → in Zoom, set the webhook URL to
+`<APP_URL>/api/webhooks/zoom` → a real end-to-end Zoom class (join, record, recording import, attendance)
+→ check the login redirect goes to the public host → submit the sitemap (`/sitemap.xml`) to Google.
+
+### Code changes made for production (prod-prep)
+- Expired lessons: the hourly cleanup also deletes Zoom's cloud copy of the class (every file), not only ours.
+- Realtime listens on Railway's `PORT` (falls back to REALTIME_PORT). Web health route `/api/health` (DB ping, 503 when down).
+- Background jobs run under a Postgres advisory lock (`jobs/job-lock.ts`), so replicas or an old+new process overlapping
+  during a deploy never run the same job twice at once.
+- Zoom import heartbeat: an import cut off by a deploy is picked up again after 10 min (was 3 h); a taken-over import stops.
+- Hourly `upload-cleanup` job: material/recording uploads started but never finished are deleted after 24 h.
+- Deleting a student also deletes their unsent chat uploads from storage (sent files stay; chats are kept).
+- Seed refuses any non-localhost database.
+- Albanian error pages for every route group + `global-error.tsx`; robots.ts, sitemap.ts, opengraph-image, metadataBase;
+  /kushtet and /privatesia indexable.
+- Credit: "Mundësuar nga Cilicom" (link cilicom.net) at the bottom of the public footer; authors/creator metadata and
+  `public/humans.txt` name Cilicom.
+- Not verified yet: `npm run build` (killed for low memory on the dev PC); Railway's first build will be the check.

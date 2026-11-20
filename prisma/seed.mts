@@ -10,6 +10,20 @@ if (process.env.NODE_ENV === "production") {
   process.exit(1);
 }
 
+// NODE_ENV is easy to leave unset when pointing a local shell at a hosted database, so the
+// database's own address decides too: only a database on this machine is ever seeded.
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
+let databaseHost: string | null = null;
+try {
+  databaseHost = new URL(process.env.DATABASE_URL ?? "").hostname;
+} catch {
+  // unparsable: treated as not local
+}
+if (!databaseHost || !LOCAL_HOSTS.has(databaseHost)) {
+  console.error(`Refusing to seed: DATABASE_URL must point to localhost (host is "${databaseHost ?? "unknown"}").`);
+  process.exit(1);
+}
+
 const { prisma } = await import("@/server/db");
 const { auth } = await import("@/server/auth/auth");
 

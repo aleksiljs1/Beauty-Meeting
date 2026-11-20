@@ -13,6 +13,8 @@ const env = z
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     APP_URL: z.url(),
     DATABASE_URL: z.string().min(1),
+    // Hosts like Railway assign the port through PORT; locally REALTIME_PORT keeps it off the web app's.
+    PORT: z.coerce.number().int().positive().optional(),
     REALTIME_PORT: z.coerce.number().int().positive().default(3100),
   })
   .parse(process.env);
@@ -33,7 +35,7 @@ const corsOrigins =
   env.NODE_ENV === "production" ? [origin] : [...new Set([origin, ...[3000, 3001, 3002, 3003].map((p) => `http://localhost:${p}`)])];
 
 const server = createRealtimeServer({ verifyToken, databaseUrl: env.DATABASE_URL, corsOrigins });
-await server.start(env.REALTIME_PORT);
+await server.start(env.PORT ?? env.REALTIME_PORT);
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, async () => {
