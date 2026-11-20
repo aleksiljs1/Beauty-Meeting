@@ -3,8 +3,8 @@
  *
  *   npm run admin:create -- --email owner@example.com --name "Emri Mbiemri"
  *
- * Creates the account without a password, emails a single-use setup link and prints it,
- * so the owner can set their own password.
+ * Creates the account without a password, emails a single-use setup link and prints it
+ * (if email fails, a fresh link is still printed), so the owner can set their own password.
  */
 import "dotenv/config";
 import { parseArgs } from "node:util";
@@ -22,9 +22,19 @@ const { prisma } = await import("@/server/db");
 
 try {
   const user = await createAccount({ email: values.email, name: values.name, role: "admin" }, null);
-  const url = await sendAccountSetupEmail(user);
   console.log(`Administrator created: ${user.email}`);
-  console.log(`Setup link (single use, 72 hours) — also sent by email:\n${url}`);
+  try {
+    const url = await sendAccountSetupEmail(user);
+    console.log(`Setup link (single use, 72 hours) — also sent by email:
+${url}`);
+  } catch (error) {
+    // Email can be unavailable (e.g. SMTP blocked by the host); the account must still be usable.
+    console.error("Could not send the setup email:", error instanceof Error ? error.message : error);
+    const { createAccountSetupLink } = await import("@/server/services/accounts");
+    const url = await createAccountSetupLink(user.id);
+    console.log(`Setup link (single use, 72 hours) — NOT emailed, open it yourself:
+${url}`);
+  }
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
   process.exitCode = 1;
