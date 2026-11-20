@@ -8,6 +8,7 @@ import { createRecordingParts } from "@/server/services/recordings";
 import { bytesMatch, SNIFF_BYTES } from "@/server/storage/file-types";
 import { abortMultipart, completeMultipart, deleteObject, headObject, MULTIPART_PART_BYTES, newObjectKey, readObjectHead, startMultipart, uploadPart } from "@/server/storage/storage";
 import { requireZoomCredentials, zoomDownload, zoomRequest } from "./client";
+import { meetingUuidPath, trashZoomCloudFile } from "./cloud-recordings";
 import { pickRecordingFiles, type ZoomRecordingFile } from "./recording-files";
 
 /**
@@ -140,7 +141,7 @@ export async function importNextZoomRecording(now = new Date()): Promise<boolean
     await audit(null, "recording.import", "lesson", recording.lessonId, { recordingId: recording.id });
     await notifyRecordingReady(recording.lessonId, recording.id);
     if (env.ZOOM_RECORDINGS_AFTER_IMPORT === "trash" && recording.providerMeetingUuid && recording.providerFileId) {
-      await trashCloudFile(recording.providerMeetingUuid, recording.providerFileId);
+      await trashZoomCloudFile(recording.providerMeetingUuid, recording.providerFileId);
     }
   } catch (error) {
     console.error("[recordings] imported, but the follow-up failed", recording.id, (error as Error).message);
@@ -200,21 +201,6 @@ async function streamIntoStorage(body: ReadableStream<Uint8Array>, key: string, 
   if (!parts.length) throw new ImportError("Zoom ktheu një skedar bosh.");
   await completeMultipart(key, uploadId, parts);
   return total;
-}
-
-/** Zoom wants a meeting UUID that starts with "/" or contains "//" encoded twice. */
-const meetingUuidPath = (uuid: string) => (uuid.startsWith("/") || uuid.includes("//") ? encodeURIComponent(encodeURIComponent(uuid)) : encodeURIComponent(uuid));
-
-async function trashCloudFile(meetingUuid: string, fileId: string) {
-  try {
-    await zoomRequest(`/meetings/${meetingUuidPath(meetingUuid)}/recordings/${encodeURIComponent(fileId)}`, {
-      method: "DELETE",
-      query: { action: "trash" },
-      acceptStatus: [404],
-    });
-  } catch (error) {
-    console.warn("[recordings] could not move the Zoom cloud file to the trash", (error as Error).message);
-  }
 }
 
 const listSchema = z.object({

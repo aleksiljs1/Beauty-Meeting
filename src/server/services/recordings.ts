@@ -5,6 +5,7 @@ import { requireLessonCapability } from "@/server/access/lesson-access";
 import type { AppUser } from "@/server/auth/session";
 import { prisma } from "@/server/db";
 import { ApiError } from "@/server/http";
+import { zoomLive } from "@/server/env";
 import { publishLessonChanged } from "@/server/realtime/publish";
 import { bytesMatch, MAX_UPLOAD_BYTES, ruleForDeclaredFile, sanitizeDisplayName, SNIFF_BYTES } from "@/server/storage/file-types";
 import {
@@ -19,6 +20,7 @@ import {
   readObjectHead,
   startMultipart,
 } from "@/server/storage/storage";
+import { deleteZoomCloudRecording } from "@/server/zoom/cloud-recordings";
 import { audit } from "./audit";
 import { notifyRecordingReady } from "./live";
 
@@ -175,9 +177,18 @@ export async function deleteExpiredRecordings(now = new Date()): Promise<number>
       // A Zoom file being copied right now is left to finish; the next run deletes it.
       NOT: { source: "ZOOM", status: "IMPORTING" },
     },
-    select: { id: true, lessonId: true, objectKey: true, uploadId: true },
+    select: { id: true, lessonId: true, objectKey: true, uploadId: true, source: true, providerMeetingUuid: true },
     take: CLEANUP_BATCH,
   });
+  // Zoom's own cloud copy goes too (every file of that class, not only the one we imported), so
+  // the plan's cloud space doesn't fill up. If Zoom refuses, our copy is still deleted; it's logged.
+  if (zoomLive) {
+    const meetings = new Set(expired.filter((r) => r.source === "ZOOM" && r.providerMeetingUuid).map((r) => r.providerMeetingUuid!));
+    for (const uuid of meetings) {
+      const lessonId = expired.find((r) => r.providerMeetingUuid === uuid)!.lessonId;
+      if (await deleteZoomCloudRecording(uuid)) await audit(null, "recording.zoom_cloud_delete", "lesson", lessonId, { meetingUuid: uuid });
+    }
+  }
   for (const recording of expired) {
     if (recording.objectKey && recording.uploadId) await abortMultipart(recording.objectKey, recording.uploadId).catch(() => undefined);
     // The row goes first: a file left behind is only wasted space, a row without its file is broken.

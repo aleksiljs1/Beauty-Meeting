@@ -22,10 +22,14 @@ vi.hoisted(() => {
 // --- Fake Zoom: OAuth, the recordings list, and file downloads (storage stays the real local one) ---
 /** A small "MP4": the ftyp box the import checks for, then filler. */
 const VIDEO = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from("ftypmp42"), Buffer.alloc(200_000, 1)]);
-const zoom = { failDownloads: 0, downloads: 0, linkLookups: 0, listed: [] as unknown[] };
+const zoom = { failDownloads: 0, downloads: 0, linkLookups: 0, listed: [] as unknown[], deleted: [] as string[] };
 
-vi.stubGlobal("fetch", async (input: string | URL) => {
+vi.stubGlobal("fetch", async (input: string | URL, init?: RequestInit) => {
   const url = new URL(String(input));
+  if (init?.method === "DELETE") {
+    zoom.deleted.push(`${url.pathname}${url.search}`);
+    return new Response(null, { status: 204 });
+  }
   if (url.hostname === "zoom.us" && url.pathname === "/oauth/token") return Response.json({ access_token: "s2s-token", expires_in: 3600 });
   if (url.pathname.startsWith("/rec/download/")) {
     zoom.downloads++;
@@ -51,6 +55,7 @@ const { handleZoomWebhook } = await import("./webhooks");
 const { importNextZoomRecording, catchUpMissedRecordings } = await import("./recording-import");
 const { getLessonAttendance } = await import("@/server/services/attendance");
 const { markLessonEnded } = await import("@/server/services/live");
+const { deleteExpiredRecordings } = await import("@/server/services/recordings");
 
 afterAll(() => vi.unstubAllGlobals());
 
@@ -194,6 +199,19 @@ describe("Zoom cloud recordings into Regjistrimet", () => {
     });
     zoom.listed = [{ id: Number(MEETING), uuid: "abc==", recording_files: [recordingFile("f-late", "active_speaker", minutesAgo(180), minutesAgo(60))] }];
     expect(await catchUpMissedRecordings()).toBe(1);
+  });
+
+  it("deletes Zoom's cloud copy of the whole class too, once the lesson has expired", async () => {
+    await webhook(recordingCompleted());
+    await importNextZoomRecording();
+    zoom.deleted = [];
+    expect(await deleteExpiredRecordings()).toBe(0); // still open: nothing goes
+
+    await prisma.lesson.update({ where: { id: lessonId }, data: { accessExpiresAt: new Date(Date.now() - 2 * 24 * 60 * 60_000) } });
+    expect(await deleteExpiredRecordings()).toBe(1);
+    expect(zoom.deleted).toEqual(["/v2/meetings/abc%3D%3D/recordings?action=delete"]);
+    expect(await prisma.recording.count({ where: { lessonId } })).toBe(0);
+    expect(await prisma.auditLog.count({ where: { action: "recording.zoom_cloud_delete", targetId: lessonId } })).toBe(1);
   });
 
   it("never brings back a recording the admin deleted", async () => {
