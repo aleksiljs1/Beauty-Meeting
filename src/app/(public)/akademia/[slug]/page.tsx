@@ -7,16 +7,9 @@ import { CourseMeta } from "@/components/public/course-card";
 import { Container, Eyebrow, LinkButton } from "@/components/public/primitives";
 import { publicSite } from "@/i18n/public";
 import { paragraphs } from "@/lib/public-content";
-import { getPublicCourse, getPublicCourses, getPublicSettings } from "@/server/queries/public";
+import { getPublicCourse, getPublicSettings } from "@/server/queries/public";
 
 const t = publicSite.academy;
-
-// Public courses are prerendered; a course published later renders on first visit and is
-// cached (dynamicParams defaults to true). Admin changes revalidate both.
-export async function generateStaticParams() {
-  const courses = await getPublicCourses();
-  return courses.map((course) => ({ slug: course.slug }));
-}
 
 export async function generateMetadata({ params }: PageProps<"/akademia/[slug]">): Promise<Metadata> {
   const course = await getPublicCourse((await params).slug);

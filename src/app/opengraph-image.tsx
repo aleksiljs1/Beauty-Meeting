@@ -3,6 +3,11 @@ import { publicSite } from "@/i18n/public";
 import { SHOW_BRAND_NAME } from "@/lib/brand";
 import { getPublicSettings } from "@/server/queries/public";
 
+// Rendered when visited, not at build time: the build (Railway) can't reach the database, which
+// may also be empty until the pre-deploy migration runs. The data itself stays cached
+// (unstable_cache in queries/public.ts, expired by admin edits), so pages are still fast.
+export const dynamic = "force-dynamic";
+
 // Default social preview for every page. Colors follow globals.css (dark background, gold accent).
 export const alt = "Sallon bukurie dhe akademi estetike";
 export const size = { width: 1200, height: 630 };

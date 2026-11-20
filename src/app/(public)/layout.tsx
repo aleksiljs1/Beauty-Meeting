@@ -6,6 +6,11 @@ import { WhatsAppButton } from "@/components/public/whatsapp-button";
 import { publicSite } from "@/i18n/public";
 import { getPublicSettings } from "@/server/queries/public";
 
+// Rendered when visited, not at build time: the build (Railway) can't reach the database, which
+// may also be empty until the pre-deploy migration runs. The data itself stays cached
+// (unstable_cache in queries/public.ts, expired by admin edits), so pages are still fast.
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getPublicSettings();
   return {

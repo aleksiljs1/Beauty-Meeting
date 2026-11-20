@@ -2,6 +2,11 @@ import type { MetadataRoute } from "next";
 import { siteUrl } from "@/lib/site-url";
 import { getPublicCourses } from "@/server/queries/public";
 
+// Rendered when visited, not at build time: the build (Railway) can't reach the database, which
+// may also be empty until the pre-deploy migration runs. The data itself stays cached
+// (unstable_cache in queries/public.ts, expired by admin edits), so pages are still fast.
+export const dynamic = "force-dynamic";
+
 type Entry = MetadataRoute.Sitemap[number];
 
 const STATIC_PAGES: Array<{ path: string; changeFrequency: Entry["changeFrequency"]; priority: number }> = [
