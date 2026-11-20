@@ -693,7 +693,8 @@ Files on **Cloudflare R2**. Zoom Pro. (Replaces the earlier Vercel + Neon quote.
 ### 2. Railway services
 **web** (repo root): build `npm run build`, start `npm run start`, **pre-deploy `npx prisma migrate deploy`**
 (dev dependencies must not be pruned: prisma is one), healthcheck `/api/health`, Node 22.
-**realtime** (same repo): start `npx tsx src/realtime/main.mts`, healthcheck `/health`, **1 replica only**
+**realtime** (same repo): build `npx prisma generate`, start `sh -c "NODE_ENV=production npx tsx src/realtime/main.mts"`,
+healthcheck `/health`, `PORT=3100` (domain targets 3100), **1 replica only**
 (per-user socket caps are per process), `NODE_ENV=production`, `APP_URL`, `DATABASE_URL` (private URL; LISTEN
 needs a direct connection, not a pooler). It listens on Railway's `PORT`.
 **Postgres**: Railway plugin; Pro has backups, so turn them on and try one restore.
@@ -728,4 +729,8 @@ Changing APP_URL, S3_* or the realtime domain = update both services and **rebui
   /kushtet and /privatesia indexable.
 - Credit: "Mundësuar nga Cilicom" (link cilicom.net) at the bottom of the public footer; authors/creator metadata and
   `public/humans.txt` name Cilicom.
-- Not verified yet: `npm run build` (killed for low memory on the dev PC); Railway's first build will be the check.
+- Public pages, sitemap and OG image are `force-dynamic`: the Railway build can't reach the database.
+- **Never set NODE_ENV as a Railway variable**: the install would skip devDependencies (prisma, tailwind, tsx).
+  Next sets it itself; realtime gets it in its start command.
+- Live 2026-11-20: project "easygoing-elegance" (EU West, Hobby), services Beauty-Meeting (web, PORT=3000),
+  realtime, Postgres. Custom domain www.akademiacem.com added in Railway (DNS at Namecheap).
